@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nordvarr\Http\Client;
 
+use CurlHandle;
+
 /**
  * HTTP klient nad curl s limitem velikosti odpovědi a přesměrování.
  */
@@ -17,18 +19,38 @@ final class CurlHttpClient implements HttpClient
 
     public function get(string $url, int $timeoutS): HttpResponse
     {
-        $body = '';
-        $handle = curl_init($url);
-        curl_setopt_array($handle, [
+        return $this->request($url, $timeoutS, [
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 5,
+            CURLOPT_HTTPHEADER => ['Accept: application/rdap+json, application/json'],
+        ]);
+    }
+
+    public function post(string $url, string $body, array $headers, int $timeoutS): HttpResponse
+    {
+        // POST nesleduje přesměrování, aby se tělo s podpisem neposílalo jinam.
+        return $this->request($url, $timeoutS, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_FOLLOWLOCATION => false,
+        ]);
+    }
+
+    /**
+     * @param array<int, mixed> $options
+     */
+    private function request(string $url, int $timeoutS, array $options): HttpResponse
+    {
+        $body = '';
+        $handle = curl_init($url);
+        curl_setopt_array($handle, $options + [
             CURLOPT_PROTOCOLS_STR => 'http,https',
             CURLOPT_REDIR_PROTOCOLS_STR => 'http,https',
             CURLOPT_TIMEOUT => max(1, $timeoutS),
             CURLOPT_USERAGENT => $this->userAgent,
-            CURLOPT_HTTPHEADER => ['Accept: application/rdap+json, application/json'],
             CURLOPT_ENCODING => '',
-            CURLOPT_WRITEFUNCTION => static function ($h, string $chunk) use (&$body): int {
+            CURLOPT_WRITEFUNCTION => static function (CurlHandle $h, string $chunk) use (&$body): int {
                 if (strlen($body) + strlen($chunk) > self::MAX_BODY) {
                     return 0;
                 }
