@@ -40,6 +40,10 @@ final class TypographyTest extends TestCase
             $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $dir, \FilesystemIterator::SKIP_DOTS));
             foreach ($it as $file) {
                 /** @var \SplFileInfo $file */
+                // Knihovny třetích stran se převzaly beze změn, pravidlo platí jen pro vlastní soubory.
+                if (str_contains($file->getPathname(), '/assets/vendor/') && $file->getFilename() !== 'VERSIONS.md') {
+                    continue;
+                }
                 if (preg_match('/\.(php|md|sql|js|css|sh)$/', $file->getFilename()) === 1) {
                     yield substr($file->getPathname(), strlen($root) + 1) => [$file->getPathname()];
                 }
