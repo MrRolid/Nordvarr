@@ -7,6 +7,7 @@ namespace Nordvarr\Checks;
 use Nordvarr\Alerts\MaintenanceState;
 use Nordvarr\Alerts\Notifier;
 use Nordvarr\Repository\DeliveryRepository;
+use Nordvarr\Repository\LoginAttemptRepository;
 use Nordvarr\Repository\SettingsRepository;
 use Nordvarr\Time;
 use PDO;
@@ -110,6 +111,8 @@ final class Worker
         $this->service->results->purgeResults(Time::toDb($now->modify('-' . self::RESULTS_RETENTION_DAYS . ' days')));
         $this->service->results->purgeHourly($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')->format('Y-m-d\TH:00:00\Z'));
         (new DeliveryRepository($this->pdo))->purgeOlderThan(Time::toDb($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')));
+        // Omezení přihlašování pracuje s poslední hodinou; starší pokusy jen zabírají místo.
+        (new LoginAttemptRepository($this->pdo))->purgeOlderThan($now->modify('-2 days'));
         $this->settings->set('maintenance_hour', $hour);
 
         return true;

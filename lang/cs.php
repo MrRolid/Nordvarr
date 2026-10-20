@@ -38,6 +38,7 @@ return [
 
     'error.title' => 'Chyba',
     'error.csrf' => 'Platnost formuláře vypršela. Načtěte stránku znovu a akci zopakujte.',
+    'error.too_large' => 'Odeslaný soubor je příliš velký (limit serveru post_max_size nebo upload_max_filesize).',
     'error.not_found' => 'Stránka nebyla nalezena.',
     'error.method_not_allowed' => 'Tato metoda není pro danou adresu povolena.',
     'error.bearer_rejected' => 'Webové rozhraní nepřijímá API tokeny. Použijte adresy /api/v1/.',

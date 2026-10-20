@@ -37,6 +37,7 @@ return [
 
     'error.title' => 'Error',
     'error.csrf' => 'The form has expired. Reload the page and try again.',
+    'error.too_large' => 'The uploaded file is too large (server limit post_max_size or upload_max_filesize).',
     'error.not_found' => 'Page not found.',
     'error.method_not_allowed' => 'This method is not allowed for this address.',
     'error.bearer_rejected' => 'The web interface does not accept API tokens. Use the /api/v1/ endpoints.',

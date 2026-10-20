@@ -10,6 +10,8 @@ namespace Nordvarr\Security;
 final class Passwords
 {
     public const MIN_LENGTH = 10;
+    /** Delší vstup se ani neověřuje (Argon2 nad megabajty dat by zbytečně pálil procesor). */
+    public const MAX_BYTES = 4096;
 
     public static function algorithm(): string
     {
@@ -23,6 +25,10 @@ final class Passwords
 
     public static function verify(string $password, string $hash): bool
     {
+        if (strlen($password) > self::MAX_BYTES) {
+            return false;
+        }
+
         return password_verify($password, $hash);
     }
 

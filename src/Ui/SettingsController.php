@@ -95,7 +95,7 @@ final class SettingsController
             return $this->index(['passwordError' => 'err.password_current'], 422);
         }
         $new = $r->input('new_password');
-        if (mb_strlen($new) < Passwords::MIN_LENGTH) {
+        if (mb_strlen($new) < Passwords::MIN_LENGTH || strlen($new) > Passwords::MAX_BYTES) {
             return $this->index(['passwordError' => 'err.password_short'], 422);
         }
         if ($new !== $r->input('new_password_confirm')) {
@@ -245,6 +245,12 @@ final class SettingsController
         }
         $backup = $backupDir . '/nordvarr-' . gmdate('Ymd-His') . '-pred-importem-' . bin2hex(random_bytes(3)) . '.sqlite';
         (new Migrator($this->ctx->pdo, $this->appRoot . '/migrations'))->backup($backup);
+        // Ponechá se posledních 10 záloh před importem.
+        $old = glob($backupDir . '/nordvarr-*-pred-importem-*.sqlite') ?: [];
+        sort($old);
+        foreach (array_slice($old, 0, max(0, count($old) - 10)) as $file) {
+            @unlink($file);
+        }
 
         try {
             $counts = (new Transfer(new Inventory($this->ctx->pdo)))->import($data);

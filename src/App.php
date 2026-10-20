@@ -62,6 +62,10 @@ final class App
 
         if ($request->method === 'POST' && !$csrf->isValid($request->post[Csrf::FIELD] ?? null)) {
             $view = new View($this->appRoot . '/templates', $i18n, $urls, $csrf->token(), $timezone);
+            // PHP zahodí celé tělo nad post_max_size; místo matoucí chyby CSRF řekne, že je soubor velký.
+            if ($request->post === [] && $request->files === [] && (int) $request->header('Content-Length') > 0) {
+                return $this->error($view, 413, 'error.too_large');
+            }
 
             return $this->error($view, 403, 'error.csrf');
         }
