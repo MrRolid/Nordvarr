@@ -50,6 +50,61 @@ final class FixtureServers
      */
     public function tls(int $validDays): int
     {
+        [$certFile, $keyFile] = $this->certificate($validDays);
+        $port = self::freePort();
+        $this->start([PHP_BINARY, __DIR__ . '/fixtures/tls-server.php', (string) $port, $certFile, $keyFile]);
+        $this->waitForPort($port);
+
+        return $port;
+    }
+
+    /**
+     * Spustí pomalý HTTP server, který obslouží všechna spojení současně (test paralelismu).
+     */
+    public function slowHttp(int $delayMs): string
+    {
+        $port = self::freePort();
+        $this->start([PHP_BINARY, __DIR__ . '/fixtures/slow-server.php', (string) $port, (string) $delayMs]);
+        $this->waitForPort($port);
+
+        return 'http://127.0.0.1:' . $port;
+    }
+
+    /**
+     * Spustí falešný SMTP server. Vrací port; zprávy se ukládají do $dir.
+     *
+     * @param array<string, mixed> $options viz tests/fixtures/smtp-server.php
+     */
+    public function smtp(string $dir, array $options = [], bool $tls = false): int
+    {
+        $port = self::freePort();
+        if ($tls) {
+            [$cert, $key] = $this->certificate(90);
+            $options += ['cert' => $cert, 'key' => $key];
+        }
+        $this->start([PHP_BINARY, __DIR__ . '/fixtures/smtp-server.php', json_encode(['port' => $port, 'dir' => $dir] + $options, JSON_THROW_ON_ERROR)]);
+        $this->waitForPort($port, (string) ($options['bind'] ?? '127.0.0.1'));
+
+        return $port;
+    }
+
+    /**
+     * Spustí mock endpoint pro Telegram a webhooky. Požadavky se ukládají do $dir.
+     */
+    public function mockEndpoint(string $dir): string
+    {
+        $port = self::freePort();
+        $this->start([PHP_BINARY, '-S', '127.0.0.1:' . $port, __DIR__ . '/fixtures/mock-endpoint.php'], ['NORDVARR_MOCK_DIR' => $dir, 'PHP_CLI_SERVER_WORKERS' => '4']);
+        $this->waitForPort($port);
+
+        return 'http://127.0.0.1:' . $port;
+    }
+
+    /**
+     * @return array{0: string, 1: string} certifikát a klíč (PEM soubory)
+     */
+    private function certificate(int $validDays): array
+    {
         $this->certDir ??= TempDir::create('nordvarr-certs-');
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         $csr = openssl_csr_new(['commonName' => 'localhost'], $key);
@@ -58,14 +113,10 @@ final class FixtureServers
             throw new RuntimeException('Testovací certifikát nelze vytvořit.');
         }
         $certFile = $this->certDir . '/cert-' . $validDays . '-' . bin2hex(random_bytes(3)) . '.pem';
-        $keyFile = $certFile . '.key';
         openssl_x509_export_to_file($cert, $certFile);
-        openssl_pkey_export_to_file($key, $keyFile);
-        $port = self::freePort();
-        $this->start([PHP_BINARY, __DIR__ . '/fixtures/tls-server.php', (string) $port, $certFile, $keyFile]);
-        $this->waitForPort($port);
+        openssl_pkey_export_to_file($key, $certFile . '.key');
 
-        return $port;
+        return [$certFile, $certFile . '.key'];
     }
 
     public function stop(): void
@@ -103,11 +154,11 @@ final class FixtureServers
         $this->processes[] = $process;
     }
 
-    private function waitForPort(int $port): void
+    private function waitForPort(int $port, string $host = '127.0.0.1'): void
     {
         $until = microtime(true) + 10;
         while (microtime(true) < $until) {
-            $socket = @stream_socket_client('tcp://127.0.0.1:' . $port, $errno, $error, 0.2);
+            $socket = @stream_socket_client('tcp://' . $host . ':' . $port, $errno, $error, 0.2);
             if ($socket !== false) {
                 fclose($socket);
 

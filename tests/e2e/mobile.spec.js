@@ -48,3 +48,11 @@ test('přehled je na mobilu bez vodorovného posuvníku', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('alerty jsou na mobilu bez vodorovného posuvníku', async ({ page }) => {
+  await loginOk(page);
+  await page.goto('/alerts');
+  await expect(page.getByTestId('alerts')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

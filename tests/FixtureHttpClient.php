@@ -14,6 +14,8 @@ final class FixtureHttpClient implements HttpClient
 {
     /** @var list<string> */
     public array $requests = [];
+    /** @var list<array{url: string, body: string, headers: list<string>}> */
+    public array $posts = [];
 
     /**
      * @param array<string, HttpResponse> $responses
@@ -30,6 +32,13 @@ final class FixtureHttpClient implements HttpClient
     public function get(string $url, int $timeoutS): HttpResponse
     {
         $this->requests[] = $url;
+
+        return $this->responses[$url] ?? new HttpResponse(0, '', 'Could not resolve host', true);
+    }
+
+    public function post(string $url, string $body, array $headers, int $timeoutS): HttpResponse
+    {
+        $this->posts[] = ['url' => $url, 'body' => $body, 'headers' => $headers];
 
         return $this->responses[$url] ?? new HttpResponse(0, '', 'Could not resolve host', true);
     }

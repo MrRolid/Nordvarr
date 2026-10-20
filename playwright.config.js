@@ -34,9 +34,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      name: 'alerty',
+      testMatch: /alerts\.spec\.js/,
+      dependencies: ['kontroly'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'mobil',
       testMatch: /mobile\.spec\.js/,
-      dependencies: ['kontroly'],
+      dependencies: ['alerty'],
       use: { ...devices['Pixel 7'] },
     },
   ],
