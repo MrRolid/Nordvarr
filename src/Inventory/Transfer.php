@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nordvarr\Inventory;
 
+use Nordvarr\Checks\CheckTypes;
+use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Security\SecretMasker;
 use Throwable;
 
@@ -85,6 +87,25 @@ final class Transfer
             'objects' => $inv->events->objectIds((string) $e['id']),
         ], $inv->events->all());
 
+        // Kontroly bez stavu a historie; token heartbeatu je tajný, po importu vznikne nový.
+        $checks = array_map(static fn (array $c): array => [
+            'id' => $c['id'],
+            'object_id' => $c['object_id'],
+            'type' => $c['type'],
+            'name' => $c['name'],
+            'config' => array_map(
+                static fn (mixed $v): mixed => is_string($v) ? SecretMasker::maskText($v) : $v,
+                $c['config']
+            ),
+            'interval_s' => (int) $c['interval_s'],
+            'timeout_s' => (int) $c['timeout_s'],
+            'failure_threshold' => (int) $c['failure_threshold'],
+            'enabled' => (bool) $c['enabled'],
+            'notify_on_degraded' => (bool) $c['notify_on_degraded'],
+            'created_at' => $c['created_at'],
+            'updated_at' => $c['updated_at'],
+        ], (new CheckRepository($inv->pdo))->all());
+
         return [
             'format' => self::FORMAT,
             'version' => self::VERSION,
@@ -92,6 +113,7 @@ final class Transfer
             'objects' => $objects,
             'relationships' => $relationships,
             'events' => $events,
+            'checks' => $checks,
         ];
     }
 
@@ -169,6 +191,19 @@ final class Transfer
                         'summary' => (string) $e['summary'],
                         'details' => (string) ($e['details'] ?? ''),
                     ], array_map('strval', $e['objects'] ?? []), (string) $e['id'], (string) $e['created_at']);
+                }
+
+                // Kontroly jsou v exportu od F2; starší export je nemá.
+                $checks = new CheckRepository($pdo);
+                foreach (is_array($data['checks'] ?? null) ? $data['checks'] : [] as $c) {
+                    $valid = CheckTypes::validate((string) $c['type'], [
+                        'name' => $c['name'] ?? '', 'interval_s' => $c['interval_s'] ?? null, 'timeout_s' => $c['timeout_s'] ?? null,
+                        'failure_threshold' => $c['failure_threshold'] ?? null,
+                    ] + (is_array($c['config'] ?? null) ? $c['config'] : []));
+                    if ($valid['errors'] !== []) {
+                        throw new ValidationException(['file' => 'invalid_content']);
+                    }
+                    $checks->restore($c);
                 }
 
                 return [
