@@ -1,8 +1,33 @@
 # Stav práce
 
-Aktualizováno: 2026-10-20
+Aktualizováno: 2026-10-21
 
 ## Hotové fáze
+
+### F3 Alerty a notifikace (větev `faze-3-alerty`, navazuje na `faze-2-kontroly`)
+
+- Migrace `0004_alerty.sql`: alerty (jeden otevřený na kontrolu), kanály a jejich pravidla, fronta odesílání s historií pokusů, údržbová okna.
+- Alerty: otevření při `unhealthy` (u `degraded` jen s `notify_on_degraded`), uzavření a notifikace o obnovení při návratu do `healthy`, připomínky (výchozí 24 h, 0 = vypnuto).
+- Potlačení o jeden krok (`depends_on` před `contains`, pak dřív otevřený alert, pak menší id; cykly nevadí). U potlačeného alertu je vidět pravděpodobná příčina: seznam alertů, detail alertu, hlavička objektu, přehled.
+- Údržbová okna (objekt nebo tag, volitelně s pozastavením kontrol). Během okna se nic neposílá, po jeho konci odejde za každý stále otevřený alert nejvýš jedna notifikace.
+- Kanály se společným rozhraním `Nordvarr\Notify\Channel`:
+  - e-mail: vlastní SMTP klient se SSL/STARTTLS, AUTH LOGIN/PLAIN, primární a záložní server,
+  - Telegram,
+  - webhook s `X-Nordvarr-Signature` (HMAC-SHA256),
+  - pravidla podle tagů, tajné údaje zašifrované, tlačítko "Odeslat test".
+- Fronta `deliveries` s opakováním po 1, 5, 15 a 60 minutách, potom `failed`; historie pokusů v UI.
+- UI:
+  - stránka Alerty (filtr, detail s doručeními, údržbová okna, odeslané notifikace),
+  - nastavení kanálů a notifikací (připomínky, adresa aplikace, jazyk notifikací).
+- Worker po kontrolách vyhodnotí alerty a odešle frontu (v rámci limitu 50 s).
+
+Ověření:
+
+- logika alertů (otevření, obnovení, degraded, potlačení přes závislost i obsažení, jen o jeden krok, pořadí kandidátů, cykly, údržba, připomínky, pravidla kanálů, opakování doručení, smazaná a vypnutá kontrola): `AlertEngineTest`,
+- e-mail proti lokálnímu falešnému SMTP serveru (STARTTLS + AUTH PLAIN, implicitní TLS + AUTH LOGIN, ověření certifikátu, záložní server, oba servery nedostupné, odmítnutý příjemce, zákaz přihlášení bez šifrování), Telegram a webhook proti lokálnímu mock endpointu: `ChannelsTest`,
+- UI kanálů, testovací odeslání, údržbová okna, stránka alertů a nastavení: `AlertsUiTest`; celý řetězec worker -> alert -> e-mail přes CLI: `CliTest`,
+- e2e `alerts.spec.js`: webhook kanál s testem a ověřením podpisu, výpadek databáze (notifikace jen o databázi, web s pravděpodobnou příčinou), údržbové okno,
+- testy zelené: `composer test` (375 testů), `npm run e2e` (20 testů).
 
 ### F2 Kontroly (větev `faze-2-kontroly`, navazuje na `faze-1-inventar`)
 
@@ -90,7 +115,10 @@ Nic.
 - Souhrn za 24 h v detailu kontroly se počítá z hodinových agregací, aktuální hodina se v něm objeví až po hodinové údržbě workeru.
 - Kontrola `tls_expiry` podporuje jen přímé TLS (např. 443, 465, 993), ne STARTTLS.
 - Chyba DNS u kontrol přes curl není pokrytá automatickým testem (vyžadovala by skutečný DNS dotaz).
+- Alerty se vyhodnocují při běhu workeru, takže signál heartbeatu nebo ruční změna se do alertů a notifikací promítne nejpozději do minuty.
+- Skutečné odeslání přes veřejné SMTP servery, Telegram a cizí webhooky se netestovalo (jen lokální falešné servery); na produkci doporučuji po nastavení kanálu použít "Odeslat test".
+- Změna `app_secret` v `config.php` znemožní dešifrovat tajné údaje kanálů, je pak potřeba je zadat znovu.
 
 ## Další krok
 
-F3 Alerty a notifikace: alerty, fronta odesílání, e-mail (testy proti lokálnímu falešnému SMTP serveru), Telegram a webhook (lokální mock endpoint), údržbová okna, potlačení o jeden krok, připomínky, testovací odeslání.
+F4 Topologie a diagnostická karta: Cytoscape graf (okolí objektu, filtrový režim), hlavička diagnózy, obnovování přes ETag. Akceptace: Playwright scénář "spadne databáze -> web je unhealthy, notifikace webu je potlačena, karta webu ukazuje databázi jako pravděpodobnou příčinu a poslední deploy v okolí".
