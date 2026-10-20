@@ -15,6 +15,7 @@ final class Request
      * @param array<string, mixed> $post
      * @param array<string, string> $cookies
      * @param array<string, string> $headers klíče malými písmeny
+     * @param array<string, mixed> $files nahrané soubory ve tvaru $_FILES
      */
     public function __construct(
         public readonly string $method,
@@ -27,10 +28,15 @@ final class Request
         public readonly bool $prettyUrls = false,
         public readonly bool $https = false,
         public readonly string $ip = '',
+        public readonly string $body = '',
+        public readonly array $files = [],
     ) {
     }
 
-    public static function fromGlobals(): self
+    /**
+     * @param int $maxBody kolik bajtů těla načíst (0 = nenačítat); načte se o bajt víc, aby šlo poznat překročení
+     */
+    public static function fromGlobals(int $maxBody = 0): self
     {
         $server = $_SERVER;
         $basePath = rtrim(str_replace('\\', '/', dirname((string) ($server['SCRIPT_NAME'] ?? '/index.php'))), '/');
@@ -72,6 +78,8 @@ final class Request
             $pretty,
             $https,
             (string) ($server['REMOTE_ADDR'] ?? ''),
+            $maxBody > 0 ? (string) file_get_contents('php://input', false, null, 0, $maxBody + 1) : '',
+            $_FILES,
         );
     }
 
@@ -80,6 +88,11 @@ final class Request
         $path = '/' . trim($path, '/');
 
         return preg_replace('#/+#', '/', $path) ?? '/';
+    }
+
+    public function isApi(): bool
+    {
+        return $this->path === '/api' || str_starts_with($this->path, '/api/');
     }
 
     public function header(string $name): ?string
@@ -92,6 +105,19 @@ final class Request
         $value = $this->post[$key] ?? $default;
 
         return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * Cesta k dočasnému souboru úspěšně nahraného souboru, nebo null.
+     */
+    public function uploadedFile(string $field): ?string
+    {
+        $file = $this->files[$field] ?? null;
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_string($file['tmp_name'] ?? null)) {
+            return null;
+        }
+
+        return $file['tmp_name'];
     }
 
     public function queryString(string $key, string $default = ''): string

@@ -12,7 +12,7 @@ use Throwable;
  */
 final class ErrorPage
 {
-    public static function fromException(Throwable $e, ?Config $config): Response
+    public static function fromException(Throwable $e, ?Config $config, bool $json = false): Response
     {
         if ($config !== null) {
             $logDir = $config->dataDir() . '/logs';
@@ -30,6 +30,10 @@ final class ErrorPage
             }
         } else {
             error_log('Nordvarr: ' . $e->getMessage());
+        }
+
+        if ($json) {
+            return new Response('{"error":"internal_error"}', 500, ['Content-Type' => 'application/json; charset=utf-8']);
         }
 
         $body = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>Nordvarr - chyba</title></head>'
