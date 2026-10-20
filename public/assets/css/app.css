@@ -14,6 +14,20 @@
     --warn-bg: #fff4d6;
     --warn-text: #7a5300;
     --nav-height: 64px;
+    --st-healthy: #2f9e5b;
+    --st-degraded: #d99a14;
+    --st-unhealthy: #d64545;
+    --st-unknown: #8a93a3;
+    --st-paused: #a3abb8;
+    --map-bg: #eef2f7;
+    --map-dot: #d5dce7;
+    --map-node: #ffffff;
+    --map-node-ring: #c3cbd8;
+    --map-text: #1d2330;
+    --map-muted: #5d6677;
+    --map-edge: #9aa5b6;
+    --map-causal: #e0672a;
+    --map-center: #1f5fa8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,6 +45,20 @@
         --ok-text: #a8dcb4;
         --warn-bg: #3a3014;
         --warn-text: #f0d48a;
+        --st-healthy: #3fbf6f;
+        --st-degraded: #e8b131;
+        --st-unhealthy: #ef5a5a;
+        --st-unknown: #7b8597;
+        --st-paused: #5d6677;
+        --map-bg: #0f131a;
+        --map-dot: #1c232f;
+        --map-node: #161c26;
+        --map-node-ring: #3a4454;
+        --map-text: #e6e9ef;
+        --map-muted: #8f99aa;
+        --map-edge: #4f5b6e;
+        --map-causal: #f08a3c;
+        --map-center: #6aa5ec;
     }
 }
 
@@ -359,6 +387,139 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 .delivery-failed { background: var(--danger-bg); color: var(--danger-text); border-color: transparent; }
 .delivery-pending { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
 input[type="radio"] { margin: 0; }
+
+/* Diagnostická karta objektu */
+.diag {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    margin: .75rem 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+/* Mřížka čar: každá buňka kreslí pravý a spodní okraj, krajní okraje ořízne overflow. */
+.diag-cell { padding: .6rem .8rem; min-width: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 0 -1px -1px 0; }
+.diag-cell dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .3rem; }
+.diag-cell dd { margin: 0; display: flex; flex-wrap: wrap; gap: .3rem .5rem; align-items: center; overflow-wrap: anywhere; }
+.diag-state { grid-column: 1 / -1; }
+.diag-wide { grid-column: span 2; }
+.diag .dep { display: flex; width: 100%; margin: 0; flex-wrap: wrap; }
+.diag .dep-kind { white-space: nowrap; color: var(--muted); }
+@media (max-width: 720px) { .diag-wide { grid-column: auto; } }
+.diag-detail { flex-basis: 100%; }
+
+/* Topologie */
+/* Stránka s mapou využije celou šířku okna. */
+.content:has(> .topo) { max-width: none; }
+/* Cytoscape by jinak pravidlo vložil jako inline styl, který CSP blokuje (viz topology.php). */
+.__________cytoscape_container { position: relative; }
+.topo-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1rem; margin-bottom: .75rem; }
+.topo-head h1 { margin: 0; }
+.topo-sub { font-size: 1rem; font-weight: 400; color: var(--muted); }
+.topo-counts { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin: 0; padding: 0; }
+.topo-counts li { display: inline-flex; gap: .3rem; align-items: center; }
+.topo-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr) 360px; gap: .75rem; align-items: start; }
+.topo-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .8rem;
+    min-width: 0;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+}
+.topo-form { display: flex; flex-direction: column; gap: .35rem; font-size: .9rem; }
+.topo-form select { max-width: none; padding: .35rem .5rem; }
+.topo-form label { font-weight: 600; }
+.topo-form button { margin-top: .4rem; }
+.topo-fields { display: flex; flex-direction: column; gap: .35rem; }
+.seg { display: flex; gap: .75rem; flex-wrap: wrap; }
+.seg label { font-weight: 400; display: inline-flex; gap: .3rem; align-items: center; }
+.topo-h { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 1rem 0 .4rem; }
+.node-list { list-style: none; margin: 0; padding: 0; }
+.node-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: .5rem;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    padding: .35rem .4rem;
+    font-size: .85rem;
+}
+.node-item:hover, .node-item.active { background: var(--bg); }
+.node-item .dot { grid-row: 1 / span 2; align-self: center; }
+.node-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-meta { color: var(--muted); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: .65rem; height: .65rem; border-radius: 50%; display: inline-block; flex: none; background: var(--st-unknown); }
+.dot-healthy { background: var(--st-healthy); }
+.dot-degraded { background: var(--st-degraded); }
+.dot-unhealthy { background: var(--st-unhealthy); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-unhealthy) 25%, transparent); }
+.dot-paused { background: transparent; border: 2px dashed var(--st-paused); }
+.dot-none { background: transparent; border: 2px solid var(--st-unknown); }
+
+.topo-map {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: var(--map-bg);
+    background-image: radial-gradient(var(--map-dot) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+.cy.pointer { cursor: pointer; }
+.cy { width: 100%; height: calc(100vh - 150px); min-height: 520px; }
+.topo-empty { padding: 3rem 1.5rem; text-align: center; color: var(--map-muted); min-height: 300px; }
+.topo-legend {
+    position: absolute;
+    left: .6rem;
+    bottom: .6rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem .9rem;
+    font-size: .75rem;
+    color: var(--map-muted);
+    background: color-mix(in srgb, var(--map-bg) 85%, transparent);
+    padding: .3rem .5rem;
+    border-radius: 6px;
+}
+.topo-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+.leg-line { width: 22px; border-top: 2px solid var(--map-edge); display: inline-block; }
+.leg-line.dashed { border-top-style: dashed; }
+.leg-line.causal { border-top: 3px solid var(--map-causal); }
+.leg-ring { width: 12px; height: 12px; border-radius: 50%; border: 3px solid var(--st-healthy); border-right-color: var(--st-unhealthy); display: inline-block; }
+.topo-tools { position: absolute; right: .6rem; top: .6rem; }
+
+.np { display: flex; flex-direction: column; gap: .45rem; font-size: .9rem; }
+.np.stale { opacity: .6; }
+.np-head h2 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.np-h { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: .7rem 0 .1rem; }
+.np-cause { margin: 0; color: var(--map-causal); font-weight: 600; }
+.np-cause a { color: inherit; }
+.np-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+.np-list li { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; min-width: 0; }
+.np-val { margin-left: auto; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.np-at { flex-basis: 100%; }
+.np-list li.np-event { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: .45rem; align-items: baseline; }
+.np-event .np-at { grid-column: 2 / -1; }
+.np-docs { max-height: 22rem; overflow-y: auto; border-top: 1px solid var(--border); padding-top: .4rem; font-size: .85rem; }
+.np-docs h3, .np-docs h4 { font-size: .95rem; }
+
+@media (max-width: 1180px) {
+    .topo-grid { grid-template-columns: 240px minmax(0, 1fr); }
+    .topo-right { grid-column: 1 / -1; max-height: none; }
+}
+@media (max-width: 720px) {
+    .topo-grid { grid-template-columns: minmax(0, 1fr); }
+    .topo-panel { max-height: none; }
+    .topo-left { order: 2; }
+    .topo-map { order: 1; }
+    .topo-right { order: 3; }
+    .cy { height: 65vh; min-height: 380px; }
+    .node-list { max-height: 18rem; overflow-y: auto; }
+}
 
 /* Mobil: hlavní navigace jako spodní lišta v dosahu palce. */
 @media (max-width: 720px) {

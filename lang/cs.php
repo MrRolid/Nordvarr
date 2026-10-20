@@ -33,7 +33,6 @@ return [
     'dashboard.title' => 'Přehled',
     
 
-    'placeholder.text' => 'Tato část bude doplněna ve fázi {phase}.',
 
     'migrations.done' => 'Databáze byla aktualizována (migrace {versions}). Záloha před migrací: {backup}',
 
@@ -517,4 +516,37 @@ return [
     'err.invalid_channel_type' => 'Neplatný typ kanálu.',
     'err.invalid_channel_name' => 'Název je povinný (max. 100 znaků).',
     'err.invalid_security' => 'Neplatné zabezpečení.',
+
+    'time.under_min' => 'méně než minuta',
+
+    'topology.show' => 'Zobrazit v topologii',
+    'topology.around' => 'okolí: {name}',
+    'topology.mode' => 'Režim zobrazení',
+    'topology.mode_neighborhood' => 'Okolí objektu',
+    'topology.mode_filter' => 'Podle filtru',
+    'topology.center' => 'Objekt',
+    'topology.depth' => 'Hloubka',
+    'topology.depth_1' => '1 krok',
+    'topology.depth_2' => '2 kroky',
+    'topology.show_view' => 'Zobrazit',
+    'topology.in_view' => 'V zobrazení ({count})',
+    'topology.graph' => 'Graf objektů a vztahů',
+    'topology.too_many' => 'Filtru odpovídá {count} objektů, graf jich zobrazí nejvýš {max}. Zužte výběr podle typu, štítku nebo stavu.',
+    'topology.empty' => 'V tomto zobrazení nejsou žádné objekty.',
+    'topology.causal' => 'cesta k pravděpodobné příčině',
+    'topology.ring' => 'prstenec: stav kontrol',
+    'topology.fit' => 'Celý graf',
+    'topology.pick_node' => 'Klikněte na uzel v grafu nebo v seznamu. Dvojklik otevře kartu objektu.',
+    'topology.open_card' => 'Otevřít kartu',
+    'topology.recenter' => 'Okolí tohoto objektu',
+    'topology.incidents' => 'Incidenty za 90 dní ({count})',
+    'topology.changes' => 'Poslední změny',
+
+    'diag.state' => 'Stav',
+    'diag.last_change' => 'Poslední změna (24 h, i v okolí)',
+    'diag.no_change' => 'Za 24 h žádná změna.',
+    'diag.alerts_90' => 'Alerty za 90 dní',
+    'diag.incidents' => 'Historie incidentů (90 dní)',
+    'diag.no_incidents' => 'Za 90 dní žádný incident.',
+    'diag.duration' => 'Trvání',
 ];

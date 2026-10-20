@@ -7,6 +7,7 @@ namespace Nordvarr\Checks;
 use DateTimeImmutable;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\CheckResultRepository;
+use Nordvarr\Repository\SettingsRepository;
 use Nordvarr\Time;
 use PDO;
 
@@ -82,11 +83,22 @@ final class CheckService
         }
         $at = Time::toDb($now);
         $detail = isset($check['last_ping_at']) && $check['last_ping_at'] !== null
-            ? 'poslední signál ' . $check['last_ping_at']
+            ? 'poslední signál ' . $this->localTime((string) $check['last_ping_at'])
             : 'signál zatím nepřišel';
         $this->checks->setNextRun((string) $check['id'], Time::toDb($now->modify('+' . (int) $check['interval_s'] . ' seconds')));
 
         return new CheckResult(Status::UNHEALTHY, Reason::HEARTBEAT_MISSED, $detail, null, $at, $at);
+    }
+
+    /**
+     * Čas pro text detailu v časové zóně z nastavení (detail se ukládá jako hotový text).
+     */
+    private function localTime(string $utc): string
+    {
+        $tz = (new SettingsRepository($this->pdo))->get('timezone', 'UTC') ?? 'UTC';
+        $zone = new \DateTimeZone(in_array($tz, timezone_identifiers_list(), true) ? $tz : 'UTC');
+
+        return Time::fromDb($utc)->setTimezone($zone)->format('j. n. Y H:i');
     }
 
     /**

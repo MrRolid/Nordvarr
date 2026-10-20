@@ -98,6 +98,19 @@ final class View
         };
     }
 
+    /**
+     * Délka mezi dvěma časy (do teď, když konec chybí), např. "3 min", "5 h", "2 d".
+     */
+    public function duration(string $fromUtc, ?string $toUtc): string
+    {
+        $end = $toUtc === null ? time() : (new DateTimeImmutable($toUtc, new DateTimeZone('UTC')))->getTimestamp();
+        if ($end - (new DateTimeImmutable($fromUtc, new DateTimeZone('UTC')))->getTimestamp() < 60) {
+            return $this->t('time.under_min');
+        }
+
+        return $this->ago($fromUtc, $end);
+    }
+
     public function raw(string $html): string
     {
         return $html;

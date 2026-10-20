@@ -65,6 +65,19 @@ final class AlertRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * Historie alertů objektu od daného času, nejnovější první.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function forObject(string $objectId, string $since, int $limit = 20): array
+    {
+        $stmt = $this->pdo->prepare(self::SELECT . ' WHERE a.object_id = ? AND a.opened_at >= ? ORDER BY a.opened_at DESC, a.id DESC LIMIT ' . max(1, $limit));
+        $stmt->execute([$objectId, $since]);
+
+        return $stmt->fetchAll();
+    }
+
     public function countForObject(string $objectId, string $since): int
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM alerts WHERE object_id = ? AND opened_at >= ?');
