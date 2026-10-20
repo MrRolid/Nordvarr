@@ -561,3 +561,7 @@ input[type="radio"] { margin: 0; }
 
     body.has-nav { padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Export pro LLM */
+.llm-tools { align-items: center; margin-bottom: .6rem; }
+.llm-text { width: 100%; min-height: 24rem; font-size: .82rem; line-height: 1.45; resize: vertical; white-space: pre; overflow: auto; }

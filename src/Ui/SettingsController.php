@@ -62,7 +62,7 @@ final class SettingsController
             'cronLine' => (new Installer($this->appRoot))->cronLine(),
             'newToken' => null,
             'tokenError' => null,
-            'tokenValues' => ['name' => '', 'source' => '', 'scopes' => ApiTokens::SCOPES],
+            'tokenValues' => ['name' => '', 'source' => '', 'scopes' => ['inventory:write', 'events:write']],
         ], $status);
     }
 
