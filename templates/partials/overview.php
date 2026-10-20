@@ -8,6 +8,8 @@
 /** @var string|null $workerLastRun */
 /** @var bool $workerStale */
 /** @var bool $hasChecks */
+/** @var array<string, true> $paused */
+/** @var array<string, array<string, mixed>> $openAlerts id kontroly => otevřený alert */
 $status = static fn (string $s): string => $v->render('partials/status', ['status' => $s]);
 ?>
 <?php if ($workerStale): ?>
@@ -34,11 +36,15 @@ $status = static fn (string $s): string => $v->render('partials/status', ['statu
     <ul class="incidents">
         <?php foreach ($failing as $c): ?>
         <li>
-            <?= $v->raw($status(\Nordvarr\Checks\ObjectStatus::checkStatus($c))) ?>
+            <?= $v->raw($status(\Nordvarr\Checks\ObjectStatus::checkStatus($c, $paused))) ?>
             <a href="<?= $v->url('/objects/' . $c['object_id']) ?>"><strong><?= $v->e($c['object_name']) ?></strong></a>
             <a href="<?= $v->url('/checks/' . $c['id']) ?>" class="muted"><?= $v->t('checktype.' . $c['type']) ?><?= (string) $c['name'] !== '' ? ' ' . $v->e($c['name']) : '' ?></a>:
             <code><?= $v->e($c['reason_code'] ?? '') ?></code>, <?= $v->ago((string) $c['since']) ?>
             <?php if ((string) $c['reason_detail'] !== ''): ?><span class="muted small-text">(<?= $v->e($c['reason_detail']) ?>)</span><?php endif; ?>
+            <?php $alert = $openAlerts[$c['id']] ?? null; ?>
+            <?php if ($alert !== null && $alert['probable_cause_object_id'] !== null): ?>
+            <br><span class="small-text" data-test="probable-cause"><?= $v->t('alert.cause') ?>: <a href="<?= $v->url('/objects/' . $alert['probable_cause_object_id']) ?>"><?= $v->e($alert['cause_name'] ?? '') ?></a></span>
+            <?php endif; ?>
         </li>
         <?php endforeach; ?>
     </ul>
@@ -74,7 +80,7 @@ $status = static fn (string $s): string => $v->render('partials/status', ['statu
         <?php foreach ($expiring as $c): ?>
         <?php $days = (int) floor((strtotime((string) $c['expires_at']) - time()) / 86400); ?>
         <li>
-            <?= $v->raw($status(\Nordvarr\Checks\ObjectStatus::checkStatus($c))) ?>
+            <?= $v->raw($status(\Nordvarr\Checks\ObjectStatus::checkStatus($c, $paused))) ?>
             <a href="<?= $v->url('/checks/' . $c['id']) ?>"><strong><?= $v->e(\Nordvarr\Checks\CheckTypes::target((string) $c['type'], $c['config'])) ?></strong></a>
             <span class="muted"><?= $v->t('checktype.' . $c['type']) ?>, <?= $v->e($c['object_name']) ?></span>:
             <?= $days < 0 ? $v->t('overview.expired') : $v->t('overview.expires_in', ['n' => $days]) ?> (<?= $v->time((string) $c['expires_at']) ?>)

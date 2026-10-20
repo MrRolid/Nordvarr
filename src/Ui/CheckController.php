@@ -227,7 +227,7 @@ final class CheckController
         return $this->ctx->page('check', [
             'title' => 'check.detail',
             'check' => $check,
-            'status' => ObjectStatus::checkStatus($check),
+            'status' => ObjectStatus::checkStatus($check, $this->ctx->pausedObjects()),
             'results' => $results->recent((string) $check['id'], 50),
             'hourly' => $results->hourly((string) $check['id'], Time::now()->modify('-48 hours')->format('Y-m-d\TH:00:00\Z')),
             'summary' => $results->summary((string) $check['id'], Time::now()->modify('-24 hours')->format('Y-m-d\TH:00:00\Z')),

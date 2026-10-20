@@ -47,9 +47,10 @@ final class InventoryController
             100000
         );
         $statuses = [];
-        $byObject = ObjectStatus::forObjects((new CheckRepository($this->ctx->pdo))->all());
+        $paused = $this->ctx->pausedObjects();
+        $byObject = ObjectStatus::forObjects((new CheckRepository($this->ctx->pdo))->all(), $paused);
         foreach ($objects as $object) {
-            $statuses[(string) $object['id']] = $object['lifecycle'] !== 'active'
+            $statuses[(string) $object['id']] = $object['lifecycle'] !== 'active' || isset($paused[(string) $object['id']])
                 ? ['status' => Status::PAUSED, 'check' => null]
                 : ($byObject[(string) $object['id']] ?? ['status' => Status::NONE, 'check' => null]);
         }

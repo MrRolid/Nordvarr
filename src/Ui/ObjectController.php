@@ -14,6 +14,7 @@ use Nordvarr\Http\Router;
 use Nordvarr\Inventory\Inventory;
 use Nordvarr\Inventory\ValidationException;
 use Nordvarr\Inventory\Vocabulary;
+use Nordvarr\Repository\AlertRepository;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\SettingsRepository;
 use Nordvarr\Time;
@@ -179,7 +180,10 @@ final class ObjectController
             'title' => 'object.detail',
             'object' => $object,
             'checks' => $checks,
-            'objectStatus' => ObjectStatus::forObject($object, $checks),
+            'objectStatus' => ObjectStatus::forObject($object, $checks, $this->ctx->pausedObjects()),
+            'paused' => $this->ctx->pausedObjects(),
+            'openAlerts' => (new AlertRepository($this->ctx->pdo))->openForObject($id),
+            'inMaintenance' => \Nordvarr\Alerts\MaintenanceState::load($this->ctx->pdo, Time::toDb(Time::now()))->inMaintenance($id),
             'dependencies' => $dependencies,
             'tags' => $inv->tags->forObject($id),
             'externalIds' => $inv->externalIds->forObject($id),
@@ -412,11 +416,12 @@ final class ObjectController
         if ($targets === []) {
             return [];
         }
-        $statuses = ObjectStatus::forObjects((new CheckRepository($this->ctx->pdo))->all());
+        $paused = $this->ctx->pausedObjects();
+        $statuses = ObjectStatus::forObjects((new CheckRepository($this->ctx->pdo))->all(), $paused);
         $objects = $this->inventory->objects->findMany(array_keys($targets));
         $result = [];
         foreach ($targets as $id => $target) {
-            $status = ($objects[$id]['lifecycle'] ?? 'active') !== 'active' ? Status::PAUSED : ($statuses[$id]['status'] ?? Status::NONE);
+            $status = ($objects[$id]['lifecycle'] ?? 'active') !== 'active' || isset($paused[$id]) ? Status::PAUSED : ($statuses[$id]['status'] ?? Status::NONE);
             $result[] = ['id' => (string) $id, 'name' => $target['name'], 'kind' => $target['kind'], 'status' => $status];
         }
         usort($result, static fn (array $a, array $b): int => Status::severity($b['status']) <=> Status::severity($a['status']));

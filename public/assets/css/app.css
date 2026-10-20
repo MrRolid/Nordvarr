@@ -354,6 +354,12 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
     dl.facts dd { margin-bottom: .4rem; }
 }
 
+/* Alerty a doručení */
+.delivery-sent { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+.delivery-failed { background: var(--danger-bg); color: var(--danger-text); border-color: transparent; }
+.delivery-pending { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+input[type="radio"] { margin: 0; }
+
 /* Mobil: hlavní navigace jako spodní lišta v dosahu palce. */
 @media (max-width: 720px) {
     .topbar { gap: .75rem; }

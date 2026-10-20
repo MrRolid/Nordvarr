@@ -6,15 +6,18 @@ namespace Nordvarr\Ui;
 
 use InvalidArgumentException;
 use JsonException;
+use Nordvarr\Alerts\Notifier;
 use Nordvarr\Api\ApiTokens;
 use Nordvarr\Db\Migrator;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Router;
+use Nordvarr\I18n;
 use Nordvarr\Installer;
 use Nordvarr\Inventory\Inventory;
 use Nordvarr\Inventory\Transfer;
 use Nordvarr\Inventory\ValidationException;
 use Nordvarr\Repository\ApiTokenRepository;
+use Nordvarr\Repository\ChannelRepository;
 use Nordvarr\Repository\SettingsRepository;
 
 /**
@@ -32,6 +35,7 @@ final class SettingsController
     {
         $router->get('/settings', fn (): Response => $this->index());
         $router->post('/settings/timezone', fn (): Response => $this->timezone());
+        $router->post('/settings/notifications', fn (): Response => $this->notifications());
         $router->post('/settings/tokens', fn (): Response => $this->createToken());
         $router->post('/settings/tokens/{id}/revoke', fn (array $p): Response => $this->revokeToken($p['id']));
         $router->get('/settings/export', fn (): Response => $this->export());
@@ -50,6 +54,10 @@ final class SettingsController
             'timezone' => $settings->get('timezone', 'Europe/Prague'),
             'timezones' => timezone_identifiers_list(),
             'tokens' => (new ApiTokenRepository($this->ctx->pdo))->all(),
+            'channels' => (new ChannelRepository($this->ctx->pdo))->all(),
+            'reminderHours' => (int) ($settings->get('alert_reminder_hours') ?? Notifier::DEFAULT_REMINDER_HOURS),
+            'baseUrl' => (string) $settings->get('base_url', ''),
+            'notificationLang' => I18n::resolve($settings->get('notification_lang')),
             'scopes' => ApiTokens::SCOPES,
             'cronLine' => (new Installer($this->appRoot))->cronLine(),
             'newToken' => null,
@@ -70,6 +78,35 @@ final class SettingsController
         $old = $settings->get('timezone');
         $settings->set('timezone', $tz);
         $this->ctx->audit('settings.timezone', ['old' => $old, 'new' => $tz]);
+        $this->ctx->flash('settings.saved');
+
+        return $this->ctx->redirect('/settings');
+    }
+
+    private function notifications(): Response
+    {
+        $r = $this->ctx->request;
+        $hours = $r->input('reminder_hours');
+        $baseUrl = rtrim(trim($r->input('base_url')), '/');
+        $parts = parse_url($baseUrl);
+        if (preg_match('/^\d{1,4}$/', $hours) !== 1 || (int) $hours > 720) {
+            $this->ctx->flash('err.invalid_reminder');
+
+            return $this->ctx->redirect('/settings');
+        }
+        if ($baseUrl !== '' && (!is_array($parts) || !in_array($parts['scheme'] ?? '', ['http', 'https'], true) || ($parts['host'] ?? '') === '')) {
+            $this->ctx->flash('err.invalid_url');
+
+            return $this->ctx->redirect('/settings');
+        }
+        $settings = new SettingsRepository($this->ctx->pdo);
+        $new = ['alert_reminder_hours' => (string) (int) $hours, 'base_url' => $baseUrl, 'notification_lang' => I18n::resolve($r->input('notification_lang'))];
+        $old = [];
+        foreach ($new as $key => $value) {
+            $old[$key] = $settings->get($key);
+            $settings->set($key, $value);
+        }
+        $this->ctx->audit('settings.notifications', ['old' => $old, 'new' => $new]);
         $this->ctx->flash('settings.saved');
 
         return $this->ctx->redirect('/settings');
