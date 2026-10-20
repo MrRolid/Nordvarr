@@ -48,7 +48,9 @@ $navItems = [
 </header>
 <main class="content">
     <?php if (is_string($flash)): ?>
-    <p class="notice" role="status"><?= $v->t($flash) ?></p>
+    <p class="notice" role="status" data-test="flash"><?= $v->t($flash) ?></p>
+    <?php elseif (is_array($flash) && is_string($flash[0] ?? null)): ?>
+    <p class="notice" role="status" data-test="flash"><?= $v->t($flash[0], is_array($flash[1] ?? null) ? $flash[1] : []) ?></p>
     <?php endif; ?>
     <?php if (is_array($migrations)): ?>
     <p class="notice" role="status"><?= $v->t('migrations.done', $migrations) ?></p>
