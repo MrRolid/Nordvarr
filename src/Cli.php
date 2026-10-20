@@ -6,9 +6,14 @@ namespace Nordvarr;
 
 use Nordvarr\Db\Database;
 use Nordvarr\Db\Migrator;
+use Nordvarr\Checks\CurlRunner;
+use Nordvarr\Checks\PingRunner;
+use Nordvarr\Checks\RdapRunner;
+use Nordvarr\Checks\Worker;
+use Nordvarr\Http\Client\CurlHttpClient;
 use Nordvarr\Inventory\DemoData;
 use Nordvarr\Inventory\Inventory;
-use Nordvarr\Repository\SettingsRepository;
+use Nordvarr\Repository\HttpCacheRepository;
 use Throwable;
 
 /**
@@ -32,7 +37,7 @@ final class Cli
             return match ($command) {
                 'version' => $this->version($out),
                 'migrate' => $this->migrate($out),
-                'worker' => $this->worker(),
+                'worker' => $this->worker($err),
                 'demo-data' => $this->demoData($out, $err, in_array('--force', $args, true)),
                 default => $this->help($out, $command !== 'help'),
             };
@@ -75,10 +80,14 @@ final class Cli
     }
 
     /**
-     * Worker zatím jen hlídá souběh a zapíše čas běhu. Kontroly přidá fáze F2.
+     * Worker: kontroly na řadě, agregace a retence. Zámek brání souběhu,
+     * celková doba běhu je omezená na 50 s.
+     *
+     * @param resource $err
      */
-    private function worker(): int
+    private function worker($err): int
     {
+        $start = microtime(true);
         $config = Config::load($this->appRoot . '/config.php');
         $lockDir = $config->dataDir() . '/locks';
         if (!is_dir($lockDir)) {
@@ -89,8 +98,25 @@ final class Cli
             return 0;
         }
         try {
-            $settings = new SettingsRepository(Database::connectSqlite($config->databasePath()));
-            $settings->set('worker_last_run', Time::toDb(Time::now()));
+            $pdo = Database::connectSqlite($config->databasePath());
+            if ((new Migrator($pdo, $this->appRoot . '/migrations'))->pending() !== []) {
+                // Migrace spouští přihlášený admin (nebo příkaz migrate); do té doby worker čeká.
+                fwrite($err, "Databáze čeká na migrace, worker nic nespustil.\n");
+
+                return 0;
+            }
+            $userAgent = 'Nordvarr/' . Installer::appVersion($this->appRoot);
+            $worker = new Worker(
+                $pdo,
+                new CurlRunner($userAgent),
+                new PingRunner((string) $config->get('ping_binary', 'ping')),
+                new RdapRunner(
+                    new CurlHttpClient($userAgent),
+                    new HttpCacheRepository($pdo),
+                    (string) $config->get('rdap_bootstrap_url', RdapRunner::BOOTSTRAP_URL),
+                ),
+            );
+            $worker->run($start + Worker::MAX_RUNTIME);
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);

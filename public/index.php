@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Nordvarr\Api\ApiApp;
 use Nordvarr\App;
+use Nordvarr\Checks\HeartbeatEndpoint;
 use Nordvarr\Config;
 use Nordvarr\Db\Database;
 use Nordvarr\ErrorPage;
@@ -28,7 +29,9 @@ if (!is_file($appRoot . '/config.php')) {
 $config = null;
 try {
     $config = Config::load($appRoot . '/config.php');
-    if ($request->isApi()) {
+    if (HeartbeatEndpoint::matches($request->path)) {
+        (new HeartbeatEndpoint(Database::connectSqlite($config->databasePath())))->handle($request)->send();
+    } elseif ($request->isApi()) {
         // API nepoužívá session ani cookies.
         (new ApiApp(Database::connectSqlite($config->databasePath()), $config->appSecret()))->handle($request)->send();
     } else {
