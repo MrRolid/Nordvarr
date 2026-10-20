@@ -80,6 +80,24 @@ final class View
         return self::escape($time->format('j. n. Y H:i'));
     }
 
+    /**
+     * Doba od daného času ("teď", "3 min", "5 h", "2 d").
+     */
+    public function ago(?string $utc, ?int $now = null): string
+    {
+        if ($utc === null || $utc === '') {
+            return '';
+        }
+        $seconds = max(0, ($now ?? time()) - (new DateTimeImmutable($utc, new DateTimeZone('UTC')))->getTimestamp());
+
+        return match (true) {
+            $seconds < 60 => $this->t('time.now'),
+            $seconds < 3600 => $this->t('time.min', ['n' => intdiv($seconds, 60)]),
+            $seconds < 172800 => $this->t('time.h', ['n' => intdiv($seconds, 3600)]),
+            default => $this->t('time.d', ['n' => intdiv($seconds, 86400)]),
+        };
+    }
+
     public function raw(string $html): string
     {
         return $html;

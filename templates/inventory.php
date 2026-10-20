@@ -5,6 +5,7 @@
 /** @var array<string, list<string>> $tags */
 /** @var list<string> $allTags */
 /** @var bool $truncated */
+/** @var array<string, array{status: string, check: array<string, mixed>|null}> $statuses */
 $back = http_build_query(array_filter($filter, static fn (string $x): bool => $x !== ''));
 ?>
 <div class="page-head">
@@ -39,6 +40,15 @@ $back = http_build_query(array_filter($filter, static fn (string $x): bool => $x
         </select>
     </div>
     <div class="field">
+        <label for="f-status"><?= $v->t('inventory.status') ?></label>
+        <select id="f-status" name="status">
+            <option value=""><?= $v->t('inventory.all') ?></option>
+            <?php foreach (['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none'] as $st): ?>
+            <option value="<?= $v->e($st) ?>"<?= $filter['status'] === $st ? ' selected' : '' ?>><?= $v->t('status.' . $st) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="field">
         <label for="f-lifecycle"><?= $v->t('inventory.lifecycle') ?></label>
         <select id="f-lifecycle" name="lifecycle">
             <?php foreach (['active', 'archived', 'all'] as $lc): ?>
@@ -66,6 +76,7 @@ $back = http_build_query(array_filter($filter, static fn (string $x): bool => $x
             <thead>
             <tr>
                 <th class="check"><span class="visually-hidden"><?= $v->t('inventory.select') ?></span></th>
+                <th><?= $v->t('inventory.status') ?></th>
                 <th><?= $v->t('object.name') ?></th>
                 <th><?= $v->t('object.type') ?></th>
                 <th><?= $v->t('object.tags') ?></th>
@@ -76,6 +87,7 @@ $back = http_build_query(array_filter($filter, static fn (string $x): bool => $x
             <?php foreach ($objects as $o): ?>
             <tr<?= $o['lifecycle'] === 'archived' ? ' class="archived"' : '' ?>>
                 <td class="check"><input type="checkbox" name="ids[]" value="<?= $v->e($o['id']) ?>" aria-label="<?= $v->t('inventory.select_one', ['name' => (string) $o['name']]) ?>"></td>
+                <td><?= $v->raw($v->render('partials/status', ['status' => $statuses[$o['id']]['status'] ?? 'none'])) ?></td>
                 <td><a href="<?= $v->url('/objects/' . $o['id']) ?>"><?= $v->e($o['name']) ?></a>
                     <?php if ($o['lifecycle'] === 'archived'): ?><span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></td>
                 <td><?= $v->t('type.' . $o['type']) ?></td>

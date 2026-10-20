@@ -109,8 +109,6 @@ final class App
     {
         $router = new Router();
 
-        $router->get('/', fn (): Response => new Response($view->page('dashboard', ['title' => 'nav.overview'])));
-
         $placeholders = ['/topology' => ['nav.topology', 'F4'], '/alerts' => ['nav.alerts', 'F3']];
         foreach ($placeholders as $path => [$title, $phase]) {
             $router->get($path, fn (): Response => new Response(
@@ -121,7 +119,9 @@ final class App
         $user = $auth->user();
         if ($user !== null) {
             $ctx = new Ui\Ctx($request, $session, $view, $urls, $this->pdo(), $user, new AuditLogRepository($this->pdo()), $this->config);
+            (new Ui\OverviewController($ctx))->register($router);
             (new Ui\InventoryController($ctx))->register($router);
+            (new Ui\CheckController($ctx))->register($router);
             (new Ui\ObjectController($ctx))->register($router);
             (new Ui\SettingsController($ctx, $this->appRoot))->register($router);
         }
