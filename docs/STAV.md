@@ -4,6 +4,29 @@ Aktualizováno: 2026-10-21
 
 ## Hotové fáze
 
+### F4 Topologie a diagnostická karta (větev `faze-4-topologie`, navazuje na `faze-3-alerty`)
+
+- Stránka Topologie (`/topology`) s grafem v Cytoscape.js a rozvržením dagre (knihovny s pevnou verzí v `public/assets/vendor/`, záznam ve `VERSIONS.md`):
+  - režim "okolí objektu" (1 nebo 2 kroky, oba směry, oba druhy vztahů); výchozí střed je objekt s nejstarším nepotlačeným alertem `unhealthy`, pak `degraded`, jinak objekt s nejvíce vztahy,
+  - režim "podle filtru" (typ, tag, stav), max. 300 uzlů, nad limitem výzva k zúžení filtru,
+  - uzel: kruh s prstencem podílu stavů kontrol, název a druhý řádek (latence, stav nebo typ), záře u `unhealthy`/`degraded`, čárkovaně pozastavené a objekty v údržbě, zvýrazněný střed,
+  - hrany: `závisí na` se šipkou, `obsahuje` čárkovaně, cesta k pravděpodobné příčině oranžově a silněji,
+  - levý panel: formulář pohledu a seznam uzlů seřazený od nejhoršího stavu; pravý panel: karta vybraného uzlu (stav a důvod, pravděpodobná příčina, tagy, kontroly s latencí, incidenty za 90 dní, poslední změny i u sousedů, dokumentace),
+  - klik na uzel otevře kartu v panelu, dvojklik nebo "Otevřít kartu" vede na detail objektu, najetí myší zvýrazní okolí uzlu,
+  - obnovování dat grafu přes `/topology/data` s ETag (15 s / 60 s / zpomalení při chybách), změna stavu bez přestavění grafu, změna struktury s novým rozvržením,
+  - světlý i tmavý vzhled, mapa přes celou šířku okna, na mobilu pod sebou.
+- Diagnostická hlavička karty objektu (SPEC kap. 9 bod 3): stav a důvod, pravděpodobná příčina, poslední změna na objektu a přímých sousedech za 24 h, stav závislostí, počet alertů za 90 dní. Obnovuje se přes `/objects/{id}/diagnosis` s ETag. Pod kartou nová sekce "Historie incidentů (90 dní)" a tlačítko "Zobrazit v topologii".
+- Obnovování přes ETag je společné (`Nordvarr\Ui\JsonFragment`, v `app.js` pro každý prvek s `data-refresh-url`).
+- Oprava: detail zmeškaného heartbeatu ukazoval čas posledního signálu v UTC ve formátu ISO, teď je v časové zóně z nastavení.
+
+Ověření:
+
+- okolí do hloubky 1 a 2, ořez velkého okolí s upozorněním, příčinná hrana, data uzlu, výchozí střed, filtr podle stavu, limit 300 uzlů, stránka, JSON endpointy s ETag a 304, karta uzlu s dokumentací a incidenty, diagnostická hlavička: `TopologyTest`,
+- obsah release zipu včetně knihoven grafu: `ReleaseBuildTest`,
+- akceptace e2e `topology.spec.js`: "spadne databáze -> web je unhealthy, notifikace webu je potlačena (lokální přijímač webhooků dostane jen databázi), karta webu ukazuje databázi jako pravděpodobnou příčinu a poslední deploy v okolí"; dál graf okolí s příčinnou hranou, klik na uzel v grafu i v seznamu, filtrový režim, ETag, samočinné obnovení mapy, žádné chyby v konzoli (CSP); `mobile.spec.js`: topologie na mobilu bez vodorovného posuvníku,
+- vzhled kontrolován na snímcích obrazovky s ukázkovými daty (světlý i tmavý režim),
+- testy zelené: `composer test` (391 testů), `npm run e2e` (26 testů).
+
 ### F3 Alerty a notifikace (větev `faze-3-alerty`, navazuje na `faze-2-kontroly`)
 
 - Migrace `0004_alerty.sql`: alerty (jeden otevřený na kontrolu), kanály a jejich pravidla, fronta odesílání s historií pokusů, údržbová okna.
@@ -118,7 +141,10 @@ Nic.
 - Alerty se vyhodnocují při běhu workeru, takže signál heartbeatu nebo ruční změna se do alertů a notifikací promítne nejpozději do minuty.
 - Skutečné odeslání přes veřejné SMTP servery, Telegram a cizí webhooky se netestovalo (jen lokální falešné servery); na produkci doporučuji po nastavení kanálu použít "Odeslat test".
 - Změna `app_secret` v `config.php` znemožní dešifrovat tajné údaje kanálů, je pak potřeba je zadat znovu.
+- Mapa topologie ukazuje stav, latenci kontrol, alerty a příčiny. Metriky jako CPU, RAM nebo GPU by potřebovaly hostového agenta, který je mimo rozsah MVP (SPEC kap. 14).
+- Rozvržení grafu se při každém načtení počítá znovu (ruční pozice se podle SPEC neukládají). U velkých grafů v režimu filtru (nad 24 uzlů) se místo dagre použije silové rozložení, viz ROZHODNUTI F4 bod 3. U stovek uzlů jsou popisky malé, je potřeba přiblížit.
+- Cytoscape vkládá na stránku vlastní `<style>`, který CSP blokuje. Obchází se to prázdným prvkem s id, které knihovna hledá, a pravidlem v `app.css` (ROZHODNUTI F4 bod 7). Při aktualizaci knihovny je potřeba to ověřit (e2e test hlídá chyby v konzoli).
 
 ## Další krok
 
-F4 Topologie a diagnostická karta: Cytoscape graf (okolí objektu, filtrový režim), hlavička diagnózy, obnovování přes ETag. Akceptace: Playwright scénář "spadne databáze -> web je unhealthy, notifikace webu je potlačena, karta webu ukazuje databázi jako pravděpodobnou příčinu a poslední deploy v okolí".
+F5 Export, bezpečnost, dokumentace: export pro LLM (Markdown i JSON v API) s maskováním a kanárkovými testy, tlačítko "Zkopírovat pro LLM" na kartě objektu, kontrolní průchod bezpečnosti podle kapitoly 11 (zjištění a opravy do `docs/STAV.md`), `docs/NAVOD.md` (instalace, cron, aktualizace, příklady API s curl), release 0.1.0.

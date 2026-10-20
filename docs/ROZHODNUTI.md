@@ -78,3 +78,17 @@ Rozhodnutí odlišná od SPEC.md nebo taková, která SPEC nechává otevřená.
 14. **Připomínky** jsou nastavitelné v nastavení (výchozí 24 h, 0 = vypnuto), počítají se od poslední notifikace k alertu. Potlačené alerty a alerty v údržbě připomínky nedostávají.
 15. **Historie doručení** se maže po 400 dnech spolu s hodinovými agregacemi.
 16. **Testy** běží proti lokálnímu falešnému SMTP serveru (STARTTLS, implicitní TLS, AUTH PLAIN/LOGIN, výpadek, odmítnutý příjemce) a lokálnímu mock endpointu pro Telegram a webhooky; v e2e přijímá webhooky malý HTTP server v Node. Test paralelismu kontrol používá vlastní pomalý server obsluhující všechna spojení současně, protože `php -S` s workery jich zvládá jen část a test byl nestabilní.
+
+## 2026-10-21 (F4 Topologie a diagnostická karta)
+
+1. **Klik na uzel otevře kartu v bočním panelu mapy** (stav, příčina, kontroly, incidenty za 90 dní, poslední změny, dokumentace) s tlačítkem na plnou kartu objektu; dvojklik vede rovnou na kartu objektu. SPEC říká "klik na uzel otevře kartu"; panel umožní procházet graf bez opouštění mapy.
+2. **Výchozí střed okolí** (SPEC ho neurčuje): objekt s nejstarším nepotlačeným otevřeným alertem úrovně `unhealthy`, potom `degraded`, jinak aktivní objekt s nejvíce vztahy. Výchozí hloubka jsou 2 kroky.
+3. **Rozvržení:** dagre shora dolů, nebo zleva doprava, pokud se tak graf do mapy vejde výrazně větší. V režimu filtru s více než 24 uzly se použije silové rozložení `cose` (součást Cytoscape), protože dagre by objekty v málo vrstvách roztáhl do velmi široké řady s nečitelnými popisky. Uzly jsou pak menší s popiskem pod sebou a popisky hran se ukazují jen u zvýrazněného uzlu.
+4. **Barva uzlu** je prstenec s podíly stavů jeho kontrol (zelená, žlutá, červená, šedá), záře u objektů `unhealthy` a `degraded`; objekt bez kontrol má neutrální obrys, pozastavený a v údržbě čárkovaný. Pravděpodobná příčina se v grafu kreslí jako oranžová hrana od potlačeného objektu k příčině (po `závisí na`, nebo po `obsahuje` od hostitele).
+5. **Metriky CPU, RAM, GPU a podobně se v mapě nezobrazují:** vyžadovaly by hostového agenta, který je mimo rozsah MVP. Uzel ukazuje latenci první kontroly `http`/`tcp`/`ping`, stav, důvod a počet alertů.
+6. **Okolí** zahrnuje i archivované objekty, které jsou ve vztahu se středem (vztah stále existuje), režim filtru jen aktivní. Limit 300 uzlů platí i pro okolí (pak se ořízne a pod seznamem uzlů je upozornění s celkovým počtem).
+7. **Cytoscape a CSP:** knihovna při startu vkládá `<style>` s jedním pravidlem, což CSP `style-src 'self'` blokuje. Místo povolení inline stylů je pravidlo v `app.css` a na stránce je prázdný prvek s id `__________cytoscape_stylesheet`, podle kterého knihovna pozná, že styl už existuje.
+8. **Knihovny:** Cytoscape.js 3.34.2, dagre 0.8.5 a cytoscape-dagre 2.5.0 (MIT) jako minifikované UMD soubory z npm, načtené běžnými `<script>` bez sestavování; kontrolní součty jsou ve `VERSIONS.md`.
+9. **Diagnostická hlavička** je samostatná šablona `partials/diagnosis.php` s endpointem `/objects/{id}/diagnosis` (JSON s HTML, ETag) a obnovuje se stejně jako přehled. "Poslední změna" bere nejnovější událost za 24 h z časové osy objektu a přímých sousedů a ukazuje, u kterého souseda nastala. Počet alertů za 90 dní zahrnuje i potlačené alerty; odkaz vede na novou sekci s historií incidentů (posledních 20).
+10. **Zástupná stránka** z F0 (`templates/placeholder.php`) byla odstraněna, všechny položky navigace už mají vlastní stránku.
+
