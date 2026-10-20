@@ -204,7 +204,11 @@ if (el && window.cytoscape) {
         cy.$(':selected').unselect();
         node.select();
         highlight(node);
-        if (center) cy.animate({ center: { eles: node }, duration: 250 });
+        // Posunout mapu jen tehdy, když uzel není celý vidět.
+        const ext = cy.extent();
+        const bb = node.boundingBox();
+        const visible = bb.x1 >= ext.x1 && bb.x2 <= ext.x2 && bb.y1 >= ext.y1 && bb.y2 <= ext.y2;
+        if (center && !visible) cy.animate({ center: { eles: node }, duration: 250 });
         for (const item of listItems()) item.classList.toggle('active', item.dataset.node === id);
         loadCard(id);
     };

@@ -44,7 +44,7 @@ $causes = array_values(array_filter($openAlerts, static fn (array $a): bool => $
             <span class="muted"><?= $v->t('diag.no_change') ?></span>
             <?php else: ?>
             <span class="badge"><?= $v->t('event.type.' . $lastChange['type']) ?></span>
-            <strong><?= $v->e($lastChange['summary']) ?></strong>, <?= $v->ago((string) $lastChange['occurred_at']) ?>
+            <span><strong><?= $v->e($lastChange['summary']) ?></strong>, <?= $v->ago((string) $lastChange['occurred_at']) ?></span>
             <?php if (!in_array((string) $diagObject['id'], $lastChange['object_ids'], true)): ?>
             <span class="small-text"><?= $v->t('event.at_neighbor') ?>
                 <?php foreach ($lastChange['object_ids'] as $oid): ?><a href="<?= $v->url('/objects/' . $oid) ?>"><?= $v->e($lastChangeObjects[$oid]['name'] ?? $oid) ?></a> <?php endforeach; ?></span>
