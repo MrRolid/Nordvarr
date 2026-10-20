@@ -1,0 +1,10 @@
+{
+  "objectClassName": "domain",
+  "ldhName": "{{DOMAIN}}",
+  "status": ["active"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "2020-01-01T00:00:00Z"},
+    {"eventAction": "last changed", "eventDate": "2026-01-01T00:00:00Z"},
+    {"eventAction": "expiration", "eventDate": "{{EXPIRY}}"}
+  ]
+}

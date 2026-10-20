@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Nordvarr\Tests\Integration;
 
+use Nordvarr\Checks\CheckTypes;
 use Nordvarr\Inventory\DemoData;
 use Nordvarr\Inventory\Inventory;
 use Nordvarr\Inventory\Transfer;
 use Nordvarr\Inventory\Upsert;
 use Nordvarr\Inventory\ValidationException;
+use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Tests\TestDb;
 use PHPUnit\Framework\TestCase;
 
@@ -33,6 +35,16 @@ final class TransferTest extends TestCase
         $id = (string) $inventory->externalIds->objectId('test', 'svc:tajne');
         $inventory->docs->save($id, "Druhá revize\n\nbez tajemství", 'admin@example.com');
         $inventory->addManualEvent($id, 'note', 'ruční poznámka', 'podrobnosti', '2026-10-20T10:00:00Z');
+
+        $checks = new CheckRepository($inventory->pdo);
+        foreach ([
+            ['http', ['url' => 'https://admin:' . self::CANARIES[1] . '@example.com/zdravi', 'contains' => 'OK']],
+            ['heartbeat', ['grace_s' => '600', 'interval_s' => '86400']],
+            ['domain_expiry', ['domain' => 'example.com']],
+        ] as [$type, $input]) {
+            $valid = CheckTypes::validate($type, $input);
+            $checks->create($id, $type, $valid['common'], $valid['config']);
+        }
 
         return $inventory;
     }
@@ -60,6 +72,12 @@ final class TransferTest extends TestCase
 
         $second = (new Transfer($target))->export();
         self::assertSame($this->withoutTimestamp($first), $this->withoutTimestamp($second));
+        self::assertCount(4, $second['checks'], 'Tři kontroly z testu a heartbeat z ukázkových dat.');
+        // Token heartbeatu se neexportuje, po importu vznikne nový.
+        $tokens = static fn (Inventory $inv): array => $inv->pdo->query("SELECT heartbeat_token FROM checks WHERE type = 'heartbeat'")->fetchAll(\PDO::FETCH_COLUMN);
+        self::assertCount(2, $tokens($target));
+        self::assertSame([], array_intersect($tokens($source), $tokens($target)));
+        self::assertStringNotContainsString((string) $tokens($source)[0], json_encode($first, JSON_THROW_ON_ERROR));
 
         // Import přes existující data nahradí celý inventář, nic se nezdvojí.
         (new Transfer($target))->import($first);

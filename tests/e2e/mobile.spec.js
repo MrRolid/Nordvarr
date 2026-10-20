@@ -40,3 +40,11 @@ test('inventář a detail objektu jsou na mobilu bez vodorovného posuvníku', a
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('přehled je na mobilu bez vodorovného posuvníku', async ({ page }) => {
+  await loginOk(page);
+  await page.goto('/');
+  await expect(page.getByTestId('summary')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

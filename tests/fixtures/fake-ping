@@ -1,0 +1,24 @@
+#!/bin/sh
+# Falešný ping pro testy: chování podle jména hosta (poslední argument).
+for last in "$@"; do :; done
+case "$last" in
+    ok.example.com)
+        echo "PING ok.example.com (192.0.2.1) 56(84) bytes of data."
+        echo "64 bytes from 192.0.2.1: icmp_seq=1 ttl=64 time=1.73 ms"
+        exit 0 ;;
+    down.example.com)
+        echo "1 packets transmitted, 0 received, 100% packet loss, time 0ms"
+        exit 1 ;;
+    nxdomain.example.com)
+        echo "ping: nxdomain.example.com: Name or service not known" >&2
+        exit 2 ;;
+    denied.example.com)
+        echo "ping: socket: Operation not permitted" >&2
+        exit 2 ;;
+    hang.example.com)
+        sleep 30
+        exit 0 ;;
+    *)
+        echo "ping: unexpected failure" >&2
+        exit 3 ;;
+esac

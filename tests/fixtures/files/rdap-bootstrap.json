@@ -1,0 +1,9 @@
+{
+  "description": "Fiktivní bootstrap RDAP pro testy (struktura jako https://data.iana.org/rdap/dns.json)",
+  "publication": "2026-10-01T00:00:00Z",
+  "services": [
+    [["test"], ["https://rdap.example.net/test/"]],
+    [["example", "co.example"], ["http://rdap-plain.example.net/", "https://rdap.example.com/"]]
+  ],
+  "version": "1.0"
+}

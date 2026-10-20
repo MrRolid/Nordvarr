@@ -35,7 +35,7 @@ export default async function globalSetup(config) {
   const server = spawn(
     php,
     ['-S', `127.0.0.1:${port}`, '-t', join(site, 'nordvarr/public'), join(root, 'bin/dev-router.php')],
-    { stdio: ['ignore', 'ignore', 'pipe'] },
+    { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, PHP_CLI_SERVER_WORKERS: '4' } },
   );
   let log = '';
   server.stderr.on('data', (chunk) => {
