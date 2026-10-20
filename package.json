@@ -1,0 +1,12 @@
+{
+  "name": "nordvarr-dev",
+  "private": true,
+  "description": "Vývojové nástroje Nordvarru (jen Playwright, na serveru se nepoužívá)",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
