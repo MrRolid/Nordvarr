@@ -1,0 +1,253 @@
+/* Nordvarr - základní vzhled. Bez externích fontů a knihoven. */
+:root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --text: #1d2330;
+    --muted: #5d6677;
+    --border: #d8dce3;
+    --accent: #1f5fa8;
+    --accent-text: #ffffff;
+    --danger-bg: #fdecec;
+    --danger-text: #8a1c1c;
+    --ok-bg: #e9f6ec;
+    --ok-text: #1d5e2c;
+    --nav-height: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #14171d;
+        --surface: #1d222b;
+        --text: #e6e9ef;
+        --muted: #9aa3b2;
+        --border: #313846;
+        --accent: #5b9be6;
+        --accent-text: #0b1220;
+        --danger-bg: #3a1c1f;
+        --danger-text: #f3b4b4;
+        --ok-bg: #18301f;
+        --ok-text: #a8dcb4;
+    }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+}
+
+a { color: var(--accent); }
+
+h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: .5rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-decoration: none;
+    color: var(--text);
+}
+
+.mainnav { display: flex; gap: .25rem; }
+
+.mainnav a {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .4rem .7rem;
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.mainnav a:hover { background: var(--bg); }
+.mainnav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); }
+
+.icon {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.toolbar {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    font-size: .9rem;
+    color: var(--muted);
+}
+
+.inline { display: inline; margin: 0; }
+
+button, .button {
+    font: inherit;
+    padding: .5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+button.primary, .button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+}
+
+button.link {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.content {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.card.narrow { max-width: 420px; margin: 2rem auto; }
+
+.form { display: flex; flex-direction: column; gap: .4rem; }
+.form label { font-weight: 600; margin-top: .5rem; }
+.form button { margin-top: 1rem; align-self: flex-start; }
+
+input[type="text"], input[type="email"], input[type="password"], select {
+    font: inherit;
+    padding: .55rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    width: 100%;
+    max-width: 32rem;
+}
+
+.lang-switch select { width: auto; padding: .25rem .4rem; }
+.lang-switch { display: flex; gap: .5rem; align-items: center; }
+
+.help, .muted { color: var(--muted); font-size: .9rem; margin: 0; }
+
+.notice {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+    padding: .6rem .9rem;
+    border-radius: 6px;
+}
+
+.alert-box, .field-error {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    padding: .6rem .9rem;
+    border-radius: 6px;
+}
+
+.field-error { padding: .3rem .6rem; margin: 0; font-size: .9rem; }
+
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li { padding: .2rem 0; }
+.checklist li.ok strong { color: var(--ok-text); }
+.checklist li.fail strong { color: var(--danger-text); }
+
+.code {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .75rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: .8rem;
+    padding: 1rem;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.js .js-hidden { display: none; }
+
+/* Mobil: hlavní navigace jako spodní lišta v dosahu palce. */
+@media (max-width: 720px) {
+    .topbar { gap: .75rem; }
+    .whoami { display: none; }
+
+    .mainnav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
+        height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        gap: 0;
+    }
+
+    .mainnav a {
+        flex: 1 1 0;
+        flex-direction: column;
+        justify-content: center;
+        gap: .1rem;
+        border-radius: 0;
+        font-size: .72rem;
+        padding: .25rem 0;
+        min-width: 0;
+    }
+
+    .mainnav a span {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .icon { width: 22px; height: 22px; }
+
+    body.has-nav { padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px)); }
+}

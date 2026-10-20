@@ -1,0 +1,19 @@
+# Nordvarr: webroot. Hezké adresy přes mod_rewrite, bez něj funguje index.php?r=...
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Aplikace podle této proměnné pozná, že může generovat hezké adresy.
+    RewriteRule ^ - [E=NORDVARR_REWRITE:1]
+    # Předání hlavičky Authorization do PHP (API tokeny).
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L,QSA]
+</IfModule>
