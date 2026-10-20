@@ -23,14 +23,14 @@ export default defineConfig({
     },
     {
       name: 'desktop',
-      testMatch: /app\.spec\.js/,
+      testMatch: /(app|inventory)\.spec\.js/,
       dependencies: ['instalace'],
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'mobil',
       testMatch: /mobile\.spec\.js/,
-      dependencies: ['instalace'],
+      dependencies: ['desktop'],
       use: { ...devices['Pixel 7'] },
     },
   ],

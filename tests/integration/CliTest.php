@@ -68,10 +68,10 @@ final class CliTest extends TestCase
         self::assertSame(0, $code);
         self::assertStringContainsString('Žádné čekající migrace', $out);
 
-        file_put_contents($this->app . '/migrations/0002_cli_test.sql', 'CREATE TABLE cli_test (id TEXT);');
+        file_put_contents($this->app . '/migrations/9001_cli_test.sql', 'CREATE TABLE cli_test (id TEXT);');
         [$code, $out] = $this->cli('migrate');
         self::assertSame(0, $code, $out);
-        self::assertStringContainsString('0002', $out);
+        self::assertStringContainsString('9001', $out);
         self::assertCount(1, glob($this->tmp . '/nordvarr-data/backups/*.sqlite') ?: []);
     }
 

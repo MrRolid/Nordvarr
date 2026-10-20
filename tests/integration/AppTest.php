@@ -206,7 +206,7 @@ final class AppTest extends TestCase
 
     public function testPendingMigrationsRunForAdminWithBackup(): void
     {
-        file_put_contents($this->app . '/migrations/0002_test_aktualizace.sql', 'CREATE TABLE aktualizace_test (id TEXT);');
+        file_put_contents($this->app . '/migrations/9001_test_aktualizace.sql', 'CREATE TABLE aktualizace_test (id TEXT);');
         // Anonymní požadavek migraci nespustí.
         $this->request('GET', '/login');
         self::assertSame([], glob($this->tmp . '/nordvarr-data/backups/*.sqlite'));
