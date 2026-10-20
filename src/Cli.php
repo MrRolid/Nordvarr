@@ -6,6 +6,7 @@ namespace Nordvarr;
 
 use Nordvarr\Db\Database;
 use Nordvarr\Db\Migrator;
+use Nordvarr\Alerts\Notifier;
 use Nordvarr\Checks\CurlRunner;
 use Nordvarr\Checks\PingRunner;
 use Nordvarr\Checks\RdapRunner;
@@ -115,6 +116,7 @@ final class Cli
                     new HttpCacheRepository($pdo),
                     (string) $config->get('rdap_bootstrap_url', RdapRunner::BOOTSTRAP_URL),
                 ),
+                Notifier::fromConfig($pdo, $this->appRoot, $config),
             );
             $worker->run($start + Worker::MAX_RUNTIME);
         } finally {
