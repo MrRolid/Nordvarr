@@ -56,3 +56,13 @@ test('alerty jsou na mobilu bez vodorovného posuvníku', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('topologie je na mobilu bez vodorovného posuvníku a graf se vykreslí', async ({ page }) => {
+  await loginOk(page);
+  await page.goto('/topology');
+  await expect(page.getByTestId('graph')).toBeVisible();
+  await page.waitForFunction(() => (document.getElementById('cy')?.cy?.nodes().length ?? 0) > 0);
+  await expect(page.getByTestId('node-panel').getByTestId('node-card')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

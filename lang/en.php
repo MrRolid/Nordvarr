@@ -531,6 +531,7 @@ return [
     'topology.in_view' => 'In view ({count})',
     'topology.graph' => 'Graph of objects and relationships',
     'topology.too_many' => '{count} objects match the filter, the graph shows at most {max}. Narrow it down by type, tag or status.',
+    'topology.truncated' => 'Showing {max} of {count} neighborhood objects, choose a smaller depth.',
     'topology.empty' => 'There are no objects in this view.',
     'topology.causal' => 'path to probable cause',
     'topology.ring' => 'ring: check status',

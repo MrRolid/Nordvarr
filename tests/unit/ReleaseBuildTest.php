@@ -44,6 +44,12 @@ final class ReleaseBuildTest extends TestCase
             'nordvarr/bin/nordvarr.php',
             'nordvarr/migrations/0001_zaklad.sql',
             'nordvarr/lang/en.php',
+            'nordvarr/public/assets/js/topology.js',
+            'nordvarr/public/assets/vendor/VERSIONS.md',
+            'nordvarr/public/assets/vendor/cytoscape-3.34.2/cytoscape.min.js',
+            'nordvarr/public/assets/vendor/cytoscape-3.34.2/LICENSE',
+            'nordvarr/public/assets/vendor/dagre-0.8.5/dagre.min.js',
+            'nordvarr/public/assets/vendor/cytoscape-dagre-2.5.0/cytoscape-dagre.js',
         ] as $expected) {
             self::assertContains($expected, $files);
         }

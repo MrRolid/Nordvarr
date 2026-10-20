@@ -532,6 +532,7 @@ return [
     'topology.in_view' => 'V zobrazení ({count})',
     'topology.graph' => 'Graf objektů a vztahů',
     'topology.too_many' => 'Filtru odpovídá {count} objektů, graf jich zobrazí nejvýš {max}. Zužte výběr podle typu, štítku nebo stavu.',
+    'topology.truncated' => 'Zobrazeno {max} z {count} objektů okolí, zvolte menší hloubku.',
     'topology.empty' => 'V tomto zobrazení nejsou žádné objekty.',
     'topology.causal' => 'cesta k pravděpodobné příčině',
     'topology.ring' => 'prstenec: stav kontrol',

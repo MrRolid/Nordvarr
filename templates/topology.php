@@ -83,6 +83,9 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
             </form>
 
             <h2 class="topo-h"><?= $v->t('topology.in_view', ['count' => count($nodes)]) ?></h2>
+            <?php if ($graph['truncated'] && $params['mode'] === 'neighborhood'): ?>
+            <p class="small-text muted" data-test="truncated"><?= $v->t('topology.truncated', ['max' => \Nordvarr\Topology\Topology::MAX_NODES, 'count' => (int) $graph['total']]) ?></p>
+            <?php endif; ?>
             <ul class="node-list" data-test="node-list">
                 <?php foreach ($nodes as $n): ?>
                 <?php $d = $n['data']; ?>
