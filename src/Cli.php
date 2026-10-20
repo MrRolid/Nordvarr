@@ -6,6 +6,8 @@ namespace Nordvarr;
 
 use Nordvarr\Db\Database;
 use Nordvarr\Db\Migrator;
+use Nordvarr\Inventory\DemoData;
+use Nordvarr\Inventory\Inventory;
 use Nordvarr\Repository\SettingsRepository;
 use Throwable;
 
@@ -31,6 +33,7 @@ final class Cli
                 'version' => $this->version($out),
                 'migrate' => $this->migrate($out),
                 'worker' => $this->worker(),
+                'demo-data' => $this->demoData($out, $err, in_array('--force', $args, true)),
                 default => $this->help($out, $command !== 'help'),
             };
         } catch (Throwable $e) {
@@ -97,11 +100,41 @@ final class Cli
     }
 
     /**
+     * Nahraje ukázková data. Do inventáře s jinými daty jen s --force.
+     *
+     * @param resource $out
+     * @param resource $err
+     */
+    private function demoData($out, $err, bool $force): int
+    {
+        $config = Config::load($this->appRoot . '/config.php');
+        $pdo = Database::connectSqlite($config->databasePath());
+        if ((new Migrator($pdo, $this->appRoot . '/migrations'))->pending() !== []) {
+            fwrite($err, "Databáze čeká na migrace. Spusťte nejdřív: php bin/nordvarr.php migrate\n");
+
+            return 1;
+        }
+        $inventory = new Inventory($pdo);
+        $foreign = (int) $pdo->query(
+            "SELECT COUNT(*) FROM objects WHERE id NOT IN (SELECT object_id FROM object_external_ids WHERE source = 'demo')"
+        )->fetchColumn();
+        if ($foreign > 0 && !$force) {
+            fwrite($err, "Inventář už obsahuje jiné objekty ($foreign). Ukázková data se přidají jen s volbou --force.\n");
+
+            return 1;
+        }
+        $result = (new DemoData($inventory))->load();
+        fwrite($out, "Ukázková data nahrána: objektů {$result['objects']}, událostí {$result['events']}.\n");
+
+        return 0;
+    }
+
+    /**
      * @param resource $out
      */
     private function help($out, bool $unknown): int
     {
-        fwrite($out, "Použití: php bin/nordvarr.php <worker|migrate|version>\n");
+        fwrite($out, "Použití: php bin/nordvarr.php <worker|migrate|demo-data [--force]|version>\n");
 
         return $unknown ? 2 : 0;
     }

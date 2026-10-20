@@ -6,6 +6,7 @@ declare(strict_types=1);
  * Příkazová řádka Nordvarru.
  *   php bin/nordvarr.php worker    spouští cron každou minutu
  *   php bin/nordvarr.php migrate   provede čekající migrace (se zálohou)
+ *   php bin/nordvarr.php demo-data [--force]   nahraje ukázkovou fiktivní infrastrukturu
  *   php bin/nordvarr.php version
  */
 
