@@ -250,6 +250,8 @@ Funguje GET i POST. Když signál nepřijde do intervalu plus tolerance, kontrol
 - Audit (přihlášení, tokeny, změny nastavení a kanálů, mazání, změna hesla) je v databázi v tabulce `audit_log`.
 - Kontroly a webhooky můžou mířit i na interní adresy ve vaší síti. To je záměr (monitoring vnitřní infrastruktury), proto účet admina chraňte silným heslem.
 - Export pro LLM a export inventáře maskují tajné údaje. Maskování je pojistka, ne důvod tajné údaje do inventáře ukládat.
+- HTTPS a hlavičku `Strict-Transport-Security` nastavte ve webovém serveru (aplikace neví, jestli k ní vede jen HTTPS).
+- Za reverzní proxy vidí aplikace jako IP adresu klienta adresu proxy: omezení přihlašování podle IP pak platí pro všechny klienty společně a cookie session nemusí dostat příznak `Secure`. Doporučený je přímý provoz na Apache s HTTPS.
 
 ## 11. Řešení problémů
 

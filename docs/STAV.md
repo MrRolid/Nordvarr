@@ -4,6 +4,55 @@ Aktualizováno: 2026-10-21
 
 ## Hotové fáze
 
+### F5 Export, bezpečnost, dokumentace (větev `faze-5-export-bezpecnost`, navazuje na `faze-4-topologie`)
+
+- **Export pro LLM** (SPEC kap. 10), `Nordvarr\Export\LlmContext`:
+  - tlačítko "Zkopírovat pro LLM" na kartě objektu vede na stránku s Markdownem a tlačítkem "Kopírovat" (`navigator.clipboard`, bez HTTPS se text označí k ručnímu zkopírování),
+  - obsah: identifikace, typ, tagy, externí id, stav a důvod, otevřené alerty s pravděpodobnou příčinou, souhrn kontrol za 24 h z hodinových agregací, okolí do 2 kroků v obou směrech (max. 30, řazeno nezdravé -> nedávno změněné -> bližší), události z okolí za 7 dní (max. 30), atributy včetně rozporů, dokumentace (max. 4000 znaků),
+  - velikost nejvýš 24 kB pro Markdown i JSON (postupně se zkracuje dokumentace, události, okolí, atributy),
+  - API `GET /api/v1/objects/{id}/context` (JSON, nebo Markdown s `?format=markdown`), nový scope `context:read`.
+- **Přísné maskování** (`SecretMasker::maskStrict`): klíče atributů s `pass`, `pwd`, `secret`, `token`, `key`, `private`; přihlašovací údaje v URL; hesla v DSN; dvojice `klíč: hodnota` s tajným klíčem v textu (i `heslo:`); `Bearer` tokeny; bloky PEM privátních klíčů; řetězce s vysokou entropií (aspoň 20 znaků, malá i velká písmena a číslice, entropie aspoň 3,5 bitu na znak) a hex řetězce delší než 40 znaků. UUID, hash commitu, cesty a názvy hostů zůstanou.
+- **Účet:** změna hesla v Nastavení -> Účet (ověření současného hesla s omezením pokusů, ostatní přihlášení se zneplatní, audit) a příkaz `php bin/nordvarr.php reset-password <e-mail>` pro zapomenuté heslo.
+- **Bezpečnostní průchod** podle kap. 11 (viz níže) s opravami a regresními testy.
+- **`docs/NAVOD.md`:** požadavky, instalace (včetně Apache), cron a worker, první kroky, aktualizace, zálohy a obnova, zapomenuté heslo, API s curl (upsert, události, kontext, heartbeat, chybové kódy), konfigurace, bezpečnost, řešení problémů. Příklady curl jsou ověřené proti běžící instanci.
+- **Release 0.1.0:** `VERSION` je `0.1.0`. Release zip sestaví CI po pushnutí tagu `v0.1.0` (tag se má vytvořit až na `main` po sloučení fází).
+
+Ověření:
+
+- kanárkové testy: 14 nastražených tajných hodnot (atribut, URL, DSN, náhodný token, hex tajemství, `password:` a `Bearer` v dokumentaci, PEM klíč, `aws_secret_access_key`, událost, popis, URL kontroly, detail důvodu, popis souseda) se neobjeví v Markdownu, JSON, na stránce exportu ani v API; test zároveň hlídá, že běžný text (commit, cesta, název hosta) maskovaný není. Ověřeno i obráceně: po vypnutí maskování podle entropie test selže. `LlmExportTest`, `SecretMaskerTest`,
+- obsah exportu, řazení okolí, limit 24 kB, prázdný objekt, API se scope (200, 401, 403, 404, Markdown): `LlmExportTest`,
+- změna hesla, zneplatnění jiných session, omezení pokusů, CLI reset: `AccountTest`,
+- CSRF u všech 34 POST adres UI (seznam se čte ze zdrojového kódu, nová adresa se otestuje sama): `AppTest`,
+- opravy z bezpečnostního průchodu: `SecurityPassTest`, `MarkdownTest`,
+- e2e `export.spec.js`: tlačítko na kartě, Kopírovat do schránky (obsah schránky = text exportu), tajné heslo atributu maskované,
+- testy zelené: `composer test` (419 testů), `npm run e2e` (27 testů).
+
+#### Bezpečnostní průchod (SPEC kap. 11)
+
+Kód prošla nezávislá kontrola (samostatný agent jen pro čtení) proti každému bodu kapitoly 11 a obvyklým chybám webových aplikací.
+
+| Bod kap. 11 | Stav |
+|---|---|
+| Hesla Argon2id (jinak bcrypt) | v pořádku; nově se neověřuje heslo delší než 4096 bajtů (ochrana procesoru) |
+| Session: HttpOnly, SameSite=Lax, Secure na HTTPS, nové id po přihlášení, zneplatnění po změně hesla | v pořádku; chyběla možnost heslo změnit -> **doplněno** (Nastavení -> Účet, CLI `reset-password`) |
+| CSRF u každého POST | v pořádku (kontrola v `App` před směrováním, `hash_equals`); nově test všech POST adres |
+| Omezení přihlašování | v pořádku; staré záznamy pokusů nově maže worker (po 2 dnech) |
+| API tokeny jako prefix + HMAC-SHA256 | v pořádku |
+| Datový adresář mimo webroot, `.htaccess` | v pořádku; **opraveno**: soubory vznikaly s výchozími právy (často čitelné pro všechny), nově `umask 0027`, `config.php` dostane práva 0640 ještě před zápisem tajemství |
+| Hlavičky CSP, X-Frame-Options, Referrer-Policy, nosniff | v pořádku na všech odpovědích (HTML, JSON, API, heartbeat, instalátor, chyby, přesměrování) |
+| Audit | **doplněno**: odebrání tagu, archivace a obnovení objektu, změna a obnova hesla |
+
+Další zjištění a opravy:
+
+- **Přesměrování na cizí web přes přepínač jazyka** (střední až nízká závažnost): cesta `/\evil.example` prošla jako místní adresa a prohlížeč ji čte jako `//evil.example`. Opraveno: cesty se zpětným lomítkem nebo řídicími znaky se nahradí `/`.
+- **Odkaz v Markdownu `/\host`** se považoval za relativní. Opraveno.
+- **`install.php` bez zachycení výjimek:** neočekávaná chyba mohla ukázat výpis PHP. Opraveno (`display_errors` vypnuté v `index.php` i `install.php`, chybová stránka).
+- **Import kontrol** ukládal konfiguraci ze souboru bez normalizace. Opraveno (ukládá se ověřená konfigurace).
+- **Import:** zálohy před importem se nově rotují (posledních 10) a příliš velký soubor (nad `post_max_size`) hlásí srozumitelnou chybu 413 místo chyby CSRF.
+- Ověřeno bez nálezu: SQL jen přes parametry, escapování výstupu a Markdownu, role viewer bez POST, heartbeat token (128 bitů), tajemství kanálů šifrovaná a nikde nevypisovaná, API bez session a cookies, UI odmítá bearer tokeny.
+
+Nechané beze změny (popsané v `docs/NAVOD.md`, kap. 10): HSTS patří do konfigurace webového serveru; za reverzní proxy aplikace vidí IP proxy a nepozná HTTPS; tabulka auditu nemá retenci; kontroly a webhooky smí mířit na interní adresy (záměr, nastavuje je jen admin).
+
 ### F4 Topologie a diagnostická karta (větev `faze-4-topologie`, navazuje na `faze-3-alerty`)
 
 - Stránka Topologie (`/topology`) s grafem v Cytoscape.js a rozvržením dagre (knihovny s pevnou verzí v `public/assets/vendor/`, záznam ve `VERSIONS.md`):
@@ -131,9 +180,9 @@ Nic.
 - Composer v cloud VM stahuje balíčky přes git (API GitHubu `api.github.com` i `codeload.github.com` vrací 403), funguje to, jen pomaleji.
 - Kontrola dostupnosti datového adresáře z webu dělá HTTP požadavek serveru na sebe sama; na hostingu, kde server nevidí sám sebe, zůstane jen obecné varování.
 - Testovaný běh je na vestavěném serveru PHP; na skutečném Apache se `.htaccess` (mod_rewrite, proměnná `NORDVARR_REWRITE`, předání hlavičky Authorization pro API) zatím neověřoval.
-- Po nahrání nové verze se migrace spustí až při prvním požadavku přihlášeného admina (SPEC kap. 12). Do té doby API vrací 500, protože nové tabulky ještě neexistují. Řešení: po aktualizaci se přihlásit nebo spustit `php bin/nordvarr.php migrate`.
+- Po nahrání nové verze se migrace spustí až při prvním požadavku přihlášeného admina (SPEC kap. 12). Do té doby API vrací 500, protože nové tabulky ještě neexistují. Řešení: po aktualizaci se přihlásit nebo spustit `php bin/nordvarr.php migrate` (popsané v `docs/NAVOD.md`).
 - Seznam objektů ve výběru cíle vztahu na detailu objektu obsahuje všechny objekty; pro cílovou velikost (nízké stovky) to stačí, pro víc objektů by bylo potřeba vyhledávání.
-- Správa uživatelů v nastavení zatím chybí (viz ROZHODNUTI F1 bod 14).
+- Správa dalších uživatelů v nastavení chybí, MVP má jednoho admina; heslo jde změnit v Nastavení -> Účet (viz ROZHODNUTI F1 bod 14 a F5).
 - Detail chyby u síťových kontrol přebírá anglický text z knihovny curl (např. "Failed to connect ..."); kód důvodu je vždy z pevného seznamu.
 - Souhrn za 24 h v detailu kontroly se počítá z hodinových agregací, aktuální hodina se v něm objeví až po hodinové údržbě workeru.
 - Kontrola `tls_expiry` podporuje jen přímé TLS (např. 443, 465, 993), ne STARTTLS.
@@ -143,8 +192,19 @@ Nic.
 - Změna `app_secret` v `config.php` znemožní dešifrovat tajné údaje kanálů, je pak potřeba je zadat znovu.
 - Mapa topologie ukazuje stav, latenci kontrol, alerty a příčiny. Metriky jako CPU, RAM nebo GPU by potřebovaly hostového agenta, který je mimo rozsah MVP (SPEC kap. 14).
 - Rozvržení grafu se při každém načtení počítá znovu (ruční pozice se podle SPEC neukládají). U velkých grafů v režimu filtru (nad 24 uzlů) se místo dagre použije silové rozložení, viz ROZHODNUTI F4 bod 3. U stovek uzlů jsou popisky malé, je potřeba přiblížit.
+- Maskování podle entropie je heuristika: krátké nebo slovníkové tajné hodnoty v textu bez klíče (např. "heslo je zahrada") nepozná. Atributy s citlivým klíčem a dvojice `klíč: hodnota` maskuje vždy.
+- Záznamy auditu (včetně neúspěšných přihlášení) se nemažou; při dlouhodobém zkoušení hesel tabulka `audit_log` roste. Tabulku pokusů o přihlášení worker čistí.
 - Cytoscape vkládá na stránku vlastní `<style>`, který CSP blokuje. Obchází se to prázdným prvkem s id, které knihovna hledá, a pravidlem v `app.css` (ROZHODNUTI F4 bod 7). Při aktualizaci knihovny je potřeba to ověřit (e2e test hlídá chyby v konzoli).
 
 ## Další krok
 
-F5 Export, bezpečnost, dokumentace: export pro LLM (Markdown i JSON v API) s maskováním a kanárkovými testy, tlačítko "Zkopírovat pro LLM" na kartě objektu, kontrolní průchod bezpečnosti podle kapitoly 11 (zjištění a opravy do `docs/STAV.md`), `docs/NAVOD.md` (instalace, cron, aktualizace, příklady API s curl), release 0.1.0.
+MVP podle SPEC je hotové (F0 až F5). Po sloučení větví do `main` vytvořit tag `v0.1.0`, CI z něj sestaví release zip.
+
+**F6 Hostový agent** (na přání vlastníka z 21. 10. 2026; SPEC ho řadí mimo MVP, proto až po release 0.1.0, viz ROZHODNUTI F5 bod 11). Návrh:
+
+- agent: jeden skript pro Linux (bash + curl, bez dalších závislostí) spouštěný cronem nebo systemd timerem každou minutu; posílá CPU, load, RAM, swap, zaplnění disků, uptime, síťový provoz a GPU (přes `nvidia-smi`, pokud je k dispozici),
+- API `POST /api/v1/metrics` s tokenem se scope `metrics:write`, server se pozná podle `external_id` (stejně jako u upsertu),
+- ukládání: syrové hodnoty 48 h, hodinové agregace 400 dní (jako u kontrol),
+- nový typ kontroly `agent`: chybějící data -> nefunguje (jako heartbeat), prahy CPU, RAM a disku -> omezeně / nefunguje, takže fungují alerty, potlačení i údržbová okna,
+- UI: aktuální hodnoty a průběh za 24 h na kartě objektu, pruhy CPU a RAM u uzlu v topologii (jako na referenčním snímku), metriky v exportu pro LLM.
+
