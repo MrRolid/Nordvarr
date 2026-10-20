@@ -608,4 +608,16 @@ return [
     'llm.no_docs' => 'No documentation.',
     'llm.docs_truncated' => '(The documentation is truncated.)',
     'llm.truncated' => '(The export is truncated to {kb} kB.)',
+
+    'settings.account' => 'Account',
+    'settings.account_email' => 'Signed in as: {email}',
+    'settings.password_current' => 'Current password',
+    'settings.password_new' => 'New password',
+    'settings.password_confirm' => 'New password again',
+    'settings.password_hint' => 'At least {min} characters. All other sessions are signed out after the change.',
+    'settings.password_change' => 'Change password',
+    'settings.password_changed' => 'The password was changed, other sessions are signed out.',
+    'err.password_current' => 'The current password does not match.',
+    'err.password_short' => 'The new password must have at least {min} characters.',
+    'err.password_mismatch' => 'The new passwords do not match.',
 ];

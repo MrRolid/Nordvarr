@@ -609,4 +609,16 @@ return [
     'llm.no_docs' => 'Dokumentace chybí.',
     'llm.docs_truncated' => '(Dokumentace je zkrácená.)',
     'llm.truncated' => '(Export je zkrácený na {kb} kB.)',
+
+    'settings.account' => 'Účet',
+    'settings.account_email' => 'Přihlášený účet: {email}',
+    'settings.password_current' => 'Současné heslo',
+    'settings.password_new' => 'Nové heslo',
+    'settings.password_confirm' => 'Nové heslo znovu',
+    'settings.password_hint' => 'Aspoň {min} znaků. Po změně se odhlásí všechna ostatní přihlášení.',
+    'settings.password_change' => 'Změnit heslo',
+    'settings.password_changed' => 'Heslo bylo změněno, ostatní přihlášení jsou zneplatněná.',
+    'err.password_current' => 'Současné heslo nesouhlasí.',
+    'err.password_short' => 'Nové heslo musí mít aspoň {min} znaků.',
+    'err.password_mismatch' => 'Nová hesla se neshodují.',
 ];

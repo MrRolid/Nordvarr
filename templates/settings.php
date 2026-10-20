@@ -8,6 +8,8 @@
 /** @var string|null $newToken */
 /** @var string|null $tokenError */
 /** @var array{name: string, source: string, scopes: list<string>} $tokenValues */
+/** @var array<string, mixed> $account */
+/** @var string|null $passwordError */
 /** @var list<array<string, mixed>> $channels */
 /** @var int $reminderHours */
 /** @var string $baseUrl */
@@ -125,6 +127,25 @@
         <input id="import-file" name="file" type="file" accept="application/json,.json" required>
         <label class="check-label"><input type="checkbox" name="confirm" value="1" required> <?= $v->t('settings.import_confirm') ?></label>
         <button type="submit" class="danger"><?= $v->t('settings.import') ?></button>
+    </form>
+</section>
+
+<section class="card" id="account">
+    <h2><?= $v->t('settings.account') ?></h2>
+    <p><?= $v->t('settings.account_email', ['email' => (string) $account['email']]) ?></p>
+    <?php if ($passwordError !== null): ?>
+    <p class="alert-box" role="alert" data-test="password-error"><?= $v->t($passwordError, ['min' => \Nordvarr\Security\Passwords::MIN_LENGTH]) ?></p>
+    <?php endif; ?>
+    <form method="post" action="<?= $v->url('/settings/password') ?>" class="form" data-test="password-form">
+        <?= $v->csrfField() ?>
+        <label for="pw-current"><?= $v->t('settings.password_current') ?></label>
+        <input id="pw-current" name="current_password" type="password" autocomplete="current-password" required>
+        <label for="pw-new"><?= $v->t('settings.password_new') ?></label>
+        <input id="pw-new" name="new_password" type="password" autocomplete="new-password" minlength="<?= \Nordvarr\Security\Passwords::MIN_LENGTH ?>" required>
+        <label for="pw-confirm"><?= $v->t('settings.password_confirm') ?></label>
+        <input id="pw-confirm" name="new_password_confirm" type="password" autocomplete="new-password" required>
+        <p class="muted small-text"><?= $v->t('settings.password_hint', ['min' => \Nordvarr\Security\Passwords::MIN_LENGTH]) ?></p>
+        <button type="submit"><?= $v->t('settings.password_change') ?></button>
     </form>
 </section>
 
