@@ -203,7 +203,10 @@ final class Transfer
                     if ($valid['errors'] !== []) {
                         throw new ValidationException(['file' => 'invalid_content']);
                     }
-                    $checks->restore($c);
+                    // Ukládá se ověřená a normalizovaná konfigurace, ne syrový vstup ze souboru.
+                    $common = $valid['common'];
+                    $checks->restore(['config' => $valid['config'], 'name' => $common['name'], 'interval_s' => $common['interval_s'],
+                        'timeout_s' => $common['timeout_s'], 'failure_threshold' => $common['failure_threshold']] + $c);
                 }
 
                 return [

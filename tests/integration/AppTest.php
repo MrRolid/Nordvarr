@@ -149,6 +149,23 @@ final class AppTest extends TestCase
         self::assertNull($this->session->get('user_id'));
     }
 
+    public function testEveryUiPostRouteRequiresCsrf(): void
+    {
+        $this->login();
+        $paths = [];
+        foreach (glob(dirname(__DIR__, 2) . '/src/{App.php,Ui/*.php}', GLOB_BRACE) ?: [] as $file) {
+            preg_match_all("/->post\\('([^']+)'/", (string) file_get_contents($file), $m);
+            array_push($paths, ...$m[1]);
+        }
+        self::assertGreaterThan(25, count($paths), 'Test našel POST adresy UI.');
+        foreach (array_unique($paths) as $pattern) {
+            $path = preg_replace('/\{[a-z]+\}/', '01a15b85-582e-7a65-b77a-24a0065da59a', $pattern);
+            self::assertSame(403, $this->request('POST', $path, ['confirm' => '1'])->status, $pattern);
+            self::assertSame(403, $this->request('POST', $path, ['_csrf' => str_repeat('a', 64), 'confirm' => '1'])->status, $pattern);
+        }
+        self::assertNotNull($this->session->get('user_id'), 'Odmítnutý POST nikoho neodhlásí.');
+    }
+
     public function testLockAfterTenFailures(): void
     {
         for ($i = 0; $i < 4; $i++) {

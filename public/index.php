@@ -12,6 +12,10 @@ use Nordvarr\Http\Request;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Session;
 
+// Podrobnosti chyb jen do logu, nikdy do stránky. Soubory v datovém adresáři bez práv pro ostatní.
+ini_set('display_errors', '0');
+umask(0027);
+
 $appRoot = dirname(__DIR__);
 require $appRoot . '/src/autoload.php';
 

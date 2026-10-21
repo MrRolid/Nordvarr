@@ -57,6 +57,7 @@ $id = (string) $object['id'];
     <?php endif; ?>
     <div class="row">
         <a class="button primary" href="<?= $v->url('/topology', ['center' => $id]) ?>" data-test="show-topology"><?= $v->t('topology.show') ?></a>
+        <a class="button" href="<?= $v->url('/objects/' . $id . '/llm') ?>" data-test="llm-export"><?= $v->t('llm.button') ?></a>
         <a class="button" href="<?= $v->url('/objects/' . $id . '/edit') ?>"><?= $v->t('object.edit') ?></a>
         <form method="post" action="<?= $v->url('/objects/' . $id . '/lifecycle') ?>" class="inline">
             <?= $v->csrfField() ?>

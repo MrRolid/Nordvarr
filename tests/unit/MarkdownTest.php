@@ -52,6 +52,7 @@ final class MarkdownTest extends TestCase
         yield 'javascript link bez závorek' => ['[klik](javascript:alert`1`)'];
         yield 'data link' => ['[klik](data:text/html;base64,PHNjcmlwdD4=)'];
         yield 'protocol relative' => ['[klik](//evil.example.net/)'];
+        yield 'zpětné lomítko' => ['[klik](/\\evil.example.net/)'];
         yield 'uvozovky v url' => ['[klik](https://example.com/"onmouseover="alert(1))'];
         yield 'html v tabulce' => ["| <b onclick=x> |\n|---|\n| <iframe> |"];
         yield 'html v nadpisu' => ['# <svg onload=alert(1)>'];
@@ -68,6 +69,7 @@ final class MarkdownTest extends TestCase
         self::assertStringNotContainsString('href="javascript', $html);
         self::assertStringNotContainsString('href="data:', $html);
         self::assertStringNotContainsString('href="//', $html);
+        self::assertStringNotContainsString('href="/\\', $html);
         self::assertStringNotContainsString("\x00", $html);
     }
 }

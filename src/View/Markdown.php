@@ -191,6 +191,10 @@ final class Markdown
             return true;
         }
         // Relativní odkazy v rámci aplikace (ne //host, který by vedl jinam).
+        if (str_contains($url, '\\')) {
+            return false;
+        }
+
         return preg_match('#^(/(?!/)|\#|\?)#', $url) === 1;
     }
 }

@@ -138,6 +138,7 @@ final class ObjectController
     {
         $new = $object['lifecycle'] === 'active' ? 'archived' : 'active';
         $this->inventory->objects->update((string) $object['id'], ['lifecycle' => $new]);
+        $this->ctx->audit($new === 'archived' ? 'object.archive' : 'object.restore', ['id' => $object['id'], 'name' => $object['name']]);
         $this->ctx->flash($new === 'archived' ? 'object.archived_done' : 'object.restored_done');
 
         return $this->ctx->redirect('/objects/' . $object['id']);
@@ -254,6 +255,7 @@ final class ObjectController
         $tag = $this->ctx->request->input('tag');
         $this->inventory->tags->detach((string) $object['id'], $tag);
         $this->inventory->objects->touch((string) $object['id']);
+        $this->ctx->audit('tag.remove', ['object_id' => $object['id'], 'tag' => $tag]);
 
         return $this->back($object, 'object.tag_removed');
     }

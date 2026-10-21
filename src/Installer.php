@@ -87,7 +87,7 @@ final class Installer
         if (filter_var($input['email'], FILTER_VALIDATE_EMAIL) === false) {
             $errors['email'] = 'install.err_email';
         }
-        if (mb_strlen($input['password']) < Passwords::MIN_LENGTH) {
+        if (mb_strlen($input['password']) < Passwords::MIN_LENGTH || strlen($input['password']) > Passwords::MAX_BYTES) {
             $errors['password'] = 'install.err_password';
         } elseif (!hash_equals($input['password'], $input['password_confirm'])) {
             $errors['password_confirm'] = 'install.err_password_confirm';
@@ -110,6 +110,20 @@ final class Installer
             throw new RuntimeException('Nordvarr už je nainstalovaný.');
         }
         $dataDir = rtrim($input['data_dir'], '/');
+        // Databáze, zálohy a logy nemají být čitelné pro ostatní uživatele serveru.
+        $umask = umask(0027);
+        try {
+            $this->installFiles($dataDir, $input, $ip);
+        } finally {
+            umask($umask);
+        }
+    }
+
+    /**
+     * @param array{data_dir: string, email: string, password: string, password_confirm: string, timezone: string} $input
+     */
+    private function installFiles(string $dataDir, array $input, string $ip): void
+    {
         $this->prepareDataDir($dataDir);
 
         $pdo = Database::connectSqlite($dataDir . '/nordvarr.sqlite');
@@ -193,6 +207,7 @@ final class Installer
                 throw new RuntimeException('Adresář nelze vytvořit: ' . $dir);
             }
         }
+        @chmod($dataDir, 0750);
         if (!is_writable($dataDir)) {
             throw new RuntimeException('Do datového adresáře nelze zapisovat: ' . $dataDir);
         }
@@ -220,8 +235,8 @@ final class Installer
         if ($handle === false) {
             throw new RuntimeException('Soubor config.php nelze vytvořit.');
         }
+        @chmod($this->configFile(), 0640);
         fwrite($handle, $php);
         fclose($handle);
-        @chmod($this->configFile(), 0640);
     }
 }

@@ -80,3 +80,21 @@ for (const box of document.querySelectorAll('[data-refresh-url]')) {
     });
     schedule();
 }
+
+// Tlačítko Kopírovat (export pro LLM): navigator.clipboard, jinak označí text k ručnímu zkopírování.
+for (const button of document.querySelectorAll('[data-copy-target]')) {
+    const field = document.getElementById(button.dataset.copyTarget);
+    const status = document.querySelector(`[data-copy-status="${button.dataset.copyTarget}"]`);
+    if (!field) continue;
+    button.addEventListener('click', async () => {
+        try {
+            if (!navigator.clipboard) throw new Error('clipboard');
+            await navigator.clipboard.writeText(field.value);
+            if (status) status.textContent = button.dataset.copied;
+        } catch {
+            field.focus();
+            field.select();
+            if (status) status.textContent = button.dataset.copyFailed;
+        }
+    });
+}

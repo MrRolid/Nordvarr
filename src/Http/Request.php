@@ -60,6 +60,9 @@ final class Request
                 $headers[strtolower(str_replace('_', '-', substr($key, 5)))] = $value;
             }
         }
+        if (isset($server['CONTENT_LENGTH']) && is_string($server['CONTENT_LENGTH'])) {
+            $headers['content-length'] = $server['CONTENT_LENGTH'];
+        }
         if (!isset($headers['authorization']) && isset($server['REDIRECT_HTTP_AUTHORIZATION'])) {
             $headers['authorization'] = (string) $server['REDIRECT_HTTP_AUTHORIZATION'];
         }
@@ -85,6 +88,10 @@ final class Request
 
     public static function normalizePath(string $path): string
     {
+        // Zpětné lomítko a řídicí znaky prohlížeče čtou jako "//", což by vedlo na cizí web.
+        if (preg_match('/[\\\\\x00-\x1f\x7f]/', $path) === 1) {
+            return '/';
+        }
         $path = '/' . trim($path, '/');
 
         return preg_replace('#/+#', '/', $path) ?? '/';

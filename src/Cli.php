@@ -14,7 +14,10 @@ use Nordvarr\Checks\Worker;
 use Nordvarr\Http\Client\CurlHttpClient;
 use Nordvarr\Inventory\DemoData;
 use Nordvarr\Inventory\Inventory;
+use Nordvarr\Repository\AuditLogRepository;
 use Nordvarr\Repository\HttpCacheRepository;
+use Nordvarr\Repository\UserRepository;
+use Nordvarr\Security\Passwords;
 use Throwable;
 
 /**
@@ -40,6 +43,7 @@ final class Cli
                 'migrate' => $this->migrate($out),
                 'worker' => $this->worker($err),
                 'demo-data' => $this->demoData($out, $err, in_array('--force', $args, true)),
+                'reset-password' => $this->resetPassword($args[1] ?? '', $out, $err),
                 default => $this->help($out, $command !== 'help'),
             };
         } catch (Throwable $e) {
@@ -160,9 +164,38 @@ final class Cli
     /**
      * @param resource $out
      */
+    /**
+     * Zapomenuté heslo: vygeneruje nové náhodné heslo, vypíše ho jen jednou
+     * a zneplatní všechna přihlášení účtu.
+     *
+     * @param resource $out
+     * @param resource $err
+     */
+    private function resetPassword(string $email, $out, $err): int
+    {
+        $config = Config::load($this->appRoot . '/config.php');
+        $pdo = Database::connectSqlite($config->databasePath());
+        $users = new UserRepository($pdo);
+        $user = $users->findByEmail(UserRepository::normalizeEmail($email));
+        if ($user === null) {
+            fwrite($err, "Účet s tímto e-mailem neexistuje.\n");
+
+            return 1;
+        }
+        $password = rtrim(strtr(base64_encode(random_bytes(15)), '+/', '-_'), '=');
+        $users->updatePassword((string) $user['id'], Passwords::hash($password));
+        (new AuditLogRepository($pdo))->log('user.password_reset', (string) $user['id'], 'cli');
+        fwrite($out, "Nové heslo pro {$user['email']}: $password\nPo přihlášení ho změňte v Nastavení -> Účet.\n");
+
+        return 0;
+    }
+
+    /**
+     * @param resource $out
+     */
     private function help($out, bool $unknown): int
     {
-        fwrite($out, "Použití: php bin/nordvarr.php <worker|migrate|demo-data [--force]|version>\n");
+        fwrite($out, "Použití: php bin/nordvarr.php <worker|migrate|demo-data [--force]|reset-password <e-mail>|version>\n");
 
         return $unknown ? 2 : 0;
     }

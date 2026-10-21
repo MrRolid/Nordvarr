@@ -18,6 +18,11 @@ use Nordvarr\Inventory\Transfer;
 use Nordvarr\Inventory\ValidationException;
 use Nordvarr\Repository\ApiTokenRepository;
 use Nordvarr\Repository\ChannelRepository;
+use Nordvarr\Repository\LoginAttemptRepository;
+use Nordvarr\Repository\UserRepository;
+use Nordvarr\Security\LoginThrottle;
+use Nordvarr\Security\Passwords;
+use Nordvarr\Time;
 use Nordvarr\Repository\SettingsRepository;
 
 /**
@@ -40,6 +45,7 @@ final class SettingsController
         $router->post('/settings/tokens/{id}/revoke', fn (array $p): Response => $this->revokeToken($p['id']));
         $router->get('/settings/export', fn (): Response => $this->export());
         $router->post('/settings/import', fn (): Response => $this->import());
+        $router->post('/settings/password', fn (): Response => $this->changePassword());
     }
 
     /**
@@ -62,8 +68,51 @@ final class SettingsController
             'cronLine' => (new Installer($this->appRoot))->cronLine(),
             'newToken' => null,
             'tokenError' => null,
-            'tokenValues' => ['name' => '', 'source' => '', 'scopes' => ApiTokens::SCOPES],
+            'tokenValues' => ['name' => '', 'source' => '', 'scopes' => ['inventory:write', 'events:write']],
+            'account' => $this->ctx->user,
+            'passwordError' => null,
         ], $status);
+    }
+
+    /**
+     * Změna vlastního hesla. Ověří současné heslo (neúspěchy se počítají do omezení
+     * přihlašování), zneplatní ostatní session a aktuální session ponechá s novým id.
+     */
+    private function changePassword(): Response
+    {
+        $r = $this->ctx->request;
+        $user = $this->ctx->user;
+        $email = (string) $user['email'];
+        $now = Time::now();
+        $throttle = new LoginThrottle(new LoginAttemptRepository($this->ctx->pdo));
+        if ($throttle->retryAfter($email, $r->ip, $now) > 0) {
+            return $this->index(['passwordError' => 'login.throttled'], 429);
+        }
+        if (!Passwords::verify($r->input('current_password'), (string) $user['password_hash'])) {
+            $throttle->record($email, $r->ip, false, $now);
+            $this->ctx->audit('user.password_failed');
+
+            return $this->index(['passwordError' => 'err.password_current'], 422);
+        }
+        $new = $r->input('new_password');
+        if (mb_strlen($new) < Passwords::MIN_LENGTH || strlen($new) > Passwords::MAX_BYTES) {
+            return $this->index(['passwordError' => 'err.password_short'], 422);
+        }
+        if ($new !== $r->input('new_password_confirm')) {
+            return $this->index(['passwordError' => 'err.password_mismatch'], 422);
+        }
+        $users = new UserRepository($this->ctx->pdo);
+        $users->updatePassword((string) $user['id'], Passwords::hash($new), $now);
+        $updated = $users->findById((string) $user['id']);
+        $this->ctx->session->regenerate();
+        $this->ctx->session->set('session_version', (int) ($updated['session_version'] ?? 0));
+        $this->ctx->audit('user.password_change');
+        $this->ctx->flash('settings.password_changed');
+
+        $response = $this->ctx->redirect('/settings');
+        $response->headers['Location'] .= '#account';
+
+        return $response;
     }
 
     private function timezone(): Response
@@ -196,6 +245,12 @@ final class SettingsController
         }
         $backup = $backupDir . '/nordvarr-' . gmdate('Ymd-His') . '-pred-importem-' . bin2hex(random_bytes(3)) . '.sqlite';
         (new Migrator($this->ctx->pdo, $this->appRoot . '/migrations'))->backup($backup);
+        // Ponechá se posledních 10 záloh před importem.
+        $old = glob($backupDir . '/nordvarr-*-pred-importem-*.sqlite') ?: [];
+        sort($old);
+        foreach (array_slice($old, 0, max(0, count($old) - 10)) as $file) {
+            @unlink($file);
+        }
 
         try {
             $counts = (new Transfer(new Inventory($this->ctx->pdo)))->import($data);
