@@ -6,8 +6,11 @@ namespace Nordvarr\Tests\Integration;
 
 use Nordvarr\Http\Session;
 use Nordvarr\Repository\AuditLogRepository;
+use Nordvarr\Repository\LoginAttemptRepository;
 use Nordvarr\Repository\UserRepository;
+use Nordvarr\Security\LoginThrottle;
 use Nordvarr\Security\Passwords;
+use Nordvarr\Time;
 use Nordvarr\Tests\InstalledApp;
 use PHPUnit\Framework\TestCase;
 
@@ -90,8 +93,14 @@ final class AccountTest extends TestCase
     public function testWrongCurrentPasswordIsThrottled(): void
     {
         $this->loginAdmin();
-        for ($i = 0; $i < 10; $i++) {
-            $this->post('/settings/password', ['current_password' => 'spatne-' . $i, 'new_password' => 'nove-heslo-123', 'new_password_confirm' => 'nove-heslo-123']);
+        // Špatné současné heslo se počítá jako neúspěšné přihlášení.
+        $this->post('/settings/password', ['current_password' => 'spatne-0', 'new_password' => 'nove-heslo-123', 'new_password_confirm' => 'nove-heslo-123']);
+        $attempts = (new LoginAttemptRepository($this->pdo()))->failuresSinceLastSuccess('email', self::ADMIN_EMAIL, Time::now()->modify('-1 hour'));
+        self::assertCount(1, $attempts);
+        // Dalších 9 selhání přímo v tabulce (deterministicky, bez závislosti na rychlosti stroje): zámek na 15 minut.
+        $throttle = new LoginThrottle(new LoginAttemptRepository($this->pdo()));
+        for ($i = 0; $i < 9; $i++) {
+            $throttle->record(self::ADMIN_EMAIL, '192.0.2.50', false, Time::now());
         }
         $blocked = $this->post('/settings/password', ['current_password' => self::ADMIN_PASSWORD, 'new_password' => 'nove-heslo-123', 'new_password_confirm' => 'nove-heslo-123']);
         self::assertSame(429, $blocked->status);
