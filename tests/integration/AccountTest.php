@@ -95,12 +95,11 @@ final class AccountTest extends TestCase
         $this->loginAdmin();
         // Špatné současné heslo se počítá jako neúspěšné přihlášení.
         $this->post('/settings/password', ['current_password' => 'spatne-0', 'new_password' => 'nove-heslo-123', 'new_password_confirm' => 'nove-heslo-123']);
-        $attempts = (new LoginAttemptRepository($this->pdo()))->failuresSinceLastSuccess('email', self::ADMIN_EMAIL, Time::now()->modify('-1 hour'));
-        self::assertCount(1, $attempts);
+        self::assertSame(1, (int) $this->pdo()->query("SELECT COUNT(*) FROM login_attempts WHERE success = 0 AND email = 'admin@example.com'")->fetchColumn());
         // Dalších 9 selhání přímo v tabulce (deterministicky, bez závislosti na rychlosti stroje): zámek na 15 minut.
         $throttle = new LoginThrottle(new LoginAttemptRepository($this->pdo()));
         for ($i = 0; $i < 9; $i++) {
-            $throttle->record(self::ADMIN_EMAIL, '192.0.2.50', false, Time::now());
+            $throttle->record(self::ADMIN_EMAIL, '192.0.2.50', false, Time::now()->modify('+1 second'));
         }
         $blocked = $this->post('/settings/password', ['current_password' => self::ADMIN_PASSWORD, 'new_password' => 'nove-heslo-123', 'new_password_confirm' => 'nove-heslo-123']);
         self::assertSame(429, $blocked->status);
