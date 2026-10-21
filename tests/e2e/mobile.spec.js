@@ -66,3 +66,12 @@ test('topologie je na mobilu bez vodorovného posuvníku a graf se vykreslí', a
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('karta serveru s agentem je na mobilu bez vodorovného posuvníku', async ({ page }) => {
+  await loginOk(page);
+  await page.goto('/inventory?q=e2e-gpu');
+  await page.getByRole('link', { name: 'e2e-gpu.example.com' }).click();
+  await expect(page.getByTestId('host')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

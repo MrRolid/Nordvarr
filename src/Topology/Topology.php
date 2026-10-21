@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Nordvarr\Topology;
 
+use Nordvarr\Agent\Report;
 use Nordvarr\Alerts\MaintenanceState;
 use Nordvarr\Checks\ObjectStatus;
 use Nordvarr\Checks\Status;
 use Nordvarr\I18n;
+use Nordvarr\Repository\AgentRepository;
 use Nordvarr\Repository\AlertRepository;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\ObjectRepository;
@@ -117,6 +119,7 @@ final class Topology
         $paused = $maintenance->pausedObjects();
         $objects = (new ObjectRepository($this->pdo))->findMany($ids);
         $tags = (new TagRepository($this->pdo))->forObjects($ids);
+        $hosts = (new AgentRepository($this->pdo))->hosts($ids);
 
         $checksByObject = [];
         foreach ((new CheckRepository($this->pdo))->all() as $check) {
@@ -164,7 +167,7 @@ final class Topology
                 'status' => $status,
                 'statusLabel' => $this->i18n->t('status.' . $status),
                 'reason' => $worst !== null && !in_array($status, [Status::HEALTHY, Status::PAUSED, Status::NONE], true)
-                    ? $this->i18n->t('checktype.' . $worst['type']) . ': ' . ($worst['reason_code'] ?? '') : '',
+                    ? $this->i18n->t('checktype.' . $worst['type']) . ((string) ($worst['reason_code'] ?? '') !== '' ? ': ' . $worst['reason_code'] : '') : '',
                 'since' => $worst['since'] ?? null,
                 'latency' => $latency,
                 'checks' => count($checks),
@@ -174,7 +177,8 @@ final class Topology
                 'maintenance' => $maintenance->inMaintenance($id),
                 'tags' => $tags[$id] ?? [],
                 'center' => $id === $centerId,
-                'subtitle' => $this->subtitle($object, $status, $latency, count($checks)),
+                'subtitle' => isset($hosts[$id]) ? $this->hostSubtitle($hosts[$id]) : $this->subtitle($object, $status, $latency, count($checks)),
+                'host' => isset($hosts[$id]),
             ]];
         }
 
@@ -204,6 +208,20 @@ final class Topology
         }
 
         return ['nodes' => $nodes, 'edges' => $edges];
+    }
+
+    /**
+     * Druhý řádek popisku serveru s agentem: vytížení CPU a RAM (a GPU, pokud ho má).
+     *
+     * @param array<string, mixed> $host
+     */
+    private function hostSubtitle(array $host): string
+    {
+        $sample = Report::sample($host['snapshot']);
+        $fmt = static fn (?float $v): string => $v === null ? '-' : (string) (int) round($v);
+        $text = 'CPU ' . $fmt($sample['cpu_pct']) . " %\nRAM " . $fmt($sample['mem_pct']) . ' %';
+
+        return $sample['gpu_util_max_pct'] === null ? $text : $text . "\nGPU " . $fmt($sample['gpu_util_max_pct']) . ' %';
     }
 
     /**

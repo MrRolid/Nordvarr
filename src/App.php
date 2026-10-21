@@ -84,6 +84,11 @@ final class App
         $view->share('flash', $session->pull('flash'));
         $view->share('migrations', $session->pull('flash_migrations'));
 
+        // Skript agenta a jeho jednotky jsou veřejné (nic tajného neobsahují), server je stáhne curl bez přihlášení.
+        if ($request->method === 'GET' && preg_match('#^/agent/(nordvarr-agent\.(?:sh|service|timer|conf\.example))$#', $request->path, $m) === 1) {
+            return $this->agentFile($m[1]);
+        }
+
         $public = ['/login', '/lang'];
         if ($user === null && !in_array($request->path, $public, true)) {
             return Response::redirect($urls->route('/login'));
@@ -210,6 +215,20 @@ final class App
         }
         $url = ($request->https ? 'https://' : 'http://') . $host . $request->basePath . ($request->prettyUrls ? '' : '/index.php?r=');
         $settings->set('base_url', $url);
+    }
+
+    private function agentFile(string $name): Response
+    {
+        $file = $this->appRoot . '/agent/' . $name;
+        if (!is_file($file)) {
+            return new Response('Not found', 404, ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        return new Response((string) file_get_contents($file), 200, [
+            'Content-Type' => 'text/plain; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="' . $name . '"',
+            'Cache-Control' => 'no-cache',
+        ]);
     }
 
     private function error(View $view, int $status, string $messageKey): Response

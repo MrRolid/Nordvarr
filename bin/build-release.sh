@@ -16,7 +16,7 @@ fi
 
 PKG="$STAGE/nordvarr"
 mkdir -p "$PKG/bin"
-cp -R "$ROOT/public" "$ROOT/src" "$ROOT/templates" "$ROOT/lang" "$ROOT/migrations" "$PKG/"
+cp -R "$ROOT/public" "$ROOT/src" "$ROOT/templates" "$ROOT/lang" "$ROOT/migrations" "$ROOT/agent" "$PKG/"
 cp "$ROOT/bin/nordvarr.php" "$PKG/bin/"
 cp "$ROOT/config.example.php" "$ROOT/VERSION" "$ROOT/.htaccess" "$PKG/"
 if [[ -f "$ROOT/docs/NAVOD.md" ]]; then

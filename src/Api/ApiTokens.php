@@ -15,7 +15,7 @@ use Nordvarr\Repository\ApiTokenRepository;
  */
 final class ApiTokens
 {
-    public const SCOPES = ['inventory:write', 'events:write', 'context:read'];
+    public const SCOPES = ['inventory:write', 'events:write', 'context:read', 'agent:write'];
     public const RATE_LIMIT = 120;
     /** Zdroje, které API token nesmí používat (vyhrazené pro UI a import). */
     public const RESERVED_SOURCES = [Vocabulary::MANUAL_SOURCE, 'import'];

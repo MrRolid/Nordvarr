@@ -27,11 +27,21 @@ final class Reason
     public const TOOL_MISSING = 'tool_missing';
     public const DEPENDENCY_UNHEALTHY = 'dependency_unhealthy';
     public const UNKNOWN_ERROR = 'unknown_error';
+    // Hostový agent (F6).
+    public const AGENT_MISSING = 'agent_missing';
+    public const CPU_HIGH = 'cpu_high';
+    public const MEMORY_HIGH = 'memory_high';
+    public const DISK_FULL = 'disk_full';
+    public const TEMPERATURE_HIGH = 'temperature_high';
+    public const DISK_FAILING = 'disk_failing';
+    public const DISK_WEAR = 'disk_wear';
+    public const DISK_ERRORS = 'disk_errors';
 
     public const ALL = [
         self::DNS_FAILURE, self::TCP_REFUSED, self::TCP_TIMEOUT, self::TLS_ERROR, self::HTTP_4XX, self::HTTP_5XX,
         self::CONTENT_MISMATCH, self::LATENCY_DEGRADED, self::CERT_EXPIRING, self::CERT_EXPIRED, self::DOMAIN_EXPIRING,
         self::DOMAIN_EXPIRED, self::RDAP_NO_EXPIRY, self::HEARTBEAT_MISSED, self::CHECK_TIMEOUT, self::TOOL_MISSING,
-        self::DEPENDENCY_UNHEALTHY, self::UNKNOWN_ERROR,
+        self::DEPENDENCY_UNHEALTHY, self::UNKNOWN_ERROR, self::AGENT_MISSING, self::CPU_HIGH, self::MEMORY_HIGH,
+        self::DISK_FULL, self::TEMPERATURE_HIGH, self::DISK_FAILING, self::DISK_WEAR, self::DISK_ERRORS,
     ];
 }

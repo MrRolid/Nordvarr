@@ -8,6 +8,7 @@ declare(strict_types=1);
  *   /bot<token>/sendMessage   token "000000:BAD..." vrací chybu 401, jinak {"ok":true}
  *   /hook/ok                  200
  *   /hook/fail                500
+ *   .../api/v1/agent/report   200 (hlášení hostového agenta)
  */
 
 $dir = (string) getenv('NORDVARR_MOCK_DIR');
@@ -36,6 +37,8 @@ if (preg_match('#^/bot([^/]+)/sendMessage$#', $path, $m) === 1) {
     } else {
         echo '{"ok":true,"result":{"message_id":1}}';
     }
+} elseif (str_ends_with($path, '/api/v1/agent/report')) {
+    echo '{"object_id":"mock","created":false,"status":"healthy"}';
 } elseif ($path === '/hook/ok') {
     echo '{"received":true}';
 } elseif ($path === '/hook/fail') {

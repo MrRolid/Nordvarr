@@ -1,0 +1,16 @@
+#!/bin/sh
+# Falešný df pro test agenta: -i vypisuje inody, jinak bajty.
+case "$*" in
+  *-i*)
+    printf 'Filesystem     Type   Inodes  IUsed   IFree IUse%% Mounted on\n'
+    printf '/dev/nvme0n1p2 ext4 30000000 900000 29100000    3%% /\n'
+    printf 'tmpfs          tmpfs 4000000     10  3999990    1%% /run\n'
+    printf '/dev/sdb1      xfs  1000000  990000    10000   99%% /mnt/zalohy disk\n'
+    ;;
+  *)
+    printf 'Filesystem     Type 1-blocks Used Available Capacity Mounted on\n'
+    printf '/dev/nvme0n1p2 ext4 500000000000 200000000000 275000000000 43%% /\n'
+    printf 'tmpfs          tmpfs 4000000000 1000000 3999000000 1%% /run\n'
+    printf '/dev/sdb1      xfs 4000000000000 3800000000000 200000000000 95%% /mnt/zalohy disk\n'
+    ;;
+esac

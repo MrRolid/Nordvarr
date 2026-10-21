@@ -128,6 +128,7 @@ final class TopologyController
         }
 
         return JsonFragment::response($this->ctx, $this->ctx->view->render('partials/topology_node', [
+            'host' => \Nordvarr\Agent\HostView::forObject($this->ctx->pdo, $id, $checks, false),
             'object' => $object,
             'status' => ObjectStatus::forObject($object, $checks, $paused),
             'checks' => $checks,

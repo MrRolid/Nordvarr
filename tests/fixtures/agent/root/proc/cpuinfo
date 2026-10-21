@@ -1,0 +1,9 @@
+processor	: 0
+model name	: Example CPU 4C
+
+processor	: 1
+model name	: Example CPU 4C
+
+processor	: 2
+
+processor	: 3

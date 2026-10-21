@@ -11,6 +11,7 @@
 /** @var array<string, array<string, mixed>> $timelineObjects */
 /** @var string|null $docsHtml */
 /** @var list<string> $tags */
+/** @var array<string, mixed>|null $host */
 $id = (string) $object['id'];
 $worst = $status['check'];
 ?>
@@ -22,7 +23,7 @@ $worst = $status['check'];
     <p class="status-line">
         <?= $v->raw($v->render('partials/status', ['status' => $status['status']])) ?>
         <?php if ($worst !== null && !in_array($status['status'], ['healthy', 'paused', 'none'], true)): ?>
-        <span><?= $v->t('checktype.' . $worst['type']) ?>: <code><?= $v->e($worst['reason_code'] ?? '') ?></code>, <?= $v->ago((string) $worst['since']) ?></span>
+        <span><?= $v->t('checktype.' . $worst['type']) ?><?php if ((string) ($worst['reason_code'] ?? '') !== ''): ?>: <code><?= $v->e($worst['reason_code']) ?></code><?php endif; ?>, <?= $v->ago((string) $worst['since']) ?></span>
         <?php endif; ?>
     </p>
     <?php foreach ($openAlerts as $alert): ?>
@@ -37,6 +38,10 @@ $worst = $status['check'];
         <a class="button primary small" href="<?= $v->url('/objects/' . $id) ?>" data-test="open-card"><?= $v->t('topology.open_card') ?></a>
         <a class="button small" href="<?= $v->url('/topology', ['center' => $id]) ?>"><?= $v->t('topology.recenter') ?></a>
     </div>
+
+    <?php if ($host !== null): ?>
+    <?= $v->raw($v->render('partials/host_compact', ['host' => $host])) ?>
+    <?php endif; ?>
 
     <h3 class="np-h"><?= $v->t('object.checks') ?></h3>
     <?php if ($checks === []): ?>

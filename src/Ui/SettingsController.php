@@ -46,6 +46,7 @@ final class SettingsController
         $router->get('/settings/export', fn (): Response => $this->export());
         $router->post('/settings/import', fn (): Response => $this->import());
         $router->post('/settings/password', fn (): Response => $this->changePassword());
+        $router->get('/settings/agent', fn (): Response => $this->agentGuide());
     }
 
     /**
@@ -72,6 +73,25 @@ final class SettingsController
             'account' => $this->ctx->user,
             'passwordError' => null,
         ], $status);
+    }
+
+    /**
+     * Návod k instalaci hostového agenta s doplněnou adresou aplikace.
+     */
+    private function agentGuide(): Response
+    {
+        $base = (string) (new SettingsRepository($this->ctx->pdo))->get('base_url', '');
+        if ($base === '') {
+            $base = 'https://nordvarr.example.com';
+        }
+        // Soubory agenta jsou na hezké adrese i bez mod_rewrite přes index.php?r=.
+        $files = str_contains($base, '?r=') ? $base . '/agent/' : rtrim($base, '/') . '/agent/';
+
+        return $this->ctx->page('agent', [
+            'title' => 'agent.title',
+            'baseUrl' => $base,
+            'filesUrl' => $files,
+        ]);
     }
 
     /**

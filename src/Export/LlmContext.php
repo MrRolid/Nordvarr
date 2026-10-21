@@ -6,6 +6,7 @@ namespace Nordvarr\Export;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nordvarr\Agent\HostView;
 use Nordvarr\Alerts\MaintenanceState;
 use Nordvarr\Checks\CheckTypes;
 use Nordvarr\Checks\ObjectStatus;
@@ -96,6 +97,7 @@ final class LlmContext
             'checks_24h' => $this->checks($checks, $paused, $now),
             'neighbors' => $neighbors,
             'events_7d' => $this->events($eventObjectIds, $names, $now),
+            'host' => $this->host($objectId, $checks),
             'attributes' => $this->attributes($objectId),
             'docs' => $this->docs($objectId),
             'truncated' => false,
@@ -254,6 +256,51 @@ final class LlmContext
     }
 
     /**
+     * Stav serveru z hostového agenta (null, když objekt agenta nemá).
+     *
+     * @param list<array<string, mixed>> $checks
+     * @return array<string, mixed>|null
+     */
+    private function host(string $objectId, array $checks): ?array
+    {
+        $h = HostView::forObject($this->pdo, $objectId, $checks, false);
+        if ($h === null) {
+            return null;
+        }
+        $temps = array_slice($h['temps'], 0, 10);
+
+        return [
+            'hostname' => self::mask($h['hostname']),
+            'last_report_at' => $h['last_report_at'],
+            'stale' => $h['stale'],
+            'os' => self::mask((string) $h['os']),
+            'kernel' => self::mask((string) $h['kernel']),
+            'uptime_s' => $h['uptime_s'],
+            'cpu_pct' => $h['cpu']['pct'],
+            'cores' => $h['cpu']['cores'],
+            'load' => $h['cpu']['load'],
+            'mem_pct' => $h['mem']['pct'],
+            'mem_total_b' => $h['mem']['total_b'],
+            'swap_pct' => $h['swap']['pct'],
+            'disks' => array_map(static fn (array $d): array => [
+                'mount' => self::mask($d['mount']), 'pct' => $d['pct'], 'size_b' => $d['size_b'], 'inodes_pct' => $d['inodes_pct'],
+            ], $h['disks']),
+            'temperatures' => array_map(static fn (array $t): array => ['name' => self::mask($t['name']), 'c' => $t['c'], 'crit_c' => $t['crit_c']], $temps),
+            'gpus' => array_map(static fn (array $g): array => [
+                'index' => $g['index'], 'name' => self::mask((string) $g['name']), 'util_pct' => $g['util_pct'], 'mem_pct' => $g['mem_pct'],
+                'temp_c' => $g['temp_c'], 'power_w' => $g['power_w'],
+            ], $h['gpus']),
+            'smart' => array_map(static fn (array $d): array => [
+                'device' => self::mask($d['device']), 'model' => self::mask($d['model']), 'health_passed' => $d['health_passed'],
+                'wear_pct' => $d['wear_pct'], 'temp_c' => $d['temp_c'], 'power_on_hours' => $d['power_on_hours'],
+                'problems' => array_map(static fn (array $p): string => self::mask($p['text']), $d['problems']),
+            ], $h['smart']),
+            'smart_at' => $h['smart_at'],
+            'problems' => array_map(static fn (array $p): string => self::mask($p['text']), $h['problems']),
+        ];
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function attributes(string $objectId): array
@@ -312,6 +359,8 @@ final class LlmContext
                 array_pop($data['neighbors']);
             } elseif (count($data['attributes']) > 5) {
                 array_pop($data['attributes']);
+            } elseif ($data['host'] !== null && count($data['host']['disks']) > 5) {
+                array_pop($data['host']['disks']);
             } elseif (count($data['checks_24h']) > 5) {
                 array_pop($data['checks_24h']);
             } else {
@@ -404,6 +453,38 @@ final class LlmContext
             $out[] = $line;
         }
         $out[] = '';
+
+        if ($data['host'] !== null) {
+            $h = $data['host'];
+            $pct = static fn (?float $v): string => $v === null ? '-' : rtrim(rtrim(number_format($v, 1, '.', ''), '0'), '.') . ' %';
+            $out[] = '## ' . $t->t('llm.host');
+            $out[] = '- ' . $t->t('llm.host_report', ['time' => $this->time($h['last_report_at'])]) . ($h['stale'] ? ' (' . $t->t('llm.host_stale') . ')' : '');
+            $out[] = '- ' . trim($h['os'] . ', ' . $h['kernel'], ', ') . ', ' . $t->t('llm.host_uptime', ['days' => intdiv((int) $h['uptime_s'], 86400)]);
+            $out[] = '- CPU ' . $pct($h['cpu_pct']) . ' (' . $t->t('host.cores', ['n' => (int) $h['cores']]) . ', load ' . implode(' / ', array_map(static fn ($l): string => $l === null ? '-' : (string) $l, $h['load'])) . ')'
+                . ', RAM ' . $pct($h['mem_pct']) . ', swap ' . $pct($h['swap_pct']);
+            foreach ($h['disks'] as $d) {
+                $out[] = '- ' . $t->t('llm.host_disk', ['mount' => $d['mount'], 'pct' => $pct($d['pct']), 'inodes' => $pct($d['inodes_pct'])]);
+            }
+            if ($h['temperatures'] !== []) {
+                $out[] = '- ' . $t->t('llm.host_temps') . ': ' . implode(', ', array_map(static fn (array $x): string => $x['name'] . ' ' . $x['c'] . ' °C', $h['temperatures']));
+            }
+            foreach ($h['gpus'] as $g) {
+                $out[] = '- GPU ' . $g['index'] . ' ' . $g['name'] . ': ' . $pct($g['util_pct']) . ', VRAM ' . $pct($g['mem_pct']) . ', ' . ($g['temp_c'] ?? '-') . ' °C'
+                    . ($g['power_w'] !== null ? ', ' . $g['power_w'] . ' W' : '');
+            }
+            foreach ($h['smart'] as $d) {
+                $out[] = '- ' . $t->t('llm.host_smart', [
+                    'device' => trim($d['device'] . ' ' . $d['model']),
+                    'health' => $d['health_passed'] === false ? $t->t('host.health_failing') : ($d['problems'] === [] ? $t->t('host.health_ok') : $t->t('host.health_warn')),
+                    'wear' => $pct($d['wear_pct']),
+                    'hours' => $d['power_on_hours'] ?? '-',
+                ]) . ($d['problems'] !== [] ? ': ' . implode('; ', $d['problems']) : '');
+            }
+            if ($h['problems'] !== []) {
+                $out[] = '- ' . $t->t('llm.host_problems') . ': ' . implode('; ', $h['problems']);
+            }
+            $out[] = '';
+        }
 
         $out[] = '## ' . $t->t('llm.checks');
         if ($data['checks_24h'] === []) {

@@ -15,6 +15,7 @@ Obsah:
 9. [Konfigurace config.php](#9-konfigurace-configphp)
 10. [Bezpečnost](#10-bezpečnost)
 11. [Řešení problémů](#11-řešení-problémů)
+12. [Agent pro servery (Linux)](#12-agent-pro-servery-linux)
 
 ## 1. Požadavky
 
@@ -140,6 +141,7 @@ API je na adresách `/api/v1/...` a přijímá jen token v hlavičce `Authorizat
 | `inventory:write` | `POST /api/v1/objects/upsert` |
 | `events:write` | `POST /api/v1/events` |
 | `context:read` | `GET /api/v1/objects/{id}/context` (export pro LLM) |
+| `agent:write` | `POST /api/v1/agent/report` (hlášení hostového agenta, viz kap. 12) |
 
 Limit je 120 požadavků za minutu na token (pak `429` s hlavičkou `Retry-After`). Tělo požadavku musí být JSON (`Content-Type: application/json`), nejvýš 1 MB.
 
@@ -265,3 +267,107 @@ Funguje GET i POST. Když signál nepřijde do intervalu plus tolerance, kontrol
 | E-mail se neodesílá | "Odeslat test" u kanálu, historie pokusů v detailu kanálu, port 465 (SSL) nebo 587 (STARTTLS) |
 | Po aktualizaci API vrací 500 | přihlaste se jako admin nebo spusťte `php bin/nordvarr.php migrate` |
 | Zapomenuté heslo | `php bin/nordvarr.php reset-password <e-mail>` |
+| Server s agentem hlásí `agent_missing` | `/usr/local/bin/nordvarr-agent.sh --test` na serveru, `systemctl status nordvarr-agent.timer`, soubor `/var/lib/nordvarr-agent/last-error` |
+| U agenta chybí stav disků | balíček `smartmontools`, agent musí běžet jako root; virtuální disky (VM) SMART často nemají |
+
+## 12. Agent pro servery (Linux)
+
+Agent je jeden skript pro bash (`agent/nordvarr-agent.sh`), který každou minutu pošle do Nordvarru stav serveru. Nepotřebuje nic kromě `bash` 4.4+, `curl` a `coreutils`; pro stav disků balíček `smartmontools`, pro GPU ovladač NVIDIA s `nvidia-smi`.
+
+### Co měří
+
+| Údaj | Zdroj |
+|---|---|
+| CPU (průměr za poslední minutu), load, počet jader | `/proc/stat`, `/proc/loadavg`, `/proc/cpuinfo` |
+| RAM a swap | `/proc/meminfo` |
+| Zaplnění disků a inodů (bez tmpfs, overlay a podobných) | `df` |
+| Teploty všech čidel (CPU, deska, NVMe) včetně mezí čidel | `/sys/class/hwmon`, jinak `/sys/class/thermal` |
+| NVIDIA GPU: vytížení, VRAM, teplota, příkon, ventilátor | `nvidia-smi` |
+| Síťový provoz rozhraní (průměr za minutu) | `/proc/net/dev` |
+| Stav disků ze SMART: zdraví, opotřebení SSD a NVMe, teplota, provozní hodiny, přemapované a čekající sektory, chyby média a chyby v logu disku | `smartctl -j` jednou za 15 minut |
+
+Výstup `smartctl` posílá agent v původní podobě JSON, rozbor (ATA/SATA i NVMe) dělá server.
+
+### Instalace
+
+1. V **Nastavení -> API tokeny** vytvořte token se scope `agent:write` (stačí jeden pro všechny servery, zdroj například `agent`).
+2. Na serveru jako root (adresy jsou i v **Nastavení -> Agent pro servery**, už s adresou vaší instalace):
+
+```
+curl -fsSL https://nordvarr.example.com/agent/nordvarr-agent.sh -o /usr/local/bin/nordvarr-agent.sh
+chmod 755 /usr/local/bin/nordvarr-agent.sh
+curl -fsSL https://nordvarr.example.com/agent/nordvarr-agent.service -o /etc/systemd/system/nordvarr-agent.service
+curl -fsSL https://nordvarr.example.com/agent/nordvarr-agent.timer -o /etc/systemd/system/nordvarr-agent.timer
+apt install smartmontools
+
+install -m 600 /dev/null /etc/nordvarr-agent.conf
+cat > /etc/nordvarr-agent.conf <<'KONEC'
+NORDVARR_URL=https://nordvarr.example.com
+NORDVARR_TOKEN=nv_...
+KONEC
+
+/usr/local/bin/nordvarr-agent.sh --test
+systemctl daemon-reload
+systemctl enable --now nordvarr-agent.timer
+```
+
+Soubory agenta jsou i v release zipu v adresáři `nordvarr/agent/`. Místo systemd jde použít cron: `* * * * * /usr/local/bin/nordvarr-agent.sh >/dev/null 2>&1`.
+
+Bez `mod_rewrite` nastavte `NORDVARR_URL=https://nordvarr.example.com/index.php?r=`.
+
+### Konfigurace `/etc/nordvarr-agent.conf`
+
+| Klíč | Význam |
+|---|---|
+| `NORDVARR_URL` | adresa Nordvarru |
+| `NORDVARR_TOKEN` | API token se scope `agent:write` |
+| `NORDVARR_EXTERNAL_ID` | identifikace serveru, výchozí `host:<hostname>` |
+| `NORDVARR_OBJECT_ID` | připojí agenta k existujícímu objektu (id z adresy karty `/objects/<id>`) |
+| `NORDVARR_HOSTNAME` | jméno serveru, výchozí `hostname -f` |
+| `NORDVARR_SMART_INTERVAL` | sekundy mezi čteními SMART (výchozí 900, 0 = nečíst) |
+| `NORDVARR_SMARTCTL`, `NORDVARR_NVIDIA_SMI` | jiná cesta k příkazům |
+
+Soubor se jen čte jako dvojice `KLÍČ=hodnota`, nic z něj se nespouští. Token se curl předává přes soubor s právy 600, takže není vidět v seznamu procesů. Poslední chyba odeslání je v `/var/lib/nordvarr-agent/last-error`.
+
+### Co se stane po prvním hlášení
+
+- Server se objeví v inventáři jako objekt typu **Server** (nebo se připojí k objektu z `NORDVARR_OBJECT_ID`) a dostane kontrolu typu **Agent (server)**.
+- Karta objektu ukáže sekci **Server (agent)**: ukazatele CPU, RAM, swapu, nejplnějšího disku, nejvyšší teploty a každé GPU, graf za 24 h, zaplnění disků, stav disků ze SMART a všechna teplotní čidla.
+- V topologii má uzel serveru v popisku CPU, RAM a GPU a panel uzlu ukazuje pruhy hodnot.
+- Export pro LLM obsahuje sekci se stavem serveru.
+
+### Prahy kontroly Agent
+
+Nastavují se na detailu kontroly (Upravit). Problém se hlásí po 3 hlášeních po sobě (práh selhání kontroly), aby jednorázová špička nevyvolala alert.
+
+| Problém | Kód důvodu | Stav | Výchozí práh |
+|---|---|---|---|
+| hlášení nepřišlo | `agent_missing` | nefunguje | interval 60 s + tolerance 180 s |
+| vytížení CPU | `cpu_high` | omezeně | 95 % |
+| obsazená RAM | `memory_high` | omezeně | 95 % |
+| zaplnění disku nebo inodů | `disk_full` | omezeně / nefunguje | 85 % / 95 % |
+| teplota čidla nebo GPU | `temperature_high` | omezeně / nefunguje | 85 / 95 °C (kritická mez čidla platí, když je nižší) |
+| opotřebení SSD/NVMe | `disk_wear` | omezeně (nefunguje při 100 %) | 80 % |
+| SMART hlásí selhání, atribut pod prahem výrobce, kritické varování NVMe | `disk_failing` | nefunguje | - |
+| přemapované, čekající nebo neopravitelné sektory, chyby média, chyby v logu disku | `disk_errors` | omezeně | - |
+
+Kontrola posílá notifikace i při stavu omezeně (lze vypnout). Hodnoty se ukládají 48 h po minutách a 400 dní jako hodinové souhrny.
+
+### API hlášení
+
+`POST /api/v1/agent/report` s tokenem `agent:write`. Tělo vytváří skript sám; vlastní agent může poslat stejný JSON:
+
+```json
+{"agent_version":"1.0.0","hostname":"srv1.example.com","collected_at":"2026-10-21T10:00:00Z",
+ "os":"Debian GNU/Linux 13","kernel":"6.12.0","uptime_s":864000,
+ "cpu":{"usage_pct":37.5,"cores":16,"model":"Example CPU","load":[2.5,2.1,1.9]},
+ "memory":{"total_b":68719476736,"available_b":25769803776,"swap_total_b":8589934592,"swap_free_b":8589934592},
+ "disks":[{"mount":"/","device":"/dev/sda1","fs":"ext4","size_b":500000000000,"used_b":200000000000,"avail_b":275000000000,"inodes_total":30000000,"inodes_used":900000}],
+ "temperatures":[{"chip":"coretemp","label":"Package id 0","c":61,"max_c":84,"crit_c":100}],
+ "gpus":[{"index":0,"name":"NVIDIA ...","util_pct":92,"mem_used_mb":18000,"mem_total_mb":24576,"temp_c":71,"power_w":280.5,"fan_pct":55}],
+ "network":[{"iface":"eth0","rx_bps":1250000,"tx_bps":250000}],
+ "smart":[{ ...výstup smartctl -j... }]}
+```
+
+Odpověď: `{"object_id":"...","created":false,"check_id":"...","status":"healthy","problems":0}`. Neznámé klíče se ignorují, hodnoty mimo rozumný rozsah se uloží jako prázdné.
+

@@ -80,15 +80,25 @@ final class Migrator
             if ($sql === false) {
                 throw new RuntimeException('Migraci nelze načíst: ' . $file);
             }
+            // Postup podle dokumentace SQLite pro přestavbu tabulek: cizí klíče se vypínají mimo
+            // transakci (jinak by DROP TABLE spustil kaskádové mazání) a po migraci se ověří.
+            $foreignKeys = (int) $this->pdo->query('PRAGMA foreign_keys')->fetchColumn();
+            $this->pdo->exec('PRAGMA foreign_keys = OFF');
             $this->pdo->beginTransaction();
             try {
                 $this->pdo->exec($sql);
+                $violations = $this->pdo->query('PRAGMA foreign_key_check')->fetchAll();
+                if ($violations !== []) {
+                    throw new RuntimeException('porušené cizí klíče: ' . count($violations));
+                }
                 $stmt = $this->pdo->prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)');
                 $stmt->execute([$version, gmdate('Y-m-d\TH:i:s\Z')]);
                 $this->pdo->commit();
             } catch (Throwable $e) {
                 $this->pdo->rollBack();
                 throw new RuntimeException("Migrace $version selhala: " . $e->getMessage(), 0, $e);
+            } finally {
+                $this->pdo->exec('PRAGMA foreign_keys = ' . ($foreignKeys === 1 ? 'ON' : 'OFF'));
             }
             $done[] = (string) $version;
         }
