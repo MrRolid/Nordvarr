@@ -33,6 +33,16 @@ final class Ctx
     ) {
     }
 
+    /**
+     * Objekty v údržbě s pozastavenými kontrolami (jejich stav je paused).
+     *
+     * @return array<string, true>
+     */
+    public function pausedObjects(): array
+    {
+        return \Nordvarr\Alerts\MaintenanceState::load($this->pdo, \Nordvarr\Time::toDb(\Nordvarr\Time::now()))->pausedObjects();
+    }
+
     public function userId(): string
     {
         return (string) $this->user['id'];

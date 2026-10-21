@@ -8,8 +8,50 @@
 /** @var string|null $newToken */
 /** @var string|null $tokenError */
 /** @var array{name: string, source: string, scopes: list<string>} $tokenValues */
+/** @var list<array<string, mixed>> $channels */
+/** @var int $reminderHours */
+/** @var string $baseUrl */
+/** @var string $notificationLang */
 ?>
 <h1><?= $v->t('nav.settings') ?></h1>
+
+<section class="card" id="channels">
+    <div class="page-head">
+        <h2><?= $v->t('channel.title') ?></h2>
+        <a class="button" href="<?= $v->url('/settings/channels/new') ?>" data-test="add-channel"><?= $v->t('channel.new') ?></a>
+    </div>
+    <?php if ($channels === []): ?>
+    <p class="muted"><?= $v->t('channel.none') ?></p>
+    <?php else: ?>
+    <ul class="incidents" data-test="channels">
+        <?php foreach ($channels as $ch): ?>
+        <li>
+            <a href="<?= $v->url('/settings/channels/' . $ch['id']) ?>"><strong><?= $v->e($ch['name']) ?></strong></a>
+            <span class="muted"><?= $v->t('channeltype.' . $ch['type']) ?>: <?= $v->e(\Nordvarr\Notify\ChannelTypes::summary((string) $ch['type'], $ch['config'])) ?></span>
+            <?php if (!$ch['enabled']): ?><span class="badge"><?= $v->t('channel.disabled') ?></span><?php endif; ?>
+            <?php foreach ($ch['tags'] as $tag): ?><span class="tag"><?= $v->e($tag) ?></span> <?php endforeach; ?>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+    <?php endif; ?>
+
+    <h3><?= $v->t('settings.notifications') ?></h3>
+    <form method="post" action="<?= $v->url('/settings/notifications') ?>" class="form" data-test="notification-settings">
+        <?= $v->csrfField() ?>
+        <label for="reminder_hours"><?= $v->t('settings.reminder_hours') ?></label>
+        <input id="reminder_hours" name="reminder_hours" type="number" min="0" max="720" value="<?= $v->e($reminderHours) ?>">
+        <label for="base_url"><?= $v->t('settings.base_url') ?></label>
+        <input id="base_url" name="base_url" type="url" value="<?= $v->e($baseUrl) ?>">
+        <p class="help"><?= $v->t('settings.base_url_help') ?></p>
+        <label for="notification_lang"><?= $v->t('settings.notification_lang') ?></label>
+        <select id="notification_lang" name="notification_lang">
+            <?php foreach (['cs', 'en'] as $code): ?>
+            <option value="<?= $v->e($code) ?>"<?= $notificationLang === $code ? ' selected' : '' ?>><?= $v->t('lang.' . $code) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit"><?= $v->t('common.save') ?></button>
+    </form>
+</section>
 
 <section class="card" id="tokens">
     <h2><?= $v->t('settings.tokens') ?></h2>

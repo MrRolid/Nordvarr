@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Nordvarr\Checks;
 
+use Nordvarr\Alerts\MaintenanceState;
+use Nordvarr\Alerts\Notifier;
+use Nordvarr\Repository\DeliveryRepository;
 use Nordvarr\Repository\SettingsRepository;
 use Nordvarr\Time;
 use PDO;
@@ -26,19 +29,23 @@ final class Worker
         private readonly CurlRunner $curl,
         private readonly PingRunner $ping,
         private readonly RdapRunner $rdap,
+        private readonly ?Notifier $notifier = null,
     ) {
         $this->service = new CheckService($pdo);
         $this->settings = new SettingsRepository($pdo);
     }
 
     /**
-     * @return array{checks: int, results: int, maintenance: bool}
+     * @return array{checks: int, results: int, maintenance: bool, notifications: array<string, int>|null}
      */
     public function run(?float $deadline = null): array
     {
         $deadline ??= microtime(true) + self::MAX_RUNTIME;
         $now = Time::now();
         $due = $this->service->checks->due(Time::toDb($now));
+        // Údržbové okno s pozastavením: kontroly objektu neběží (a po konci okna jsou hned na řadě).
+        $paused = MaintenanceState::load($this->pdo, Time::toDb($now))->pausedObjects();
+        $due = array_values(array_filter($due, static fn (array $c): bool => !isset($paused[(string) $c['object_id']])));
 
         // Termín dalšího běhu se posune hned, aby se kontrola při pádu workeru neopakovala každou minutu.
         foreach ($due as $check) {
@@ -78,10 +85,11 @@ final class Worker
         $this->ping->run($groups['ping'], $onResult, $deadline);
         $this->rdap->run($groups['rdap'], $onResult, $deadline);
 
+        $notifications = $this->notifier?->run($deadline);
         $maintenance = $this->maintenance();
         $this->settings->set('worker_last_run', Time::toDb(Time::now()));
 
-        return ['checks' => count($due), 'results' => $count, 'maintenance' => $maintenance];
+        return ['checks' => count($due), 'results' => $count, 'maintenance' => $maintenance, 'notifications' => $notifications];
     }
 
     /**
@@ -101,6 +109,7 @@ final class Worker
         $this->service->results->aggregate($from, '9999-12-31T00:00:00Z');
         $this->service->results->purgeResults(Time::toDb($now->modify('-' . self::RESULTS_RETENTION_DAYS . ' days')));
         $this->service->results->purgeHourly($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')->format('Y-m-d\TH:00:00\Z'));
+        (new DeliveryRepository($this->pdo))->purgeOlderThan(Time::toDb($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')));
         $this->settings->set('maintenance_hour', $hour);
 
         return true;

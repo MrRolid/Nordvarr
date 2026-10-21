@@ -14,4 +14,6 @@ return [
     // 'ping_binary' => '/usr/bin/ping',
     // Nepovinné: adresa bootstrapu RDAP (výchozí https://data.iana.org/rdap/dns.json).
     // 'rdap_bootstrap_url' => 'https://data.iana.org/rdap/dns.json',
+    // Nepovinné: adresa API Telegramu (výchozí https://api.telegram.org).
+    // 'telegram_api_url' => 'https://api.telegram.org',
 ];

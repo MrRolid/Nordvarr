@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Nordvarr\Tests\Integration;
 
 use Nordvarr\Checks\CheckTypes;
+use Nordvarr\Config;
 use Nordvarr\Db\Database;
 use Nordvarr\Installer;
 use Nordvarr\Inventory\Inventory;
+use Nordvarr\Notify\ChannelTypes;
+use Nordvarr\Repository\ChannelRepository;
 use Nordvarr\Repository\CheckRepository;
+use Nordvarr\Security\SecretBox;
 use Nordvarr\Tests\FixtureServers;
 use Nordvarr\Tests\TempDir;
 use PHPUnit\Framework\TestCase;
@@ -99,6 +103,40 @@ final class CliTest extends TestCase
             self::assertSame(['unhealthy', 'http_5xx'], [$checks->find($badId)['status'], $checks->find($badId)['reason_code']]);
         } finally {
             $servers->stop();
+        }
+    }
+
+    public function testWorkerSendsAlertEmailThroughFakeSmtp(): void
+    {
+        $servers = new FixtureServers();
+        $mailDir = TempDir::create('nordvarr-mail-');
+        try {
+            $base = $servers->http();
+            $smtpPort = $servers->smtp($mailDir);
+            $pdo = Database::connectSqlite($this->tmp . '/nordvarr-data/nordvarr.sqlite');
+            $object = (new Inventory($pdo))->objects->create(['type' => 'website', 'name' => 'shop.example.com']);
+            $valid = CheckTypes::validate('http', ['url' => $base . '/status/503', 'failure_threshold' => '1']);
+            (new CheckRepository($pdo))->create($object, 'http', $valid['common'], $valid['config']);
+            $box = new SecretBox(Config::load($this->app . '/config.php')->appSecret());
+            $channel = ChannelTypes::validate('email', ['from' => 'nordvarr@example.com', 'to' => 'admin@example.com',
+                'primary_host' => '127.0.0.1', 'primary_port' => (string) $smtpPort, 'primary_security' => 'none'], null, $box);
+            self::assertSame([], $channel['errors']);
+            (new ChannelRepository($pdo))->create('E-mail', 'email', $channel['config'], true, []);
+
+            [$code, $out] = $this->cli('worker');
+            self::assertSame(0, $code, $out);
+            $mails = glob($mailDir . '/*.json') ?: [];
+            self::assertCount(1, $mails);
+            $mail = json_decode((string) file_get_contents($mails[0]), true);
+            self::assertStringContainsString('Subject: [Nordvarr] NEFUNGUJE: shop.example.com (HTTP: http_5xx)', $mail['data']);
+            self::assertSame('sent', $pdo->query('SELECT status FROM deliveries')->fetchColumn());
+
+            // Další běh nic nepošle (alert je otevřený, připomínka až za 24 h).
+            $this->cli('worker');
+            self::assertCount(1, glob($mailDir . '/*.json') ?: []);
+        } finally {
+            $servers->stop();
+            TempDir::remove($mailDir);
         }
     }
 

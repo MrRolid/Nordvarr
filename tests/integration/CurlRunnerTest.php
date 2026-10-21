@@ -104,14 +104,19 @@ final class CurlRunnerTest extends TestCase
 
     public function testRequestsRunInParallel(): void
     {
+        // Server obslouží všechna spojení současně, takže měří jen paralelismus runneru.
+        $slow = self::$servers->slowHttp(700);
         $checks = [];
-        for ($i = 0; $i < 8; $i++) {
-            $checks['slow' . $i] = self::http('/slow?ms=700');
+        for ($i = 0; $i < 20; $i++) {
+            $checks['slow' . $i] = ['type' => 'http', 'config' => ['url' => $slow . '/', 'method' => 'GET', 'expected_status' => '200-399']];
         }
         $start = microtime(true);
         $r = $this->runChecks($checks);
-        self::assertCount(8, $r);
-        self::assertLessThan(3.5, microtime(true) - $start, 'Osm pomalých požadavků paralelně, ne postupně (5,6 s).');
+        self::assertCount(20, $r);
+        foreach ($r as $result) {
+            self::assertSame('healthy', $result->status);
+        }
+        self::assertLessThan(3.0, microtime(true) - $start, 'Dvacet pomalých požadavků paralelně, ne postupně (14 s).');
     }
 
     public function testTcp(): void

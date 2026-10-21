@@ -69,6 +69,7 @@ final class App
         $user = $auth->user();
         if ($user !== null && $user['role'] === 'admin') {
             $this->runPendingMigrations($session, $audit, (string) $user['id'], $request->ip);
+            $this->rememberBaseUrl($request, $settings);
         }
 
         $view = new View($this->appRoot . '/templates', $i18n, $urls, $csrf->token(), $timezone);
@@ -109,7 +110,7 @@ final class App
     {
         $router = new Router();
 
-        $placeholders = ['/topology' => ['nav.topology', 'F4'], '/alerts' => ['nav.alerts', 'F3']];
+        $placeholders = ['/topology' => ['nav.topology', 'F4']];
         foreach ($placeholders as $path => [$title, $phase]) {
             $router->get($path, fn (): Response => new Response(
                 $view->page('placeholder', ['title' => $title, 'phase' => $phase])
@@ -124,6 +125,8 @@ final class App
             (new Ui\CheckController($ctx))->register($router);
             (new Ui\ObjectController($ctx))->register($router);
             (new Ui\SettingsController($ctx, $this->appRoot))->register($router);
+            (new Ui\AlertController($ctx))->register($router);
+            (new Ui\ChannelController($ctx, $this->appRoot))->register($router);
         }
 
         $router->get('/login', function () use ($auth, $view, $urls): Response {
@@ -192,6 +195,21 @@ final class App
         $done = $migrator->migrate();
         $audit->log('migrate', $userId, $ip, ['versions' => $done, 'backup' => basename($backup)]);
         $session->set('flash_migrations', ['versions' => implode(', ', $done), 'backup' => basename($backup)]);
+    }
+
+    /**
+     * Adresa aplikace pro odkazy v notifikacích (worker z cronu ji nezná). Uloží se
+     * při prvním požadavku admina, v nastavení jde změnit. Bez mod_rewrite obsahuje
+     * i "index.php?r=", aby šlo za ni rovnou připojit cestu.
+     */
+    private function rememberBaseUrl(Request $request, SettingsRepository $settings): void
+    {
+        $host = (string) $request->header('Host');
+        if ($host === '' || preg_match('/^[a-z0-9.\-:\[\]]+$/i', $host) !== 1 || ($settings->get('base_url') ?? '') !== '') {
+            return;
+        }
+        $url = ($request->https ? 'https://' : 'http://') . $host . $request->basePath . ($request->prettyUrls ? '' : '/index.php?r=');
+        $settings->set('base_url', $url);
     }
 
     private function error(View $view, int $status, string $messageKey): Response

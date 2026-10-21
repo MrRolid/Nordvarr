@@ -8,6 +8,7 @@ use Nordvarr\Checks\ObjectStatus;
 use Nordvarr\Checks\Status;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Router;
+use Nordvarr\Repository\AlertRepository;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\EventRepository;
 use Nordvarr\Repository\ObjectRepository;
@@ -59,7 +60,8 @@ final class OverviewController
         $now = Time::now();
         $checks = (new CheckRepository($pdo))->all();
         $objects = (new ObjectRepository($pdo))->search(['lifecycle' => 'active'], 100000);
-        $statuses = ObjectStatus::forObjects($checks);
+        $paused = $this->ctx->pausedObjects();
+        $statuses = ObjectStatus::forObjects($checks, $paused);
 
         $summary = array_fill_keys([Status::UNHEALTHY, Status::DEGRADED, Status::UNKNOWN, Status::HEALTHY, Status::PAUSED, Status::NONE], 0);
         foreach ($objects as $object) {
@@ -67,7 +69,7 @@ final class OverviewController
         }
 
         $failing = array_values(array_filter($checks, static fn (array $c): bool => in_array(
-            ObjectStatus::checkStatus($c),
+            ObjectStatus::checkStatus($c, $paused),
             [Status::UNHEALTHY, Status::DEGRADED],
             true
         )));
@@ -76,7 +78,7 @@ final class OverviewController
 
         $limit = Time::toDb($now->modify('+' . self::EXPIRY_DAYS . ' days'));
         $expiring = array_values(array_filter($checks, static fn (array $c): bool => in_array($c['type'], ['tls_expiry', 'domain_expiry'], true)
-            && ObjectStatus::checkStatus($c) !== Status::PAUSED && $c['expires_at'] !== null && strcmp((string) $c['expires_at'], $limit) <= 0));
+            && ObjectStatus::checkStatus($c, $paused) !== Status::PAUSED && $c['expires_at'] !== null && strcmp((string) $c['expires_at'], $limit) <= 0));
         usort($expiring, static fn (array $a, array $b): int => strcmp((string) $a['expires_at'], (string) $b['expires_at']));
 
         $events = (new EventRepository($pdo))->recent(Time::toDb($now->modify('-24 hours')), 50);
@@ -90,6 +92,8 @@ final class OverviewController
 
         return [
             'summary' => $summary,
+            'paused' => $paused,
+            'openAlerts' => array_column((new AlertRepository($pdo))->openAlerts(), null, 'check_id'),
             'failing' => $failing,
             'expiring' => $expiring,
             'events' => $events,

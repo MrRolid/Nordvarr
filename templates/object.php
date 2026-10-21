@@ -17,6 +17,9 @@
 /** @var list<array{id: string, name: string, kind: string, status: string}> $dependencies */
 $id = (string) $object['id'];
 $worst = $objectStatus['check'];
+/** @var array<string, true> $paused */
+/** @var list<array<string, mixed>> $openAlerts */
+/** @var bool $inMaintenance */
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
@@ -28,6 +31,15 @@ $worst = $objectStatus['check'];
         <?php if ((string) $worst['reason_detail'] !== ''): ?><span class="muted small-text">(<?= $v->e($worst['reason_detail']) ?>)</span><?php endif; ?>
         <?php endif; ?>
     </p>
+    <?php if ($inMaintenance): ?>
+    <p><span class="badge warn" data-test="in-maintenance"><?= $v->t('object.in_maintenance') ?></span> <a href="<?= $v->url('/alerts') ?>#maintenance" class="small-text"><?= $v->t('maintenance.title') ?></a></p>
+    <?php endif; ?>
+    <?php foreach ($openAlerts as $alert): ?>
+    <?php if ($alert['probable_cause_object_id'] !== null): ?>
+    <p class="small-text" data-test="probable-cause"><?= $v->t('alert.cause') ?>: <a href="<?= $v->url('/objects/' . $alert['probable_cause_object_id']) ?>"><?= $v->e($alert['cause_name'] ?? '') ?></a>
+        (<a href="<?= $v->url('/alerts/' . $alert['id']) ?>"><?= $v->t('checktype.' . $alert['check_type']) ?></a>)</p>
+    <?php endif; ?>
+    <?php endforeach; ?>
     <?php if ($dependencies !== []): ?>
     <p class="small-text" data-test="dependencies"><?= $v->t('object.dependencies') ?>:
         <?php foreach ($dependencies as $dep): ?>
@@ -81,7 +93,7 @@ $worst = $objectStatus['check'];
         <thead><tr><th><?= $v->t('check.result') ?></th><th><?= $v->t('check.type') ?></th><th><?= $v->t('check.target') ?></th><th><?= $v->t('check.reason') ?></th><th><?= $v->t('check.last_run') ?></th></tr></thead>
         <tbody>
         <?php foreach ($checks as $c): ?>
-        <?php $cs = \Nordvarr\Checks\ObjectStatus::checkStatus($c); ?>
+        <?php $cs = \Nordvarr\Checks\ObjectStatus::checkStatus($c, $paused); ?>
         <tr>
             <td><?= $v->raw($v->render('partials/status', ['status' => $cs])) ?></td>
             <td><a href="<?= $v->url('/checks/' . $c['id']) ?>"><?= $v->t('checktype.' . $c['type']) ?><?= (string) $c['name'] !== '' ? ': ' . $v->e($c['name']) : '' ?></a></td>
