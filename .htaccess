@@ -1,0 +1,9 @@
+# Pojistka pro případ, že je do webrootu nahraný celý adresář aplikace:
+# přístupný má být jen podadresář public/ (ten má vlastní .htaccess).
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

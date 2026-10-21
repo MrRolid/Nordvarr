@@ -1,0 +1,10 @@
+/config.php
+/nordvarr-data/
+/data/
+/vendor/
+/node_modules/
+/dist/
+/test-results/
+/playwright-report/
+.phpunit.cache/
+.phpunit.result.cache
