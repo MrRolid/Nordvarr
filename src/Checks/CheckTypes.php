@@ -9,7 +9,10 @@ namespace Nordvarr\Checks;
  */
 final class CheckTypes
 {
-    public const TYPES = ['http', 'tcp', 'ping', 'tls_expiry', 'domain_expiry', 'heartbeat'];
+    public const TYPES = ['http', 'tcp', 'ping', 'tls_expiry', 'domain_expiry', 'heartbeat', 'agent'];
+
+    /** Typy, které vyhodnocuje příchozí signál, ne worker (worker hlídá jen, jestli signál chodí). */
+    public const PUSH_TYPES = ['heartbeat', 'agent'];
 
     /** Typy, které spouští curl paralelně. */
     public const CURL_TYPES = ['http', 'tcp', 'tls_expiry'];
@@ -30,6 +33,8 @@ final class CheckTypes
             'tls_expiry' => ['interval_s' => 21600, 'timeout_s' => 10, 'failure_threshold' => 1, 'notify_on_degraded' => true],
             'domain_expiry' => ['interval_s' => self::DOMAIN_INTERVAL, 'timeout_s' => 15, 'failure_threshold' => 1, 'notify_on_degraded' => true],
             'heartbeat' => ['interval_s' => 3600, 'timeout_s' => 10, 'failure_threshold' => 1, 'notify_on_degraded' => false],
+            // Agent hlásí každou minutu; jednorázová špička CPU nebo teploty se nehlásí (3 hlášení po sobě).
+            'agent' => ['interval_s' => 60, 'timeout_s' => 10, 'failure_threshold' => 3, 'notify_on_degraded' => true],
             default => ['interval_s' => 60, 'timeout_s' => 10, 'failure_threshold' => 2, 'notify_on_degraded' => false],
         };
     }
@@ -48,6 +53,7 @@ final class CheckTypes
             'tls_expiry' => ['host' => '', 'port' => 443, 'degraded_days' => 21, 'unhealthy_days' => 7],
             'domain_expiry' => ['domain' => '', 'degraded_days' => 30, 'unhealthy_days' => 7],
             'heartbeat' => ['grace_s' => 300],
+            'agent' => \Nordvarr\Agent\HostEvaluator::DEFAULTS,
             default => [],
         };
     }
@@ -142,6 +148,26 @@ final class CheckTypes
                     $errors['domain'] = 'invalid_domain';
                 }
                 $config = ['domain' => $domain] + self::days($input, 30, 7, $errors);
+                break;
+
+            case 'agent':
+                $limits = [
+                    'grace_s' => [0, 86400], 'cpu_pct' => [1, 101], 'mem_pct' => [1, 101], 'disk_degraded_pct' => [1, 101],
+                    'disk_unhealthy_pct' => [1, 101], 'temp_degraded_c' => [20, 200], 'temp_unhealthy_c' => [20, 200], 'wear_degraded_pct' => [1, 101],
+                ];
+                foreach ($limits as $key => [$min, $max]) {
+                    $value = self::int($input[$key] ?? null, \Nordvarr\Agent\HostEvaluator::DEFAULTS[$key]);
+                    if ($value === null || $value < $min || $value > $max) {
+                        $errors[$key] = 'invalid_agent_limit';
+                    }
+                    $config[$key] = (int) $value;
+                }
+                if (!isset($errors['disk_unhealthy_pct']) && $config['disk_unhealthy_pct'] < $config['disk_degraded_pct']) {
+                    $errors['disk_unhealthy_pct'] = 'invalid_agent_limit';
+                }
+                if (!isset($errors['temp_unhealthy_c']) && $config['temp_unhealthy_c'] < $config['temp_degraded_c']) {
+                    $errors['temp_unhealthy_c'] = 'invalid_agent_limit';
+                }
                 break;
 
             case 'heartbeat':

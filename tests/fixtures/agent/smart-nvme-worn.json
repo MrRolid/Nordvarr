@@ -1,0 +1,15 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {"version": [7, 4], "exit_status": 0},
+  "device": {"name": "/dev/nvme0", "info_name": "/dev/nvme0", "type": "nvme", "protocol": "NVMe"},
+  "model_name": "EXAMPLE NVME 2TB",
+  "serial_number": "EX0000000003",
+  "smart_status": {"passed": true, "nvme": {"value": 0}},
+  "nvme_smart_health_information_log": {
+    "critical_warning": 0, "temperature": 52, "available_spare": 100, "available_spare_threshold": 10,
+    "percentage_used": 87, "data_units_read": 123456789, "data_units_written": 987654321,
+    "power_on_hours": 30100, "unsafe_shutdowns": 12, "media_errors": 3, "num_err_log_entries": 40
+  },
+  "power_on_time": {"hours": 30100},
+  "temperature": {"current": 52}
+}

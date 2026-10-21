@@ -1,0 +1,17 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {"version": [7, 4], "exit_status": 72},
+  "device": {"name": "/dev/sdb", "info_name": "/dev/sdb [SAT]", "type": "sat", "protocol": "ATA"},
+  "model_name": "EXAMPLE HDD 4TB",
+  "serial_number": "EX0000000002",
+  "smart_status": {"passed": false},
+  "ata_smart_attributes": {"revision": 16, "table": [
+    {"id": 5, "name": "Reallocated_Sector_Ct", "value": 5, "worst": 5, "thresh": 10, "when_failed": "now", "raw": {"value": 1872, "string": "1872"}},
+    {"id": 9, "name": "Power_On_Hours", "value": 40, "worst": 40, "thresh": 0, "when_failed": "", "raw": {"value": 52300, "string": "52300"}},
+    {"id": 197, "name": "Current_Pending_Sector", "value": 100, "worst": 100, "thresh": 0, "when_failed": "", "raw": {"value": 24, "string": "24"}},
+    {"id": 198, "name": "Offline_Uncorrectable", "value": 100, "worst": 100, "thresh": 0, "when_failed": "", "raw": {"value": 8, "string": "8"}}
+  ]},
+  "ata_smart_error_log": {"summary": {"revision": 1, "count": 17}},
+  "power_on_time": {"hours": 52300},
+  "temperature": {"current": 41}
+}

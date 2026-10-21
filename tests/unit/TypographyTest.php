@@ -32,7 +32,7 @@ final class TypographyTest extends TestCase
     public static function files(): iterable
     {
         $root = dirname(__DIR__, 2);
-        $dirs = ['lang', 'templates', 'src', 'public', 'migrations', 'bin', 'docs', 'tests'];
+        $dirs = ['lang', 'templates', 'src', 'public', 'migrations', 'bin', 'docs', 'tests', 'agent'];
         foreach ($dirs as $dir) {
             if (!is_dir($root . '/' . $dir)) {
                 continue;

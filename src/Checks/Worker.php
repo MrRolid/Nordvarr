@@ -6,6 +6,8 @@ namespace Nordvarr\Checks;
 
 use Nordvarr\Alerts\MaintenanceState;
 use Nordvarr\Alerts\Notifier;
+use Nordvarr\Agent\AgentService;
+use Nordvarr\Repository\AgentRepository;
 use Nordvarr\Repository\DeliveryRepository;
 use Nordvarr\Repository\LoginAttemptRepository;
 use Nordvarr\Repository\SettingsRepository;
@@ -21,6 +23,7 @@ final class Worker
     public const MAX_RUNTIME = 50;
     public const RESULTS_RETENTION_DAYS = 14;
     public const HOURLY_RETENTION_DAYS = 400;
+    public const AGENT_SAMPLES_RETENTION_HOURS = 48;
 
     private CheckService $service;
     private SettingsRepository $settings;
@@ -50,7 +53,7 @@ final class Worker
 
         // Termín dalšího běhu se posune hned, aby se kontrola při pádu workeru neopakovala každou minutu.
         foreach ($due as $check) {
-            if ($check['type'] !== 'heartbeat') {
+            if (!in_array($check['type'], CheckTypes::PUSH_TYPES, true)) {
                 $this->service->checks->setNextRun((string) $check['id'], Time::toDb($now->modify('+' . (int) $check['interval_s'] . ' seconds')));
             }
         }
@@ -60,7 +63,7 @@ final class Worker
         foreach ($due as $check) {
             $byId[(string) $check['id']] = $check;
             match (true) {
-                $check['type'] === 'heartbeat' => null,
+                in_array($check['type'], CheckTypes::PUSH_TYPES, true) => null,
                 in_array($check['type'], CheckTypes::CURL_TYPES, true) => $groups['curl'][] = $check,
                 $check['type'] === 'ping' => $groups['ping'][] = $check,
                 $check['type'] === 'domain_expiry' => $groups['rdap'][] = $check,
@@ -75,11 +78,13 @@ final class Worker
         };
 
         foreach ($due as $check) {
-            if ($check['type'] === 'heartbeat') {
-                $result = $this->service->evaluateHeartbeat($check, $now);
-                if ($result !== null) {
-                    $onResult((string) $check['id'], $result);
-                }
+            $result = match ($check['type']) {
+                'heartbeat' => $this->service->evaluateHeartbeat($check, $now),
+                'agent' => (new AgentService($this->pdo))->evaluateMissing($check, $now),
+                default => null,
+            };
+            if ($result !== null) {
+                $onResult((string) $check['id'], $result);
             }
         }
         $this->curl->run($groups['curl'], $onResult, $deadline);
@@ -111,6 +116,10 @@ final class Worker
         $this->service->results->purgeResults(Time::toDb($now->modify('-' . self::RESULTS_RETENTION_DAYS . ' days')));
         $this->service->results->purgeHourly($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')->format('Y-m-d\TH:00:00\Z'));
         (new DeliveryRepository($this->pdo))->purgeOlderThan(Time::toDb($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')));
+        $agents = new AgentRepository($this->pdo);
+        $agents->aggregate($from);
+        $agents->purgeSamples(Time::toDb($now->modify('-' . self::AGENT_SAMPLES_RETENTION_HOURS . ' hours')));
+        $agents->purgeHourly($now->modify('-' . self::HOURLY_RETENTION_DAYS . ' days')->format('Y-m-d\TH:00:00\Z'));
         // Omezení přihlašování pracuje s poslední hodinou; starší pokusy jen zabírají místo.
         (new LoginAttemptRepository($this->pdo))->purgeOlderThan($now->modify('-2 days'));
         $this->settings->set('maintenance_hour', $hour);

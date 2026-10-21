@@ -8,6 +8,7 @@ use JsonException;
 use Nordvarr\Http\Request;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Router;
+use Nordvarr\Agent\AgentService;
 use Nordvarr\Export\LlmContext;
 use Nordvarr\I18n;
 use Nordvarr\Inventory\EventIngest;
@@ -41,6 +42,8 @@ final class ApiApp
             fn (array $input, string $source): Response => $this->upsert($input, $source)));
         $router->post('/api/v1/events', fn (): Response => $this->write($request, 'events:write',
             fn (array $input, string $source): Response => $this->event($input, $source)));
+        $router->post('/api/v1/agent/report', fn (): Response => $this->write($request, 'agent:write',
+            fn (array $input, string $source): Response => self::json((new AgentService($this->pdo))->ingest($input, $source))));
         $router->get('/api/v1/objects/{id}/context', fn (array $p): Response => $this->context($request, $p['id']));
 
         $match = $router->match($request->method, $request->path);

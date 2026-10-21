@@ -1,0 +1,17 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {"version": [7, 4], "exit_status": 0},
+  "device": {"name": "/dev/sda", "info_name": "/dev/sda [SAT]", "type": "sat", "protocol": "ATA"},
+  "model_name": "EXAMPLE SSD 1TB",
+  "serial_number": "EX0000000001",
+  "smart_status": {"passed": true},
+  "ata_smart_attributes": {"revision": 1, "table": [
+    {"id": 5, "name": "Reallocated_Sector_Ct", "value": 100, "worst": 100, "thresh": 10, "when_failed": "", "raw": {"value": 0, "string": "0"}},
+    {"id": 9, "name": "Power_On_Hours", "value": 95, "worst": 95, "thresh": 0, "when_failed": "", "raw": {"value": 21500, "string": "21500"}},
+    {"id": 177, "name": "Wear_Leveling_Count", "value": 88, "worst": 88, "thresh": 0, "when_failed": "", "raw": {"value": 140, "string": "140"}},
+    {"id": 197, "name": "Current_Pending_Sector", "value": 100, "worst": 100, "thresh": 0, "when_failed": "", "raw": {"value": 0, "string": "0"}}
+  ]},
+  "ata_smart_error_log": {"summary": {"revision": 1, "count": 0}},
+  "power_on_time": {"hours": 21500},
+  "temperature": {"current": 34}
+}
