@@ -1,0 +1,13 @@
+# Konfigurace agenta Nordvarru: /etc/nordvarr-agent.conf (vlastník root, práva 600).
+# Řádky KLÍČ=hodnota, soubor se jen čte (nespouští se).
+
+# Adresa Nordvarru. Bez mod_rewrite: https://nordvarr.example.com/index.php?r=
+NORDVARR_URL=https://nordvarr.example.com
+# API token se scope agent:write (Nastavení -> API tokeny).
+NORDVARR_TOKEN=
+
+# Nepovinné:
+# NORDVARR_EXTERNAL_ID=host:srv1.example.com
+# NORDVARR_OBJECT_ID=
+# NORDVARR_HOSTNAME=srv1.example.com
+# NORDVARR_SMART_INTERVAL=900

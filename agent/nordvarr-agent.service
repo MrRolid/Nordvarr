@@ -1,0 +1,13 @@
+# Nordvarr: jedno hlášení hostového agenta. Spouští ho nordvarr-agent.timer každou minutu.
+[Unit]
+Description=Nordvarr agent (hlášení stavu serveru)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/nordvarr-agent.sh
+# Root kvůli smartctl; skript zapisuje jen do /var/lib/nordvarr-agent.
+User=root
+Nice=10
+TimeoutStartSec=50

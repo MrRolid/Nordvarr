@@ -1,0 +1,13 @@
+#!/bin/sh
+# Falešný smartctl: seznam disků a JSON z fixture souborů.
+dir="$(dirname "$0")/.."
+case "$*" in
+  *--scan*)
+    printf '/dev/sda -d sat # /dev/sda [SAT], ATA device\n'
+    printf '/dev/sdb -d sat # /dev/sdb [SAT], ATA device\n'
+    printf '/dev/nvme0 -d nvme # /dev/nvme0, NVMe device\n'
+    ;;
+  */dev/sda*) cat "$dir/smart-ata-ok.json"; exit 0 ;;
+  */dev/sdb*) cat "$dir/smart-ata-failing.json"; exit 72 ;;
+  */dev/nvme0*) cat "$dir/smart-nvme-worn.json"; exit 0 ;;
+esac

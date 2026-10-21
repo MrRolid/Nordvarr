@@ -1,0 +1,4 @@
+#!/bin/sh
+# Falešné nvidia-smi: dvě karty, druhá bez údaje o výkonu.
+printf '0, NVIDIA Example 24GB, 87, 20000, 24576, 74, 285.40, 60\n'
+printf '1, NVIDIA Example 24GB, 3, 500, 24576, 41, [N/A], 30\n'
