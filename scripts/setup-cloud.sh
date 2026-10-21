@@ -94,6 +94,11 @@ if ! command -v zip >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
     apt-get install -y zip unzip
 fi
 
+# Systémový ping pro kontrolu typu ping (lokální testy ho nepotřebují, používají falešný ping).
+if ! command -v ping >/dev/null 2>&1; then
+    apt-get install -y iputils-ping
+fi
+
 if ! command -v composer >/dev/null 2>&1; then
     log "Instaluji Composer"
     apt-get install -y composer

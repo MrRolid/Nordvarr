@@ -12,11 +12,29 @@
 /** @var array<string, array<string, mixed>> $timelineObjects */
 /** @var array<string, string> $objectNames */
 /** @var string $nowLocal */
+/** @var list<array<string, mixed>> $checks */
+/** @var array{status: string, check: array<string, mixed>|null} $objectStatus */
+/** @var list<array{id: string, name: string, kind: string, status: string}> $dependencies */
 $id = (string) $object['id'];
+$worst = $objectStatus['check'];
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
     <h1 data-test="object-name"><?= $v->e($object['name']) ?></h1>
+    <p class="status-line" data-test="object-status">
+        <?= $v->raw($v->render('partials/status', ['status' => $objectStatus['status']])) ?>
+        <?php if ($worst !== null && !in_array($objectStatus['status'], ['healthy', 'paused', 'none'], true)): ?>
+        <span><?= $v->t('checktype.' . $worst['type']) ?>: <code><?= $v->e($worst['reason_code'] ?? '') ?></code>, <?= $v->ago((string) $worst['since']) ?></span>
+        <?php if ((string) $worst['reason_detail'] !== ''): ?><span class="muted small-text">(<?= $v->e($worst['reason_detail']) ?>)</span><?php endif; ?>
+        <?php endif; ?>
+    </p>
+    <?php if ($dependencies !== []): ?>
+    <p class="small-text" data-test="dependencies"><?= $v->t('object.dependencies') ?>:
+        <?php foreach ($dependencies as $dep): ?>
+        <span class="dep"><?= $v->t('dep.' . $dep['kind']) ?> <a href="<?= $v->url('/objects/' . $dep['id']) ?>"><?= $v->e($dep['name']) ?></a> <?= $v->raw($v->render('partials/status', ['status' => $dep['status']])) ?></span>
+        <?php endforeach; ?>
+    </p>
+    <?php endif; ?>
     <?php if ((string) $object['description'] !== ''): ?>
     <p><?= $v->e($object['description']) ?></p>
     <?php endif; ?>
@@ -49,6 +67,34 @@ $id = (string) $object['id'];
         </form>
     </div>
 </header>
+
+<section class="card" id="checks">
+    <div class="page-head">
+        <h2><?= $v->t('object.checks') ?></h2>
+        <a class="button" href="<?= $v->url('/objects/' . $id . '/checks/new') ?>" data-test="add-check"><?= $v->t('check.add') ?></a>
+    </div>
+    <?php if ($checks === []): ?>
+    <p class="muted"><?= $v->t('check.none') ?></p>
+    <?php else: ?>
+    <div class="table-wrap">
+    <table class="list" data-test="checks">
+        <thead><tr><th><?= $v->t('check.result') ?></th><th><?= $v->t('check.type') ?></th><th><?= $v->t('check.target') ?></th><th><?= $v->t('check.reason') ?></th><th><?= $v->t('check.last_run') ?></th></tr></thead>
+        <tbody>
+        <?php foreach ($checks as $c): ?>
+        <?php $cs = \Nordvarr\Checks\ObjectStatus::checkStatus($c); ?>
+        <tr>
+            <td><?= $v->raw($v->render('partials/status', ['status' => $cs])) ?></td>
+            <td><a href="<?= $v->url('/checks/' . $c['id']) ?>"><?= $v->t('checktype.' . $c['type']) ?><?= (string) $c['name'] !== '' ? ': ' . $v->e($c['name']) : '' ?></a></td>
+            <td class="value"><code><?= $v->e(\Nordvarr\Checks\CheckTypes::target((string) $c['type'], $c['config'])) ?></code></td>
+            <td><?php if (!in_array($cs, ['healthy', 'paused'], true) && $c['reason_code'] !== null): ?><code><?= $v->e($c['reason_code']) ?></code>, <?= $v->ago((string) $c['since']) ?><?php endif; ?></td>
+            <td class="nowrap"><?= $c['last_run_at'] !== null ? $v->ago((string) $c['last_run_at']) : '-' ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+</section>
 
 <section class="card" id="attributes">
     <h2><?= $v->t('object.attributes') ?></h2>

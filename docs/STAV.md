@@ -4,6 +4,34 @@ Aktualizováno: 2026-10-20
 
 ## Hotové fáze
 
+### F2 Kontroly (větev `faze-2-kontroly`, navazuje na `faze-1-inventar`)
+
+- Migrace `0003_kontroly.sql`: kontroly, syrové výsledky (retence 14 dní), hodinové agregace (retence 400 dní), aktuální stav, cache HTTP odpovědí.
+- Všech 6 typů kontrol:
+  - `http`: GET/HEAD, očekávané kódy, hledaný text, limit latence, max. 5 přesměrování, max. 1 MB, ověření TLS,
+  - `tcp`, `tls_expiry` (prahy 21/7 dní),
+  - `ping` přes systémový příkaz (`tool_missing`, když chybí nebo nemá oprávnění),
+  - `domain_expiry` přes RDAP s bootstrapem IANA v cache 7 dní,
+  - `heartbeat` s adresou `/hb/<token>` (GET i POST).
+- Stavy, kódy důvodů a detail (max. 300 znaků). Přechod do horšího stavu až po nastaveném počtu selhání, návrat po prvním úspěchu, pozdní výsledek jen do historie. Stav objektu je nejhorší stav jeho kontrol, archivovaný objekt a vypnutá kontrola jsou `paused`.
+- Worker (`php bin/nordvarr.php worker`): zámek, limit 50 s, `http`/`tcp`/`tls_expiry` paralelně přes `curl_multi` (max. 20), ping paralelně, RDAP postupně. Jednou za hodinu agregace a retence, zápis času posledního běhu.
+- UI:
+  - přehled: souhrn stavů, nefunguje teď, změny za 24 h, brzy vyprší, varování o neběžícím workeru; obnovování přes JSON s ETag (15 s / 60 s / zpomalení při chybách),
+  - kontroly na detailu objektu: přidání, úprava, pozastavení, spuštění při dalším běhu, smazání s auditem,
+  - detail kontroly: posledních 50 výsledků, hodinové souhrny za 48 h, souhrn za 24 h, adresa heartbeatu,
+  - stav a důvod v hlavičce objektu, stav závislostí, sloupec a filtr stavu v inventáři.
+- Kontroly jsou součástí exportu a importu inventáře.
+
+Ověření (SPEC F2: testy proti lokálním fixture serverům, RDAP z fixture JSON, bez síťových volání):
+
+- HTTP 200, 500, 404, pomalá odpověď (latence i timeout), přesměrování (3 v pořádku, 7 příliš mnoho), zavřený port, chybějící text, odpověď nad 1 MB, nedůvěryhodný certifikát: `CurlRunnerTest`,
+- TLS certifikát s blízkou expirací (90, 10 a 3 dny) a nedostupný TLS port: `CurlRunnerTest`,
+- RDAP z fixture JSON (platná, brzy vyprší, vypršelá, bez data expirace, 404, cache bootstrapu, nejdelší přípona): `RdapRunnerTest`,
+- ping přes falešný příkaz (odpověď, bez odpovědi, DNS, oprávnění, zaseknutý proces, chybějící příkaz): `PingRunnerTest`,
+- worker, prahy, pozastavení, heartbeat, agregace a retence: `WorkerTest`, `StateMachineTest`, CLI `CliTest`,
+- UI a přehled s ETag: `ChecksUiTest`, e2e `checks.spec.js` (worker spuštěný přes CLI nad nainstalovaným zipem),
+- testy zelené: `composer test` (306 testů), `npm run e2e` (16 testů).
+
 ### F1 Inventář (větev `faze-1-inventar`, navazuje na `faze-0-kostra`)
 
 - Migrace `0002_inventar.sql`: objekty, externí id, atributy (se zdrojem a příznakem JSON), vztahy (`depends_on`, `contains`), tagy, dokumentace s neměnnými revizemi, události, API tokeny, limity API.
@@ -58,7 +86,11 @@ Nic.
 - Po nahrání nové verze se migrace spustí až při prvním požadavku přihlášeného admina (SPEC kap. 12). Do té doby API vrací 500, protože nové tabulky ještě neexistují. Řešení: po aktualizaci se přihlásit nebo spustit `php bin/nordvarr.php migrate`.
 - Seznam objektů ve výběru cíle vztahu na detailu objektu obsahuje všechny objekty; pro cílovou velikost (nízké stovky) to stačí, pro víc objektů by bylo potřeba vyhledávání.
 - Správa uživatelů v nastavení zatím chybí (viz ROZHODNUTI F1 bod 14).
+- Detail chyby u síťových kontrol přebírá anglický text z knihovny curl (např. "Failed to connect ..."); kód důvodu je vždy z pevného seznamu.
+- Souhrn za 24 h v detailu kontroly se počítá z hodinových agregací, aktuální hodina se v něm objeví až po hodinové údržbě workeru.
+- Kontrola `tls_expiry` podporuje jen přímé TLS (např. 443, 465, 993), ne STARTTLS.
+- Chyba DNS u kontrol přes curl není pokrytá automatickým testem (vyžadovala by skutečný DNS dotaz).
 
 ## Další krok
 
-F2 Kontroly: všech 6 typů kontrol, worker, stavy a kódy důvodů, historie, agregace, retence, přehled. Testy proti lokálním fixture serverům a RDAP z fixture JSON.
+F3 Alerty a notifikace: alerty, fronta odesílání, e-mail (testy proti lokálnímu falešnému SMTP serveru), Telegram a webhook (lokální mock endpoint), údržbová okna, potlačení o jeden krok, připomínky, testovací odeslání.

@@ -7,11 +7,14 @@ namespace Nordvarr\Ui;
 use DateTimeImmutable;
 use DateTimeZone;
 use Exception;
+use Nordvarr\Checks\ObjectStatus;
+use Nordvarr\Checks\Status;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Router;
 use Nordvarr\Inventory\Inventory;
 use Nordvarr\Inventory\ValidationException;
 use Nordvarr\Inventory\Vocabulary;
+use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\SettingsRepository;
 use Nordvarr\Time;
 use Nordvarr\View\Markdown;
@@ -169,9 +172,15 @@ final class ObjectController
             array_push($relatedIds, ...$event['object_ids']);
         }
 
+        $checks = (new CheckRepository($this->ctx->pdo))->forObject($id);
+        $dependencies = $this->dependencyStatuses($id);
+
         return $this->ctx->page('object', [
             'title' => 'object.detail',
             'object' => $object,
+            'checks' => $checks,
+            'objectStatus' => ObjectStatus::forObject($object, $checks),
+            'dependencies' => $dependencies,
             'tags' => $inv->tags->forObject($id),
             'externalIds' => $inv->externalIds->forObject($id),
             'attributes' => $inv->attributes->grouped($id),
@@ -379,6 +388,40 @@ final class ObjectController
         }
 
         return $response;
+    }
+
+    /**
+     * Stav přímých závislostí (objekty, na kterých objekt závisí nebo ve kterých je obsažen).
+     *
+     * @return list<array{id: string, name: string, kind: string, status: string}>
+     */
+    private function dependencyStatuses(string $objectId): array
+    {
+        $relationships = $this->inventory->relationships->forObject($objectId);
+        $targets = [];
+        foreach ($relationships['outgoing'] as $rel) {
+            if ($rel['kind'] === 'depends_on') {
+                $targets[(string) $rel['other_id']] = ['kind' => 'depends_on', 'name' => (string) $rel['other_name']];
+            }
+        }
+        foreach ($relationships['incoming'] as $rel) {
+            if ($rel['kind'] === 'contains') {
+                $targets[(string) $rel['other_id']] ??= ['kind' => 'contained_in', 'name' => (string) $rel['other_name']];
+            }
+        }
+        if ($targets === []) {
+            return [];
+        }
+        $statuses = ObjectStatus::forObjects((new CheckRepository($this->ctx->pdo))->all());
+        $objects = $this->inventory->objects->findMany(array_keys($targets));
+        $result = [];
+        foreach ($targets as $id => $target) {
+            $status = ($objects[$id]['lifecycle'] ?? 'active') !== 'active' ? Status::PAUSED : ($statuses[$id]['status'] ?? Status::NONE);
+            $result[] = ['id' => (string) $id, 'name' => $target['name'], 'kind' => $target['kind'], 'status' => $status];
+        }
+        usort($result, static fn (array $a, array $b): int => Status::severity($b['status']) <=> Status::severity($a['status']));
+
+        return $result;
     }
 
     private function timezone(): DateTimeZone

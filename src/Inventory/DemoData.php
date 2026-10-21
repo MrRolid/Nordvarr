@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nordvarr\Inventory;
 
 use DateInterval;
+use Nordvarr\Checks\CheckTypes;
+use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Time;
 
 /**
@@ -41,6 +43,14 @@ final class DemoData
             $db1 = $this->inventory->externalIds->objectId(self::SOURCE, 'vm:db1');
             if ($db1 !== null) {
                 $this->inventory->attributes->set($db1, 'ram', '32 GB', false, Vocabulary::MANUAL_SOURCE);
+            }
+
+            // Ukázková kontrola bez síťových volání: heartbeat noční zálohy.
+            $backup = $this->inventory->externalIds->objectId(self::SOURCE, 'svc:backup-job');
+            $checks = new CheckRepository($this->inventory->pdo);
+            if ($backup !== null && $checks->forObject($backup) === []) {
+                $valid = CheckTypes::validate('heartbeat', ['name' => 'noční záloha', 'interval_s' => '86400', 'grace_s' => '3600']);
+                $checks->create($backup, 'heartbeat', $valid['common'], $valid['config']);
             }
 
             $ingest = new EventIngest($this->inventory);

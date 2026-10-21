@@ -1,8 +1,8 @@
 <?php
 /** @var \Nordvarr\View\View $v */
+/** @var string $overviewHtml */
 ?>
 <h1><?= $v->t('dashboard.title') ?></h1>
-<section class="card">
-    <p><?= $v->t('dashboard.welcome') ?></p>
-    <p class="muted"><?= $v->t('dashboard.placeholder') ?></p>
-</section>
+<div id="overview" data-refresh-url="<?= $v->url('/overview/data') ?>" aria-live="polite">
+    <?= $v->raw($overviewHtml) ?>
+</div>

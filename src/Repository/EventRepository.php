@@ -90,6 +90,27 @@ final class EventRepository
     }
 
     /**
+     * Všechny události od daného času, nejnovější první, s id dotčených objektů.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function recent(string $since, int $limit = 50): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT e.*, group_concat(eo.object_id) AS object_ids FROM events e
+             LEFT JOIN event_objects eo ON eo.event_id = e.id
+             WHERE e.occurred_at >= ? GROUP BY e.id ORDER BY e.occurred_at DESC, e.id DESC LIMIT ' . max(1, $limit)
+        );
+        $stmt->execute([$since]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$row) {
+            $row['object_ids'] = $row['object_ids'] === null ? [] : explode(',', (string) $row['object_ids']);
+        }
+
+        return $rows;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function all(): array

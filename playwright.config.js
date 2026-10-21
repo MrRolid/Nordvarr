@@ -28,9 +28,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      name: 'kontroly',
+      testMatch: /checks\.spec\.js/,
+      dependencies: ['desktop'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'mobil',
       testMatch: /mobile\.spec\.js/,
-      dependencies: ['desktop'],
+      dependencies: ['kontroly'],
       use: { ...devices['Pixel 7'] },
     },
   ],

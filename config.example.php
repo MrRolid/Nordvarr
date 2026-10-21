@@ -10,4 +10,8 @@ return [
     'data_dir' => '/srv/www/nordvarr-data',
     // Podrobné chyby jen pro vývoj.
     'debug' => false,
+    // Nepovinné: cesta k příkazu ping (výchozí "ping" z PATH).
+    // 'ping_binary' => '/usr/bin/ping',
+    // Nepovinné: adresa bootstrapu RDAP (výchozí https://data.iana.org/rdap/dns.json).
+    // 'rdap_bootstrap_url' => 'https://data.iana.org/rdap/dns.json',
 ];
