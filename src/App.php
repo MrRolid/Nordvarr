@@ -74,9 +74,15 @@ final class App
         $view = new View($this->appRoot . '/templates', $i18n, $urls, $csrf->token(), $timezone);
         $view->share('user', $user);
         $view->share('path', $request->path);
+        $view->share('pretty_urls', $request->prettyUrls);
         $view->share('version', Installer::appVersion($this->appRoot));
         $view->share('flash', $session->pull('flash'));
         $view->share('migrations', $session->pull('flash_migrations'));
+
+        $public = ['/login', '/lang'];
+        if ($user === null && !in_array($request->path, $public, true)) {
+            return Response::redirect($urls->route('/login'));
+        }
 
         $router = $this->routes($request, $session, $auth, $csrf, $view, $urls);
         $match = $router->match($request->method, $request->path);
@@ -90,9 +96,10 @@ final class App
             return $response;
         }
 
-        $public = ['/login', '/lang'];
-        if ($user === null && !in_array($request->path, $public, true)) {
-            return Response::redirect($urls->route('/login'));
+        // Změny smí dělat jen admin (role viewer je připravená pro pozdější použití).
+        if ($request->method === 'POST' && !in_array($request->path, ['/login', '/logout', '/lang'], true)
+            && ($user['role'] ?? null) !== 'admin') {
+            return $this->error($view, 403, 'error.forbidden');
         }
 
         return ($match['handler'])($match['params']);
@@ -104,12 +111,19 @@ final class App
 
         $router->get('/', fn (): Response => new Response($view->page('dashboard', ['title' => 'nav.overview'])));
 
-        $placeholders = ['/inventory' => ['nav.inventory', 'F1'], '/topology' => ['nav.topology', 'F4'],
-            '/alerts' => ['nav.alerts', 'F3'], '/settings' => ['nav.settings', 'F1']];
+        $placeholders = ['/topology' => ['nav.topology', 'F4'], '/alerts' => ['nav.alerts', 'F3']];
         foreach ($placeholders as $path => [$title, $phase]) {
             $router->get($path, fn (): Response => new Response(
                 $view->page('placeholder', ['title' => $title, 'phase' => $phase])
             ));
+        }
+
+        $user = $auth->user();
+        if ($user !== null) {
+            $ctx = new Ui\Ctx($request, $session, $view, $urls, $this->pdo(), $user, new AuditLogRepository($this->pdo()), $this->config);
+            (new Ui\InventoryController($ctx))->register($router);
+            (new Ui\ObjectController($ctx))->register($router);
+            (new Ui\SettingsController($ctx, $this->appRoot))->register($router);
         }
 
         $router->get('/login', function () use ($auth, $view, $urls): Response {

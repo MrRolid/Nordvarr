@@ -24,3 +24,19 @@ test('na mobilu je hlavní navigace spodní lišta', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('inventář a detail objektu jsou na mobilu bez vodorovného posuvníku', async ({ page }) => {
+  await loginOk(page);
+  await page.goto('/inventory');
+  await expect(page.getByTestId('inventory-table')).toBeVisible();
+  for (const path of ['/inventory', '/settings']) {
+    await page.goto(path);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, path).toBeLessThanOrEqual(0);
+  }
+  await page.goto('/inventory');
+  await page.getByTestId('inventory-table').getByRole('link').first().click();
+  await expect(page.getByTestId('object-name')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

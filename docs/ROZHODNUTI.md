@@ -21,3 +21,23 @@ Rozhodnutí odlišná od SPEC.md nebo taková, která SPEC nechává otevřená.
 15. **Knihovny JS** budou v `public/assets/vendor/` (CLAUDE.md píše `assets/vendor/`, SPEC má webroot `public/`). Seznam verzí bude v `public/assets/vendor/VERSIONS.md`. V F0 žádná knihovna není.
 16. **Testovací nástroje:** PHPUnit 12, Playwright `@playwright/test` 1.56.1 (shoda s Chromiem předinstalovaným v cloud VM). CI pouští PHPUnit na PHP 8.4 i 8.5, e2e na 8.4. E2E testy sestaví zip, rozbalí ho do prázdného dočasného adresáře a instalují z něj.
 17. **Verze** v souboru `VERSION` je během vývoje `0.1.0-dev`, release 0.1.0 je až v F5.
+
+## 2026-10-20 (F1 Inventář)
+
+1. **Upsert jako úplný stav zdroje.** Když vstup upsertu obsahuje klíč `attributes`, bere se jako kompletní sada atributů daného zdroje: atributy tohoto zdroje, které ve vstupu chybí, se smažou. Totéž platí pro `relationships` (odchozí vztahy objektu od tohoto zdroje). Když klíč ve vstupu chybí, nic se nemaže. Tagy se jen přidávají, protože jsou sdílené s ručními úpravami. Ruční atributy a vztahy (zdroj `manual`) upsert nikdy nemaže.
+2. **Cíle vztahů v upsertu** se hledají podle `to_external_id` jen v rámci zdroje tokenu. Odkaz na neexistující objekt vrátí 422 se seznamem `missing_external_ids` a nic se nezapíše (celý upsert běží v transakci).
+3. **Vztah je unikátní podle (od, do, druh)** bez ohledu na zdroj. Když stejný vztah už existuje od jiného zdroje, upsert ho nezdvojí ani nesmaže.
+4. **Události** musí patřit aspoň k jednomu objektu. Objekty se odkazují přes `external_id` (v rámci zdroje tokenu) nebo přes interní `id`. Stejné `event_id` z jiného zdroje je jiná událost. Opakované odeslání vrátí 200 a existující id, obsah se nemění.
+5. **Časová osa objektu** ukazuje jeho události a události přímých sousedů (oba směry, oba druhy vztahů), nejnovějších 50. U události souseda je vidět, ke kterému sousedovi patří.
+6. **Ruční události z UI** (zdroj `manual`): SPEC je výslovně nezmiňuje, ale bez nich by časová osa šla plnit jen přes API.
+7. **Export** obsahuje objekty, externí id, atributy, tagy, vztahy, dokumentaci s revizemi a události. Neobsahuje uživatele, tokeny, audit ani nastavení. Tajné údaje se maskují (`***`) podle klíče atributu a v URL/DSN; po importu takového exportu zůstanou zamaskované. Maskování řetězců s vysokou entropií a kanárkové testy pro export pro LLM jsou v F5.
+8. **Import nahradí celý inventář** (ne slučování), vyžaduje potvrzení a předtím se udělá záloha databáze do `backups/`. Neplatný soubor nic nezmění (transakce). Limit 20 MB, na hostingu ho může dál omezit `upload_max_filesize`.
+9. **API tokeny** mají tvar `nv_<12 hex>_<48 hex>`, ukládá se prefix a HMAC-SHA256 s tajemstvím aplikace (změna `app_secret` tokeny zneplatní). Zdroje `manual` a `import` jsou pro tokeny vyhrazené.
+10. **Limit 120 požadavků za minutu** se počítá v pevném minutovém okně (tabulka `api_rate_limits`). Překročení vrací 429 s `Retry-After`.
+11. **API přijímá jen JSON** (`Content-Type: application/json`, max. 1 MB). Session se pro `/api/` vůbec nestartuje, cookies se ignorují.
+12. **Atributy** ukládají text, nebo JSON (pole, čísla, logické hodnoty) s příznakem `is_json`. Při rozporu platí ruční hodnota; bez ruční hodnoty se jako platná neoznačí žádná.
+13. **Filtr podle stavu** v inventáři přibude v F2 spolu s kontrolami (stav zatím neexistuje). Místo něj je filtr aktivní/archivované.
+14. **Správa uživatelů** v nastavení zatím není (F1 ji nezmiňuje, MVP má jednoho admina z instalátoru). Role `viewer` je připravená: nesmí odeslat žádný POST kromě přihlášení, odhlášení a jazyka.
+15. **Mazání objektu** je fyzické (kaskádově atributy, vztahy, dokumentace, vazby událostí), vyžaduje potvrzení a zapisuje se do auditu. Pro běžné vyřazení slouží archivace.
+16. **Ukázková data** nahrává `php bin/nordvarr.php demo-data` přes upsert se zdrojem `demo` (40 objektů, 8 událostí, ukázkový rozpor atributu). Do inventáře s jinými objekty jen s `--force`.
+17. **Markdown v dokumentaci** posouvá úrovně nadpisů o jednu (`#` -> `h2`), protože `h1` stránky je název objektu.
