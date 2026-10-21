@@ -25,6 +25,12 @@ final class HostEvaluator
         'wear_degraded_pct' => 80,
     ];
 
+    /** Pořadí důležitosti kódů při stejné závažnosti. */
+    private const PRIORITY = [
+        Reason::DISK_FAILING, Reason::TEMPERATURE_HIGH, Reason::DISK_FULL, Reason::DISK_WEAR, Reason::DISK_ERRORS,
+        Reason::MEMORY_HIGH, Reason::CPU_HIGH,
+    ];
+
     /**
      * @param array<string, mixed> $snapshot normalizované hlášení (Report::normalize)
      * @param list<array<string, mixed>> $smart rozebrané disky (Smart::parse)
@@ -111,7 +117,10 @@ final class HostEvaluator
         if ($problems === []) {
             return ['status' => Status::HEALTHY, 'reason' => null, 'detail' => ''];
         }
-        usort($problems, static fn (array $a, array $b): int => Status::severity($b['severity']) <=> Status::severity($a['severity']));
+        // Nejdřív závažnost, při shodě důležitost druhu problému (selhávající disk je víc než plný disk).
+        $priority = array_flip(self::PRIORITY);
+        usort($problems, static fn (array $a, array $b): int => [Status::severity($b['severity']), $priority[$a['code']] ?? 99]
+            <=> [Status::severity($a['severity']), $priority[$b['code']] ?? 99]);
         $detail = implode('; ', array_column($problems, 'text'));
 
         return [

@@ -624,6 +624,7 @@ return [
 
     'checktype.agent' => 'Agent (server)',
     'check.agent_help' => 'The agent creates this check itself on its first report. Without a report for interval + grace it reports agent_missing. Limits: CPU and RAM -> degraded, disk usage and temperatures -> degraded / unhealthy, disk wear -> degraded, failing disk according to SMART -> unhealthy.',
+    'check.agent_grace' => 'Grace without reports (s)',
     'check.cpu_pct' => 'CPU from (%)',
     'check.mem_pct' => 'RAM from (%)',
     'check.disk_degraded_pct' => 'Disk usage: degraded from (%)',

@@ -75,7 +75,7 @@ $field = static function (string $t, string $key, string $label, string $inputTy
             <?= $v->raw($field('domain_expiry', 'unhealthy_days', 'check.unhealthy_days', 'number', ' min="0"')) ?>
             <p class="help"><?= $v->t('check.domain_help') ?></p>
             <?php elseif ($t === 'agent'): ?>
-            <?= $v->raw($field('agent', 'grace_s', 'check.grace', 'number', ' min="0"')) ?>
+            <?= $v->raw($field('agent', 'grace_s', 'check.agent_grace', 'number', ' min="0"')) ?>
             <?php foreach (['cpu_pct', 'mem_pct', 'disk_degraded_pct', 'disk_unhealthy_pct', 'temp_degraded_c', 'temp_unhealthy_c', 'wear_degraded_pct'] as $key): ?>
             <?= $v->raw($field('agent', $key, 'check.' . $key, 'number', ' min="1"')) ?>
             <?php endforeach; ?>

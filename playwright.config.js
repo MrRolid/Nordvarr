@@ -52,9 +52,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      name: 'agent',
+      testMatch: /agent\.spec\.js/,
+      dependencies: ['export'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'mobil',
       testMatch: /mobile\.spec\.js/,
-      dependencies: ['export'],
+      dependencies: ['agent'],
       use: { ...devices['Pixel 7'] },
     },
   ],

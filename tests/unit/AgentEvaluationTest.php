@@ -156,7 +156,8 @@ final class AgentEvaluationTest extends TestCase
 
         $summary = HostEvaluator::summarize($problems);
         self::assertSame('unhealthy', $summary['status']);
-        self::assertContains($summary['reason'], ['temperature_high', 'disk_failing']);
+        self::assertSame('disk_failing', $summary['reason'], 'Při stejné závažnosti má selhávající disk přednost.');
+        self::assertStringStartsWith('/dev/sdb: SMART hlásí selhávající disk', $summary['detail']);
         self::assertLessThanOrEqual(300, mb_strlen($summary['detail']));
 
         // Prahy z konfigurace kontroly.

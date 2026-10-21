@@ -625,6 +625,7 @@ return [
 
     'checktype.agent' => 'Agent (server)',
     'check.agent_help' => 'Kontrolu založí agent sám při prvním hlášení. Bez hlášení po dobu intervalu + tolerance hlásí agent_missing. Prahy: CPU a RAM -> omezeně, zaplnění disku a teploty -> omezeně / nefunguje, opotřebení disku -> omezeně, selhávající disk podle SMART -> nefunguje.',
+    'check.agent_grace' => 'Tolerance bez hlášení (s)',
     'check.cpu_pct' => 'CPU od (%)',
     'check.mem_pct' => 'RAM od (%)',
     'check.disk_degraded_pct' => 'Zaplnění disku: omezeně od (%)',
