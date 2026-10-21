@@ -24,6 +24,7 @@ $id = (string) $object['id'];
 /** @var array<string, mixed>|null $lastChange */
 /** @var array<string, array<string, mixed>> $lastChangeObjects */
 /** @var int $alertCount90 */
+/** @var array<string, mixed>|null $host */
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
@@ -65,6 +66,10 @@ $id = (string) $object['id'];
         </form>
     </div>
 </header>
+
+<?php if ($host !== null): ?>
+<?= $v->raw($v->render('partials/host', ['host' => $host])) ?>
+<?php endif; ?>
 
 <section class="card" id="checks">
     <div class="page-head">

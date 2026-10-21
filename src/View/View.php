@@ -99,6 +99,56 @@ final class View
     }
 
     /**
+     * Číslo s desetinnou čárkou (česky) nebo tečkou (anglicky); null jako "-".
+     */
+    public function num(?float $value, int $decimals = 0): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        return self::escape(number_format($value, $decimals, $this->lang() === 'cs' ? ',' : '.', ''));
+    }
+
+    /**
+     * Velikost v bajtech v binárních jednotkách (KiB, MiB, GiB, TiB).
+     */
+    public function bytes(int|float|null $bytes): string
+    {
+        if ($bytes === null) {
+            return '-';
+        }
+        $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+        $i = 0;
+        $value = (float) $bytes;
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
+            $i++;
+        }
+
+        return $this->num($value, $value >= 100 || $i === 0 ? 0 : 1) . ' ' . $units[$i];
+    }
+
+    /**
+     * Doba běhu ze sekund: "12 d 3 h", "5 h 20 min", "4 min".
+     */
+    public function uptime(?int $seconds): string
+    {
+        if ($seconds === null) {
+            return '-';
+        }
+        $d = intdiv($seconds, 86400);
+        $h = intdiv($seconds % 86400, 3600);
+        $m = intdiv($seconds % 3600, 60);
+
+        return match (true) {
+            $d > 0 => $this->t('time.d', ['n' => $d]) . ' ' . $this->t('time.h', ['n' => $h]),
+            $h > 0 => $this->t('time.h', ['n' => $h]) . ' ' . $this->t('time.min', ['n' => $m]),
+            default => $this->t('time.min', ['n' => $m]),
+        };
+    }
+
+    /**
      * Délka mezi dvěma časy (do teď, když konec chybí), např. "3 min", "5 h", "2 d".
      */
     public function duration(string $fromUtc, ?string $toUtc): string

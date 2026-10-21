@@ -177,7 +177,10 @@ final class ObjectController
 
         $checks = (new CheckRepository($this->ctx->pdo))->forObject($id);
 
+        $host = \Nordvarr\Agent\HostView::forObject($this->ctx->pdo, $id, $checks, true, $this->ctx->view->t('host.chart_label'));
+
         return $this->ctx->page('object', $this->diagnosis($object, $checks) + [
+            'host' => $host,
             'title' => 'object.detail',
             'object' => $object,
             'checks' => $checks,

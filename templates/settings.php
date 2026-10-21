@@ -130,6 +130,12 @@
     </form>
 </section>
 
+<section class="card" id="agent">
+    <h2><?= $v->t('settings.agent') ?></h2>
+    <p><?= $v->t('settings.agent_intro') ?></p>
+    <p><a class="button" href="<?= $v->url('/settings/agent') ?>" data-test="agent-guide"><?= $v->t('settings.agent_guide') ?></a></p>
+</section>
+
 <section class="card" id="account">
     <h2><?= $v->t('settings.account') ?></h2>
     <p><?= $v->t('settings.account_email', ['email' => (string) $account['email']]) ?></p>

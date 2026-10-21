@@ -18,7 +18,7 @@ $causes = array_values(array_filter($openAlerts, static fn (array $a): bool => $
         <dd data-test="object-status">
             <?= $v->raw($v->render('partials/status', ['status' => $objectStatus['status']])) ?>
             <?php if ($failing): ?>
-            <span class="diag-reason"><?= $v->t('checktype.' . $worst['type']) ?>: <code><?= $v->e($worst['reason_code'] ?? '') ?></code>, <?= $v->ago((string) $worst['since']) ?></span>
+            <span class="diag-reason"><?= $v->t('checktype.' . $worst['type']) ?><?php if ((string) ($worst['reason_code'] ?? '') !== ''): ?>: <code><?= $v->e($worst['reason_code']) ?></code><?php endif; ?>, <?= $v->ago((string) $worst['since']) ?></span>
             <?php if ((string) $worst['reason_detail'] !== ''): ?><span class="muted small-text diag-detail"><?= $v->e($worst['reason_detail']) ?></span><?php endif; ?>
             <?php endif; ?>
             <?php if ($inMaintenance): ?><span class="badge warn" data-test="in-maintenance"><?= $v->t('object.in_maintenance') ?></span><?php endif; ?>

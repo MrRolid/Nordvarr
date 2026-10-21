@@ -46,7 +46,7 @@ final class TempDir
         $root = dirname(__DIR__);
         $app = $target . '/nordvarr';
         mkdir($app . '/bin', 0700, true);
-        foreach (['public', 'src', 'templates', 'lang', 'migrations'] as $dir) {
+        foreach (['public', 'src', 'templates', 'lang', 'migrations', 'agent'] as $dir) {
             self::copyDir($root . '/' . $dir, $app . '/' . $dir);
         }
         copy($root . '/bin/nordvarr.php', $app . '/bin/nordvarr.php');
