@@ -106,3 +106,22 @@ Rozhodnutí odlišná od SPEC.md nebo taková, která SPEC nechává otevřená.
 9. **Vědomě neřešeno v aplikaci:** HSTS (patří do konfigurace webového serveru), reverzní proxy (aplikace nedůvěřuje hlavičkám `X-Forwarded-*`, protože by šly podvrhnout), retence auditu. Popsané v `docs/NAVOD.md`.
 10. **Release 0.1.0:** `VERSION` je `0.1.0`. Tag `v0.1.0` agent nevytváří: CI z tagu sestaví a zveřejní release, to má proběhnout až z `main` po sloučení všech fází.
 11. **Hostový agent** je podle SPEC kap. 14 mimo rozsah MVP. Vlastník o něj 21. 10. 2026 výslovně požádal. Aby release 0.1.0 odpovídal SPEC, bude agent samostatná fáze F6 po release; `SPEC.md` se nemění, návrh je v `docs/STAV.md` (Další krok).
+
+## 2026-10-21 (F6 Hostový agent)
+
+Vlastník fázi zadal výslovně ("jen linux, nvidia ano, teploty ano, stav opotřebení disku a hlášení problémů, zaplnění disku"), i když SPEC kap. 14 hostového agenta řadí mimo MVP. `SPEC.md` se nemění, rozsah je popsaný zde a v `docs/STAV.md`.
+
+1. **Agent je skript pro bash + curl**, ne binárka ani PHP: na serverech nic dalšího instalovat nemusí a kód jde přečíst. Spouští ho systemd timer nebo cron každou minutu; démon by potřeboval vlastní hlídání.
+2. **CPU a síť se počítají z rozdílu čítačů od minulého běhu** (uložené ve stavovém adresáři), takže hodnota je průměr za minutu a skript nemusí čekat. První běh tyto hodnoty nemá.
+3. **SMART posílá agent jako syrový `smartctl -j` a rozbor dělá server** (PHP je testovatelné a opravy nevyžadují aktualizaci agentů). Čte se jednou za 15 minut; hlášení bez SMART ponechá na serveru poslední stav. Při chybě odeslání se SMART pošle znovu příště.
+4. **První hlášení založí objekt typu Server** (podle zdroje tokenu a `external_id`, výchozí `host:<hostname>`) a kontrolu Agent s výchozími prahy. Nejde o automatické objevování sítě: objekt založí jen agent nainstalovaný adminem s jeho tokenem. Připojení k existujícímu objektu přes `NORDVARR_OBJECT_ID`; když `external_id` už patří jinému objektu, API vrátí 422.
+5. **Kontrola Agent:** interval 60 s, tolerance 180 s, práh 3 hlášení po sobě, notifikace i při stavu omezeně. Prahy viz `docs/NAVOD.md`. U teplot platí nižší z prahu kontroly a kritické meze čidla; mez `max` čidla znamená omezeně. Při stejné závažnosti určuje kód důvodu pořadí: selhávající disk, teplota, zaplnění, opotřebení, chyby disku, RAM, CPU. Detail výsledku obsahuje všechny problémy (max. 300 znaků).
+6. **Opotřebení:** NVMe `percentage_used`, u ATA normalizovaná hodnota atributů 177, 202, 231 nebo 233 (100 - hodnota). Chyby (přemapované, čekající, neopravitelné sektory, chyby média, chyby v logu) jsou omezeně, selhání podle SMART, atribut pod prahem výrobce a kritické varování NVMe jsou nefunguje.
+7. **Čas hlášení** je čas agenta, jen když se od času serveru liší nejvýš o 5 minut; jinak čas příjmu (rozladěné hodiny serveru nesmí rozbít graf ani hlídání).
+8. **Ukládání:** poslední hlášení a SMART v `agent_hosts`, souhrnné hodnoty každého hlášení v `agent_samples` (48 h, jeden řádek na hlášení), hodinové souhrny v `agent_hourly` (400 dní) počítá hodinová údržba workeru. Podrobné hodnoty (jednotlivé disky, čidla) se drží jen z posledního hlášení.
+9. **Přestavba tabulky `checks`** v migraci 0005 (SQLite neumí změnit omezení CHECK). Migrator proto nově vypíná cizí klíče mimo transakci, po migraci spustí `PRAGMA foreign_key_check` a klíče zase zapne (postup z dokumentace SQLite); jinak by DROP TABLE kaskádově smazal výsledky a alerty.
+10. **Pruhy a graf jsou SVG generované na serveru** (šířky jako atributy), protože CSP zakazuje inline styly. Graf za 24 h je v 5minutových úsecích, mezera v datech přeruší čáru.
+11. **Soubory agenta jsou veřejně ke stažení** na `/agent/<soubor>` (jen pevný seznam souborů), aby šel agent nainstalovat příkazem curl přímo na serveru bez přihlášení. Neobsahují nic tajného.
+12. **Verze** je `0.2.0-dev`: agent je nová funkce nad release 0.1.0.
+13. **Test omezení pokusů při změně hesla** (F5) byl závislý na rychlosti stroje a na tom, jestli se pokus trefí do stejné sekundy jako přihlášení; přepsán deterministicky, oprava je i na větvi F5.
+

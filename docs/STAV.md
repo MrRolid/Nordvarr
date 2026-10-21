@@ -4,6 +4,38 @@ Aktualizováno: 2026-10-21
 
 ## Hotové fáze
 
+### F6 Hostový agent (větev `faze-6-agent`, navazuje na `faze-5-export-bezpecnost`)
+
+Fáze nad rámec SPEC na přání vlastníka (viz ROZHODNUTI F5 bod 11 a F6). Rozsah podle zadání: jen Linux, NVIDIA GPU, teploty, opotřebení disků a hlášení jejich problémů, zaplnění disků.
+
+- **Agent** `agent/nordvarr-agent.sh` (bash + curl, bez dalších závislostí), systemd služba a časovač, vzor konfigurace:
+  - CPU a síť jako průměr od minulého běhu (za minutu), load, RAM, swap, zaplnění disků a inodů, teploty všech čidel hwmon (s mezemi max a crit), NVIDIA GPU přes `nvidia-smi`,
+  - SMART jednou za 15 minut: agent posílá výstup `smartctl -j`, rozbor dělá server,
+  - konfigurace se jen čte (nespouští), token jde curl přes soubor s právy 600, poslední chyba v `last-error`,
+  - režimy `--test`, `--dry-run`, `--version`.
+- **Server:**
+  - API `POST /api/v1/agent/report` (scope `agent:write`): ověření a normalizace hlášení, první hlášení založí objekt typu Server (nebo se připojí k objektu z `NORDVARR_OBJECT_ID`) a kontrolu typu **Agent**,
+  - rozbor SMART pro ATA/SATA i NVMe: zdraví, opotřebení (atributy 177, 202, 231, 233, NVMe `percentage_used`), teplota, provozní hodiny, přemapované, čekající a neopravitelné sektory, chyby média, kritická varování NVMe, chyby v logu disku,
+  - kontrola Agent s nastavitelnými prahy a novými kódy důvodů `agent_missing`, `cpu_high`, `memory_high`, `disk_full`, `temperature_high`, `disk_failing`, `disk_wear`, `disk_errors`; vyhodnocuje se hned při hlášení, chybějící hlášení hlídá worker, fungují alerty, potlačení i údržba,
+  - migrace `0005_agent.sql` (přestavba tabulky `checks` kvůli novému typu, tabulky `agent_hosts`, `agent_samples` 48 h, `agent_hourly` 400 dní), Migrator nově spouští migrace s vypnutými cizími klíči a po migraci je ověří.
+- **UI:**
+  - na kartě objektu sekce Server (agent): ukazatele CPU, RAM, swap, nejplnější disk, nejvyšší teplota a každá GPU, graf za 24 h (CPU, RAM, teplota, GPU), zaplnění disků, stav disků ze SMART, všechna čidla, síť,
+  - v topologii popisek uzlu s CPU, RAM a GPU a pruhy hodnot v panelu uzlu,
+  - sekce v exportu pro LLM,
+  - Nastavení -> Agent pro servery s návodem a adresami ke stažení; soubory agenta jsou veřejné na `/agent/...` (neobsahují nic tajného),
+  - pole prahů ve formuláři kontroly.
+- `docs/NAVOD.md` kapitola 12 (instalace, konfigurace, prahy, API). Agent je součástí release zipu (`nordvarr/agent/`). `VERSION` je `0.2.0-dev`.
+
+Ověření:
+
+- normalizace hlášení, rozbor SMART nad vzorky výstupu `smartctl -j` (zdravé SSD, selhávající HDD, opotřebené NVMe s chybami), prahy, priorita důvodů: `AgentEvaluationTest`,
+- API (založení serveru a kontroly, připojení k objektu, konflikt, oprávnění, validace), práh 3 hlášení a alert, chybějící agent přes worker, agregace a retence, migrace 0005 se zachováním výsledků a alertů a funkční kaskádou: `AgentApiTest`,
+- skript agenta nad falešným `/proc` a `/sys` a falešnými `df`, `nvidia-smi` a `smartctl`: hodnoty, výpočet CPU a sítě ze dvou běhů, mezera v cestě disku, SMART a jeho interval, konfigurace se nespouští, odeslání s tokenem v hlavičce na lokální mock, chyba odeslání: `AgentScriptTest`,
+- karta, topologie, export, formulář prahů, návod, veřejné soubory agenta, žádné inline styly: `AgentUiTest`,
+- e2e `agent.spec.js`: token se scope `agent:write` z UI, skutečný skript ze zipu nad falešným `/proc` třikrát pošle hlášení do nainstalované aplikace -> karta s metrikami, SMART "selhává", stav nefunguje (`disk_failing`), alert po běhu workeru, panel v topologii; mobil bez vodorovného posuvníku,
+- vzhled na snímcích s ukázkovými daty (tmavý, světlý, mobil),
+- testy zelené: `composer test` (468 testů), `npm run e2e` (30 testů).
+
 ### F5 Export, bezpečnost, dokumentace (větev `faze-5-export-bezpecnost`, navazuje na `faze-4-topologie`)
 
 - **Export pro LLM** (SPEC kap. 10), `Nordvarr\Export\LlmContext`:
@@ -194,17 +226,11 @@ Nic.
 - Rozvržení grafu se při každém načtení počítá znovu (ruční pozice se podle SPEC neukládají). U velkých grafů v režimu filtru (nad 24 uzlů) se místo dagre použije silové rozložení, viz ROZHODNUTI F4 bod 3. U stovek uzlů jsou popisky malé, je potřeba přiblížit.
 - Maskování podle entropie je heuristika: krátké nebo slovníkové tajné hodnoty v textu bez klíče (např. "heslo je zahrada") nepozná. Atributy s citlivým klíčem a dvojice `klíč: hodnota` maskuje vždy.
 - Záznamy auditu (včetně neúspěšných přihlášení) se nemažou; při dlouhodobém zkoušení hesel tabulka `audit_log` roste. Tabulku pokusů o přihlášení worker čistí.
+- Agent: jen Linux s bash 4.4+. Bez root práv a bez `smartmontools` chybí stav disků (karta to napíše). Virtuální disky ve VM obvykle SMART nemají. Disky za RAID řadičem vyžadují pro `smartctl` zvláštní typ zařízení (`-d megaraid,N` apod.), který `smartctl --scan` někdy nenabídne.
+- Agent: popisy problémů (např. "přemapované sektory: 1872") jsou uložené česky i pro anglické UI, stejně jako detaily ostatních kontrol.
 - Cytoscape vkládá na stránku vlastní `<style>`, který CSP blokuje. Obchází se to prázdným prvkem s id, které knihovna hledá, a pravidlem v `app.css` (ROZHODNUTI F4 bod 7). Při aktualizaci knihovny je potřeba to ověřit (e2e test hlídá chyby v konzoli).
 
 ## Další krok
 
-MVP podle SPEC je hotové (F0 až F5). Po sloučení větví do `main` vytvořit tag `v0.1.0`, CI z něj sestaví release zip.
-
-**F6 Hostový agent** (na přání vlastníka z 21. 10. 2026; SPEC ho řadí mimo MVP, proto až po release 0.1.0, viz ROZHODNUTI F5 bod 11). Návrh:
-
-- agent: jeden skript pro Linux (bash + curl, bez dalších závislostí) spouštěný cronem nebo systemd timerem každou minutu; posílá CPU, load, RAM, swap, zaplnění disků, uptime, síťový provoz a GPU (přes `nvidia-smi`, pokud je k dispozici),
-- API `POST /api/v1/metrics` s tokenem se scope `metrics:write`, server se pozná podle `external_id` (stejně jako u upsertu),
-- ukládání: syrové hodnoty 48 h, hodinové agregace 400 dní (jako u kontrol),
-- nový typ kontroly `agent`: chybějící data -> nefunguje (jako heartbeat), prahy CPU, RAM a disku -> omezeně / nefunguje, takže fungují alerty, potlačení i údržbová okna,
-- UI: aktuální hodnoty a průběh za 24 h na kartě objektu, pruhy CPU a RAM u uzlu v topologii (jako na referenčním snímku), metriky v exportu pro LLM.
-
+- Sloučit větve F0 až F6 do `main`. Release 0.1.0 (stav po F5) jde vytvořit tagem na příslušném commitu, nebo rovnou vydat 0.2.0 s agentem (změnit `VERSION` na `0.2.0` a vytvořit tag `v0.2.0`).
+- Další fáze nejsou v plánu. Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
