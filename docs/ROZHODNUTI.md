@@ -122,6 +122,6 @@ Vlastník fázi zadal výslovně ("jen linux, nvidia ano, teploty ano, stav opot
 9. **Přestavba tabulky `checks`** v migraci 0005 (SQLite neumí změnit omezení CHECK). Migrator proto nově vypíná cizí klíče mimo transakci, po migraci spustí `PRAGMA foreign_key_check` a klíče zase zapne (postup z dokumentace SQLite); jinak by DROP TABLE kaskádově smazal výsledky a alerty.
 10. **Pruhy a graf jsou SVG generované na serveru** (šířky jako atributy), protože CSP zakazuje inline styly. Graf za 24 h je v 5minutových úsecích, mezera v datech přeruší čáru.
 11. **Soubory agenta jsou veřejně ke stažení** na `/agent/<soubor>` (jen pevný seznam souborů), aby šel agent nainstalovat příkazem curl přímo na serveru bez přihlášení. Neobsahují nic tajného.
-12. **Verze** je `0.2.0-dev`: agent je nová funkce nad release 0.1.0.
+12. **Verze:** agent je nová funkce nad MVP, vydává se jako 0.2.0. Release 0.1.0 se samostatně nevydal: vlastník rozhodl vydat rovnou 0.2.0 se všemi fázemi F0 až F6.
 13. **Test omezení pokusů při změně hesla** (F5) byl závislý na rychlosti stroje a na tom, jestli se pokus trefí do stejné sekundy jako přihlášení; přepsán deterministicky, oprava je i na větvi F5.
 

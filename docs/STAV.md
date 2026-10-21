@@ -24,7 +24,7 @@ Fáze nad rámec SPEC na přání vlastníka (viz ROZHODNUTI F5 bod 11 a F6). Ro
   - sekce v exportu pro LLM,
   - Nastavení -> Agent pro servery s návodem a adresami ke stažení; soubory agenta jsou veřejné na `/agent/...` (neobsahují nic tajného),
   - pole prahů ve formuláři kontroly.
-- `docs/NAVOD.md` kapitola 12 (instalace, konfigurace, prahy, API). Agent je součástí release zipu (`nordvarr/agent/`). `VERSION` je `0.2.0-dev`.
+- `docs/NAVOD.md` kapitola 12 (instalace, konfigurace, prahy, API). Agent je součástí release zipu (`nordvarr/agent/`). Vydáno jako release 0.2.0.
 
 Ověření:
 
@@ -232,5 +232,5 @@ Nic.
 
 ## Další krok
 
-- Sloučit větve F0 až F6 do `main`. Release 0.1.0 (stav po F5) jde vytvořit tagem na příslušném commitu, nebo rovnou vydat 0.2.0 s agentem (změnit `VERSION` na `0.2.0` a vytvořit tag `v0.2.0`).
+- Release 0.2.0 (F0 až F6) je vydaný z `main` tagem `v0.2.0`, zip sestavilo CI.
 - Další fáze nejsou v plánu. Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
