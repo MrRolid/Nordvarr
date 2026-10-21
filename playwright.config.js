@@ -40,9 +40,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      name: 'topologie',
+      testMatch: /topology\.spec\.js/,
+      dependencies: ['alerty'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'mobil',
       testMatch: /mobile\.spec\.js/,
-      dependencies: ['alerty'],
+      dependencies: ['topologie'],
       use: { ...devices['Pixel 7'] },
     },
   ],

@@ -16,37 +16,21 @@
 /** @var array{status: string, check: array<string, mixed>|null} $objectStatus */
 /** @var list<array{id: string, name: string, kind: string, status: string}> $dependencies */
 $id = (string) $object['id'];
-$worst = $objectStatus['check'];
 /** @var array<string, true> $paused */
 /** @var list<array<string, mixed>> $openAlerts */
 /** @var bool $inMaintenance */
+/** @var list<array<string, mixed>> $incidents */
+/** @var array<string, mixed> $diagObject */
+/** @var array<string, mixed>|null $lastChange */
+/** @var array<string, array<string, mixed>> $lastChangeObjects */
+/** @var int $alertCount90 */
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
     <h1 data-test="object-name"><?= $v->e($object['name']) ?></h1>
-    <p class="status-line" data-test="object-status">
-        <?= $v->raw($v->render('partials/status', ['status' => $objectStatus['status']])) ?>
-        <?php if ($worst !== null && !in_array($objectStatus['status'], ['healthy', 'paused', 'none'], true)): ?>
-        <span><?= $v->t('checktype.' . $worst['type']) ?>: <code><?= $v->e($worst['reason_code'] ?? '') ?></code>, <?= $v->ago((string) $worst['since']) ?></span>
-        <?php if ((string) $worst['reason_detail'] !== ''): ?><span class="muted small-text">(<?= $v->e($worst['reason_detail']) ?>)</span><?php endif; ?>
-        <?php endif; ?>
-    </p>
-    <?php if ($inMaintenance): ?>
-    <p><span class="badge warn" data-test="in-maintenance"><?= $v->t('object.in_maintenance') ?></span> <a href="<?= $v->url('/alerts') ?>#maintenance" class="small-text"><?= $v->t('maintenance.title') ?></a></p>
-    <?php endif; ?>
-    <?php foreach ($openAlerts as $alert): ?>
-    <?php if ($alert['probable_cause_object_id'] !== null): ?>
-    <p class="small-text" data-test="probable-cause"><?= $v->t('alert.cause') ?>: <a href="<?= $v->url('/objects/' . $alert['probable_cause_object_id']) ?>"><?= $v->e($alert['cause_name'] ?? '') ?></a>
-        (<a href="<?= $v->url('/alerts/' . $alert['id']) ?>"><?= $v->t('checktype.' . $alert['check_type']) ?></a>)</p>
-    <?php endif; ?>
-    <?php endforeach; ?>
-    <?php if ($dependencies !== []): ?>
-    <p class="small-text" data-test="dependencies"><?= $v->t('object.dependencies') ?>:
-        <?php foreach ($dependencies as $dep): ?>
-        <span class="dep"><?= $v->t('dep.' . $dep['kind']) ?> <a href="<?= $v->url('/objects/' . $dep['id']) ?>"><?= $v->e($dep['name']) ?></a> <?= $v->raw($v->render('partials/status', ['status' => $dep['status']])) ?></span>
-        <?php endforeach; ?>
-    </p>
-    <?php endif; ?>
+    <div data-refresh-url="<?= $v->url('/objects/' . $id . '/diagnosis') ?>" id="diagnosis">
+        <?= $v->raw($v->render('partials/diagnosis', compact('diagObject', 'objectStatus', 'openAlerts', 'inMaintenance', 'dependencies', 'lastChange', 'lastChangeObjects', 'alertCount90'))) ?>
+    </div>
     <?php if ((string) $object['description'] !== ''): ?>
     <p><?= $v->e($object['description']) ?></p>
     <?php endif; ?>
@@ -72,6 +56,7 @@ $worst = $objectStatus['check'];
     </p>
     <?php endif; ?>
     <div class="row">
+        <a class="button primary" href="<?= $v->url('/topology', ['center' => $id]) ?>" data-test="show-topology"><?= $v->t('topology.show') ?></a>
         <a class="button" href="<?= $v->url('/objects/' . $id . '/edit') ?>"><?= $v->t('object.edit') ?></a>
         <form method="post" action="<?= $v->url('/objects/' . $id . '/lifecycle') ?>" class="inline">
             <?= $v->csrfField() ?>
@@ -256,6 +241,31 @@ $worst = $objectStatus['check'];
             <button type="submit"><?= $v->t('event.save') ?></button>
         </form>
     </details>
+</section>
+
+<section class="card" id="incidents">
+    <h2><?= $v->t('diag.incidents') ?></h2>
+    <?php if ($incidents === []): ?>
+    <p class="muted"><?= $v->t('diag.no_incidents') ?></p>
+    <?php else: ?>
+    <div class="table-wrap">
+    <table class="list" data-test="incidents">
+        <thead><tr><th><?= $v->t('alert.opened') ?></th><th><?= $v->t('check.detail') ?></th><th><?= $v->t('check.reason') ?></th><th><?= $v->t('diag.duration') ?></th><th><?= $v->t('alert.state') ?></th></tr></thead>
+        <tbody>
+        <?php foreach ($incidents as $a): ?>
+        <tr>
+            <td class="nowrap"><a href="<?= $v->url('/alerts/' . $a['id']) ?>"><?= $v->time((string) $a['opened_at']) ?></a></td>
+            <td><?= $v->t('checktype.' . $a['check_type']) ?><?= (string) $a['check_name'] !== '' ? ' ' . $v->e($a['check_name']) : '' ?></td>
+            <td><?php if ($a['reason_code'] !== null): ?><code><?= $v->e($a['reason_code']) ?></code><?php endif; ?>
+                <?php if ($a['probable_cause_object_id'] !== null): ?><br><span class="small-text"><?= $v->t('alert.cause') ?>: <a href="<?= $v->url('/objects/' . $a['probable_cause_object_id']) ?>"><?= $v->e($a['cause_name'] ?? '') ?></a></span><?php endif; ?></td>
+            <td class="nowrap"><?= $v->duration((string) $a['opened_at'], $a['resolved_at'] !== null ? (string) $a['resolved_at'] : null) ?></td>
+            <td><?= $a['status'] === 'open' ? $v->raw($v->render('partials/status', ['status' => (string) $a['level']])) : $v->t('alert.resolved_reason.' . ($a['resolved_reason'] ?? 'recovered')) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
 </section>
 
 <section class="card danger-zone">

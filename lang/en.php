@@ -32,7 +32,6 @@ return [
     'dashboard.title' => 'Overview',
     
 
-    'placeholder.text' => 'This section will be added in phase {phase}.',
 
     'migrations.done' => 'The database was updated (migrations {versions}). Backup before migration: {backup}',
 
@@ -516,4 +515,38 @@ return [
     'err.invalid_channel_type' => 'Invalid channel type.',
     'err.invalid_channel_name' => 'Name is required (max. 100 characters).',
     'err.invalid_security' => 'Invalid security.',
+
+    'time.under_min' => 'under a minute',
+
+    'topology.show' => 'Show in topology',
+    'topology.around' => 'around: {name}',
+    'topology.mode' => 'View mode',
+    'topology.mode_neighborhood' => 'Object neighborhood',
+    'topology.mode_filter' => 'By filter',
+    'topology.center' => 'Object',
+    'topology.depth' => 'Depth',
+    'topology.depth_1' => '1 step',
+    'topology.depth_2' => '2 steps',
+    'topology.show_view' => 'Show',
+    'topology.in_view' => 'In view ({count})',
+    'topology.graph' => 'Graph of objects and relationships',
+    'topology.too_many' => '{count} objects match the filter, the graph shows at most {max}. Narrow it down by type, tag or status.',
+    'topology.truncated' => 'Showing {max} of {count} neighborhood objects, choose a smaller depth.',
+    'topology.empty' => 'There are no objects in this view.',
+    'topology.causal' => 'path to probable cause',
+    'topology.ring' => 'ring: check status',
+    'topology.fit' => 'Fit graph',
+    'topology.pick_node' => 'Click a node in the graph or in the list. Double-click opens the object card.',
+    'topology.open_card' => 'Open card',
+    'topology.recenter' => 'Neighborhood of this object',
+    'topology.incidents' => 'Incidents in 90 days ({count})',
+    'topology.changes' => 'Recent changes',
+
+    'diag.state' => 'Status',
+    'diag.last_change' => 'Last change (24 h, incl. neighbors)',
+    'diag.no_change' => 'No change in 24 h.',
+    'diag.alerts_90' => 'Alerts in 90 days',
+    'diag.incidents' => 'Incident history (90 days)',
+    'diag.no_incidents' => 'No incident in 90 days.',
+    'diag.duration' => 'Duration',
 ];

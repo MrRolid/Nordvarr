@@ -110,12 +110,6 @@ final class App
     {
         $router = new Router();
 
-        $placeholders = ['/topology' => ['nav.topology', 'F4']];
-        foreach ($placeholders as $path => [$title, $phase]) {
-            $router->get($path, fn (): Response => new Response(
-                $view->page('placeholder', ['title' => $title, 'phase' => $phase])
-            ));
-        }
 
         $user = $auth->user();
         if ($user !== null) {
@@ -127,6 +121,7 @@ final class App
             (new Ui\SettingsController($ctx, $this->appRoot))->register($router);
             (new Ui\AlertController($ctx))->register($router);
             (new Ui\ChannelController($ctx, $this->appRoot))->register($router);
+            (new Ui\TopologyController($ctx, $this->appRoot))->register($router);
         }
 
         $router->get('/login', function () use ($auth, $view, $urls): Response {

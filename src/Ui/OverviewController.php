@@ -39,16 +39,7 @@ final class OverviewController
 
     private function json(): Response
     {
-        $html = $this->ctx->view->render('partials/overview', $this->data());
-        $etag = '"' . sha1($html) . '"';
-        $headers = ['ETag' => $etag, 'Cache-Control' => 'no-cache, private'];
-        $sent = (string) $this->ctx->request->header('If-None-Match');
-        if ($sent !== '' && in_array($etag, array_map('trim', explode(',', $sent)), true)) {
-            return new Response('', 304, $headers);
-        }
-        $body = json_encode(['html' => $html], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-
-        return new Response($body, 200, $headers + ['Content-Type' => 'application/json; charset=utf-8']);
+        return JsonFragment::response($this->ctx, $this->ctx->view->render('partials/overview', $this->data()));
     }
 
     /**

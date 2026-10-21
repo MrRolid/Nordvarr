@@ -37,6 +37,7 @@ final class ObjectController
         $router->get('/objects/new', fn (): Response => $this->form(null, $this->emptyForm(), []));
         $router->post('/objects', fn (): Response => $this->create());
         $router->get('/objects/{id}', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->show($o)));
+        $router->get('/objects/{id}/diagnosis', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->diagnosisJson($o)));
         $router->get('/objects/{id}/edit', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->form($o, $o, [])));
         $router->post('/objects/{id}/edit', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->update($o)));
         $router->post('/objects/{id}/lifecycle', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->lifecycle($o)));
@@ -174,17 +175,13 @@ final class ObjectController
         }
 
         $checks = (new CheckRepository($this->ctx->pdo))->forObject($id);
-        $dependencies = $this->dependencyStatuses($id);
 
-        return $this->ctx->page('object', [
+        return $this->ctx->page('object', $this->diagnosis($object, $checks) + [
             'title' => 'object.detail',
             'object' => $object,
             'checks' => $checks,
-            'objectStatus' => ObjectStatus::forObject($object, $checks, $this->ctx->pausedObjects()),
             'paused' => $this->ctx->pausedObjects(),
-            'openAlerts' => (new AlertRepository($this->ctx->pdo))->openForObject($id),
-            'inMaintenance' => \Nordvarr\Alerts\MaintenanceState::load($this->ctx->pdo, Time::toDb(Time::now()))->inMaintenance($id),
-            'dependencies' => $dependencies,
+            'incidents' => (new AlertRepository($this->ctx->pdo))->forObject($id, Time::toDb(Time::now()->modify('-90 days')), 20),
             'tags' => $inv->tags->forObject($id),
             'externalIds' => $inv->externalIds->forObject($id),
             'attributes' => $inv->attributes->grouped($id),
@@ -392,6 +389,47 @@ final class ObjectController
         }
 
         return $response;
+    }
+
+    /**
+     * Data diagnostické hlavičky: stav a důvod, pravděpodobná příčina, poslední změna
+     * na objektu a přímých sousedech za 24 h, stav závislostí, počet alertů za 90 dní.
+     *
+     * @param array<string, mixed> $object
+     * @param list<array<string, mixed>> $checks
+     * @return array<string, mixed>
+     */
+    private function diagnosis(array $object, array $checks): array
+    {
+        $id = (string) $object['id'];
+        $now = Time::now();
+        $alerts = new AlertRepository($this->ctx->pdo);
+        $changes = $this->inventory->timeline($id, 1, Time::toDb($now->modify('-24 hours')));
+        $lastChange = $changes[0] ?? null;
+        $changeObjects = $lastChange === null ? [] : $this->inventory->objects->findMany($lastChange['object_ids']);
+
+        return [
+            'diagObject' => $object,
+            'objectStatus' => ObjectStatus::forObject($object, $checks, $this->ctx->pausedObjects()),
+            'openAlerts' => $alerts->openForObject($id),
+            'inMaintenance' => \Nordvarr\Alerts\MaintenanceState::load($this->ctx->pdo, Time::toDb($now))->inMaintenance($id),
+            'dependencies' => $this->dependencyStatuses($id),
+            'lastChange' => $lastChange,
+            'lastChangeObjects' => $changeObjects,
+            'alertCount90' => $alerts->countForObject($id, Time::toDb($now->modify('-90 days'))),
+        ];
+    }
+
+    /**
+     * Diagnostická hlavička jako JSON pro obnovování s ETag.
+     *
+     * @param array<string, mixed> $object
+     */
+    private function diagnosisJson(array $object): Response
+    {
+        $checks = (new CheckRepository($this->ctx->pdo))->forObject((string) $object['id']);
+
+        return JsonFragment::response($this->ctx, $this->ctx->view->render('partials/diagnosis', $this->diagnosis($object, $checks)));
     }
 
     /**

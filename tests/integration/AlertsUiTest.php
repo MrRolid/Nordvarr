@@ -206,7 +206,7 @@ final class AlertsUiTest extends TestCase
         self::assertStringContainsString('notifikace potlačena', $page);
 
         $webPage = $this->ui('GET', '/objects/' . $web)->body;
-        self::assertMatchesRegularExpression('#data-test="probable-cause">pravděpodobná příčina: <a[^>]*>db1\.example\.com#', $webPage);
+        self::assertMatchesRegularExpression('#data-test="probable-cause"><a[^>]*>db1\.example\.com#', $webPage);
         self::assertMatchesRegularExpression('#data-test="down-now">.*shop\.example\.com.*pravděpodobná příčina#s', $this->ui('GET', '/')->body);
 
         $dbAlert = (string) $this->pdo()->query("SELECT a.id FROM alerts a WHERE a.object_id = " . $this->pdo()->quote($db))->fetchColumn();

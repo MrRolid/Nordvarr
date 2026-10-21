@@ -36,10 +36,10 @@ if (checkForm) {
     showFields();
 }
 
-// Přehled: obnovení dat dotazem na JSON s ETag. Aktivní karta každých 15 s,
-// karta na pozadí každých 60 s, při chybě postupné prodlužování až na 5 minut.
-const overview = document.querySelector('#overview[data-refresh-url]');
-if (overview) {
+// Obnovování částí stránky (přehled, diagnostická karta objektu) dotazem na JSON s ETag.
+// Aktivní karta každých 15 s, karta na pozadí každých 60 s, při chybě postupné
+// prodlužování až na 5 minut.
+for (const box of document.querySelectorAll('[data-refresh-url]')) {
     const ACTIVE = 15000;
     const BACKGROUND = 60000;
     const MAX_BACKOFF = 300000;
@@ -59,16 +59,16 @@ if (overview) {
         try {
             const headers = { Accept: 'application/json' };
             if (etag) headers['If-None-Match'] = etag;
-            const response = await fetch(overview.dataset.refreshUrl, { headers, credentials: 'same-origin', cache: 'no-store' });
+            const response = await fetch(box.dataset.refreshUrl, { headers, credentials: 'same-origin', cache: 'no-store' });
             if (response.status === 200) {
                 const data = await response.json();
-                overview.innerHTML = data.html;
+                box.innerHTML = data.html;
                 etag = response.headers.get('ETag');
             } else if (response.status !== 304) {
                 throw new Error(`HTTP ${response.status}`);
             }
             failures = 0;
-            overview.dataset.refreshedAt = String(Date.now());
+            box.dataset.refreshedAt = String(Date.now());
         } catch {
             failures += 1;
         }
