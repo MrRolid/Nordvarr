@@ -697,4 +697,14 @@ return [
     'agent.step_done' => 'After its first report the server appears in the inventory (type Server) with an "Agent" check. To attach the agent to an existing object, add NORDVARR_OBJECT_ID with the id from its card address to the configuration.',
     'agent.files' => 'Files',
     'agent.cron_alternative' => 'Instead of systemd you can use cron (root): * * * * * /usr/local/bin/nordvarr-agent.sh >/dev/null 2>&1',
+
+    'suggest.title' => 'Suggested checks:',
+    'suggest.help' => 'Suggested from the object type, name and attributes (url, ip, host, port). Settings can be changed later on the check page.',
+    'suggest.add' => 'Add selected checks',
+    'suggest.added' => 'Checks added: {count}. They run on the next worker run (within a minute).',
+    'suggest.bulk' => 'Add suggested checks',
+    'suggest.bulk_done' => 'Checks added: {checks} for {objects} objects. {without} objects had no suggestion (add an url, ip or host and port attribute, or add a check manually).',
+    'suggest.agent_hint' => 'Server CPU and RAM usage, disk usage and health and temperatures are sent by the agent.',
+    'suggest.overview_hint' => 'Objects without checks: {count}.',
+    'suggest.overview_link' => 'Show them and add suggested checks',
 ];

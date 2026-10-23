@@ -26,6 +26,10 @@ $status = static fn (string $s): string => $v->render('partials/status', ['statu
         <li><a href="<?= $v->url('/inventory', ['status' => $key]) ?>"><?= $v->raw($status($key)) ?> <strong data-test="summary-<?= $v->e($key) ?>"><?= $v->e($count) ?></strong></a></li>
         <?php endforeach; ?>
     </ul>
+    <?php if (($summary['none'] ?? 0) > 0): ?>
+    <p class="muted small-text" data-test="no-checks-hint"><?= $v->t('suggest.overview_hint', ['count' => (int) $summary['none']]) ?>
+        <a href="<?= $v->url('/inventory', ['status' => 'none']) ?>"><?= $v->t('suggest.overview_link') ?></a></p>
+    <?php endif; ?>
 </section>
 
 <section class="card" data-test="down-now">

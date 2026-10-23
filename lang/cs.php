@@ -698,4 +698,14 @@ return [
     'agent.step_done' => 'Server se po prvním hlášení objeví v inventáři (typ Server) s kontrolou "Agent". Chcete-li agenta připojit k existujícímu objektu, doplňte do konfigurace NORDVARR_OBJECT_ID s id z adresy jeho karty.',
     'agent.files' => 'Soubory',
     'agent.cron_alternative' => 'Místo systemd jde použít cron (root): * * * * * /usr/local/bin/nordvarr-agent.sh >/dev/null 2>&1',
+
+    'suggest.title' => 'Doporučené kontroly:',
+    'suggest.help' => 'Návrh podle typu, názvu a atributů objektu (url, ip, host, port). Nastavení jde potom upravit na detailu kontroly.',
+    'suggest.add' => 'Přidat vybrané kontroly',
+    'suggest.added' => 'Přidáno kontrol: {count}. Spustí se při dalším běhu workeru (do minuty).',
+    'suggest.bulk' => 'Přidat doporučené kontroly',
+    'suggest.bulk_done' => 'Přidáno kontrol: {checks} u {objects} objektů. Bez návrhu zůstalo {without} objektů (doplňte jim atribut url, ip nebo host a port, nebo kontrolu přidejte ručně).',
+    'suggest.agent_hint' => 'Vytížení CPU, RAM, zaplnění a stav disků a teploty serveru posílá agent.',
+    'suggest.overview_hint' => 'Objekty bez kontrol: {count}.',
+    'suggest.overview_link' => 'Zobrazit a přidat doporučené kontroly',
 ];
