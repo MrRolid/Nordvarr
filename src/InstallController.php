@@ -46,7 +46,7 @@ final class InstallController
         }
 
         $input = [
-            'data_dir' => $installer->defaultDataDir(),
+            'data_dir' => $installer->defaultDataDir($this->documentRoot),
             'email' => '',
             'password' => '',
             'password_confirm' => '',

@@ -125,3 +125,9 @@ Vlastník fázi zadal výslovně ("jen linux, nvidia ano, teploty ano, stav opot
 12. **Verze:** agent je nová funkce nad MVP, vydává se jako 0.2.0. Release 0.1.0 se samostatně nevydal: vlastník rozhodl vydat rovnou 0.2.0 se všemi fázemi F0 až F6.
 13. **Test omezení pokusů při změně hesla** (F5) byl závislý na rychlosti stroje a na tom, jestli se pokus trefí do stejné sekundy jako přihlášení; přepsán deterministicky, oprava je i na větvi F5.
 
+## 2026-10-23 (oprava po nasazení, 0.2.1)
+
+1. **Datový adresář smí být uvnitř adresáře aplikace** (mimo složky s kódem `public`, `src`, `templates`, `lang`, `migrations`, `bin`, `agent`, `vendor`). Nahrazuje F0 bod 8. Důvod: při instalaci na server, kde webový server zapisuje jen do adresáře domény (vlastník nepoužívá Plesk, podobnost cesty `/var/www/vhosts/...` je náhoda), takže adresář vedle aplikace vytvořit nešel a uvnitř aplikace ho instalátor zakazoval; instalace nebyla možná. Riziko přepsání při aktualizaci je malé (nahrání souborů přes staré nic nemaže), adresář chrání `.htaccess` v kořeni aplikace i jeho vlastní, a pokud by ležel ve webrootu, instalátor dál varuje a zkouší ho stáhnout přes HTTP.
+2. **Návrh datového adresáře** bere první použitelnou možnost: `nordvarr-data` vedle aplikace, potom `nordvarr-data` v adresáři aplikace. Použitelná je možnost, kterou webový server smí vytvořit nebo do ní zapisovat a kterou povoluje `open_basedir`; přednost mají možnosti mimo webroot.
+3. **Instalátor ověří zapisovatelnost** datového adresáře už při kontrole formuláře a srozumitelně napíše, proč adresář nejde použít (dřív se zobrazila jen technická chyba "Adresář nelze vytvořit").
+

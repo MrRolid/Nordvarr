@@ -48,6 +48,36 @@ final class InstallerTest extends TestCase
         self::assertSame($this->tmp . '/nordvarr-data', (new Installer($this->app))->defaultDataDir());
     }
 
+    public function testDefaultDataDirFallsBackInsideAppWhenParentIsNotUsable(): void
+    {
+        // Jako na sdíleném hostingu: vedle aplikace zapisovat nejde (tady tam překáží soubor).
+        file_put_contents($this->tmp . '/nordvarr-data', '');
+        $installer = new Installer($this->app);
+        self::assertSame($this->app . '/nordvarr-data', $installer->defaultDataDir($this->app . '/public'));
+        self::assertSame([], $installer->validate($this->input(['data_dir' => $this->app . '/nordvarr-data'])));
+
+        $installer->install($this->input(['data_dir' => $this->app . '/nordvarr-data']));
+        self::assertFileExists($this->app . '/nordvarr-data/nordvarr.sqlite');
+        self::assertFileExists($this->app . '/nordvarr-data/.htaccess');
+    }
+
+    public function testDefaultDataDirAvoidsDocumentRoot(): void
+    {
+        $installer = new Installer($this->app);
+        // Celá aplikace ve webrootu: návrh vedle aplikace, ne uvnitř.
+        self::assertSame($this->tmp . '/nordvarr-data', $installer->defaultDataDir($this->app));
+        // Obě možnosti ve webrootu: návrh vedle aplikace (instalátor pak varuje).
+        self::assertSame($this->tmp . '/nordvarr-data', $installer->defaultDataDir($this->tmp));
+    }
+
+    public function testOpenBasedir(): void
+    {
+        self::assertTrue(Installer::allowedByOpenBasedir('/var/www/vhosts/example/data', ''));
+        self::assertTrue(Installer::allowedByOpenBasedir('/var/www/vhosts/example/data', '/var/www/vhosts/example/:/tmp/'));
+        self::assertFalse(Installer::allowedByOpenBasedir('/var/www/vhosts/data', '/var/www/vhosts/example/:/tmp/'));
+        self::assertFalse(Installer::allowedByOpenBasedir('/var/www/vhosts/example2/data', '/var/www/vhosts/example'));
+    }
+
     public function testRequirementsAreMetInTestEnvironment(): void
     {
         self::assertTrue((new Installer($this->app))->requirementsMet());
@@ -70,8 +100,15 @@ final class InstallerTest extends TestCase
         $errors = $installer->validate($this->input(['password_confirm' => 'jine-heslo-123']));
         self::assertSame(['password_confirm' => 'install.err_password_confirm'], $errors);
 
-        $errors = $installer->validate($this->input(['data_dir' => $this->app . '/data']));
-        self::assertSame('install.err_data_dir_in_app', $errors['data_dir']);
+        foreach ([$this->app, $this->app . '/', $this->app . '/public/data', $this->app . '/src/x'] as $dir) {
+            $errors = $installer->validate($this->input(['data_dir' => $dir]));
+            self::assertSame('install.err_data_dir_in_app', $errors['data_dir'], $dir);
+        }
+        self::assertSame([], $installer->validate($this->input(['data_dir' => $this->app . '/nordvarr-data'])), 'Podadresář aplikace mimo kód je povolený.');
+
+        file_put_contents($this->tmp . '/soubor', '');
+        $errors = $installer->validate($this->input(['data_dir' => $this->tmp . '/soubor/data']));
+        self::assertSame('install.err_data_dir_create', $errors['data_dir'], 'Adresář nejde vytvořit.');
 
         $errors = $installer->validate($this->input(['data_dir' => $this->tmp . '/../etc']));
         self::assertSame('install.err_data_dir', $errors['data_dir']);

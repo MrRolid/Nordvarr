@@ -21,6 +21,9 @@ final class Installer
     public const MIN_PHP = '8.4.0';
     public const EXTENSIONS = ['pdo_sqlite', 'curl', 'openssl', 'json', 'mbstring'];
 
+    /** Složky aplikace, ve kterých datový adresář být nesmí (aktualizace je přepisuje, public/ je webroot). */
+    public const CODE_DIRS = ['public', 'src', 'templates', 'lang', 'migrations', 'bin', 'agent', 'vendor'];
+
     public function __construct(private readonly string $appRoot)
     {
     }
@@ -35,9 +38,68 @@ final class Installer
         return file_exists($this->configFile());
     }
 
-    public function defaultDataDir(): string
+    /**
+     * Návrh datového adresáře: vedle adresáře aplikace, pokud tam webový server smí zapisovat,
+     * jinak uvnitř adresáře aplikace (mimo public/). Na serverech s oddělenými uživateli pro domény bývá
+     * zapisovatelný jen adresář domény, ve kterém aplikace leží. Kandidát uvnitř webrootu se
+     * navrhne jen tehdy, když jiný není.
+     */
+    public function defaultDataDir(string $documentRoot = ''): string
     {
-        return dirname($this->appRoot) . '/nordvarr-data';
+        $candidates = [dirname($this->appRoot) . '/nordvarr-data', $this->appRoot . '/nordvarr-data'];
+        foreach ([true, false] as $outsideDocRootOnly) {
+            foreach ($candidates as $dir) {
+                if ($outsideDocRootOnly && self::isInsideDocumentRoot($dir, $documentRoot)) {
+                    continue;
+                }
+                if (self::canUseDir($dir)) {
+                    return $dir;
+                }
+            }
+        }
+
+        return $candidates[0];
+    }
+
+    /**
+     * Může webový server adresář použít? Buď existuje a dá se do něj zapisovat, nebo ho
+     * jde vytvořit (nejbližší existující nadřazený adresář je zapisovatelný a open_basedir
+     * přístup povoluje).
+     */
+    public static function canUseDir(string $dir): bool
+    {
+        $dir = rtrim($dir, '/');
+        if (!self::allowedByOpenBasedir($dir)) {
+            return false;
+        }
+        if (file_exists($dir)) {
+            return is_dir($dir) && is_writable($dir);
+        }
+        $parent = dirname($dir);
+        while ($parent !== '/' && !file_exists($parent)) {
+            $parent = dirname($parent);
+        }
+
+        return is_dir($parent) && is_writable($parent) && self::allowedByOpenBasedir($parent);
+    }
+
+    /**
+     * Povoluje omezení open_basedir přístup k cestě?
+     */
+    public static function allowedByOpenBasedir(string $path, ?string $openBasedir = null): bool
+    {
+        $openBasedir ??= (string) ini_get('open_basedir');
+        if ($openBasedir === '') {
+            return true;
+        }
+        foreach (explode(PATH_SEPARATOR, $openBasedir) as $base) {
+            $base = rtrim(trim($base), '/');
+            if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -79,10 +141,12 @@ final class Installer
         $dataDir = $input['data_dir'];
         if (!str_starts_with($dataDir, '/') || str_contains($dataDir, "\0") || preg_match('#(^|/)\.\.(/|$)#', $dataDir)) {
             $errors['data_dir'] = 'install.err_data_dir';
-        } elseif (self::isInside(rtrim($dataDir, '/'), $this->appRoot)) {
+        } elseif ($this->isInCodeDir(rtrim($dataDir, '/'))) {
             $errors['data_dir'] = 'install.err_data_dir_in_app';
         } elseif (is_file(rtrim($dataDir, '/') . '/nordvarr.sqlite')) {
             $errors['data_dir'] = 'install.err_data_dir_used';
+        } elseif (!self::canUseDir($dataDir)) {
+            $errors['data_dir'] = 'install.err_data_dir_create';
         }
         if (filter_var($input['email'], FILTER_VALIDATE_EMAIL) === false) {
             $errors['email'] = 'install.err_email';
@@ -190,6 +254,28 @@ final class Installer
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
 
         return $status >= 200 && $status < 300;
+    }
+
+    /**
+     * Je cesta adresářem aplikace nebo leží v některé z jejích složek s kódem?
+     * Vlastní podadresář aplikace (např. nordvarr-data vedle public/) je povolený.
+     */
+    private function isInCodeDir(string $path): bool
+    {
+        $root = rtrim($this->appRoot, '/');
+        $real = realpath($root) ?: $root;
+        foreach (array_unique([$root, $real]) as $base) {
+            if ($path === $base) {
+                return true;
+            }
+            foreach (self::CODE_DIRS as $dir) {
+                if (self::isInside($path, $base . '/' . $dir)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static function isInside(string $path, string $parent): bool
