@@ -4,6 +4,11 @@ Aktualizováno: 2026-10-21
 
 ## Hotové fáze
 
+### Oprava 0.2.1 (větev `oprava-datovy-adresar`)
+
+- Instalace na server, kde webový server smí zapisovat jen do adresáře domény (aplikace v adresáři domény, webroot `public/`), selhala: instalátor navrhl datový adresář o úroveň výš, kam webový server nesmí zapisovat, a uvnitř aplikace ho zakazoval. Nově navrhne první zapisovatelné místo (vedle aplikace, jinak v adresáři aplikace vedle `public/`), respektuje `open_basedir` a zapisovatelnost ověří už ve formuláři. Viz ROZHODNUTI z 23. 10. 2026.
+- Testy: `InstallerTest` (záložní návrh, vyhýbání se webrootu, `open_basedir`, zakázané složky s kódem, instalace do podadresáře aplikace).
+
 ### F6 Hostový agent (větev `faze-6-agent`, navazuje na `faze-5-export-bezpecnost`)
 
 Fáze nad rámec SPEC na přání vlastníka (viz ROZHODNUTI F5 bod 11 a F6). Rozsah podle zadání: jen Linux, NVIDIA GPU, teploty, opotřebení disků a hlášení jejich problémů, zaplnění disků.

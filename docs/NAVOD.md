@@ -31,7 +31,7 @@ Obsah:
 2. Nahrajte adresář na server, například do `/var/www/nordvarr`.
 3. Webroot (DocumentRoot) nastavte na `/var/www/nordvarr/public`. Mimo `public/` nesmí být nic dostupné z webu.
 4. Otevřete v prohlížeči `https://nordvarr.example.com/install.php` a vyplňte formulář:
-   - **Datový adresář**: databáze, logy, zámky a zálohy. Výchozí návrh je `nordvarr-data` vedle adresáře aplikace (`/var/www/nordvarr-data`), tedy mimo webroot. Instalátor ověří, že adresář není dostupný z webu, a do adresáře přidá `.htaccess` se zákazem přístupu.
+   - **Datový adresář**: databáze, logy, zámky a zálohy. Instalátor navrhne `nordvarr-data` vedle adresáře aplikace (`/var/www/nordvarr-data`), a když tam webový server zapisovat nesmí (typicky server, kde má každá doména vlastního uživatele a zapisovat smí jen do adresáře domény), navrhne `nordvarr-data` uvnitř adresáře aplikace vedle `public/` (například `/var/www/vhosts/example.com/app.example.com/nordvarr-data`). Obě místa leží mimo webroot. Datový adresář nesmí být ve složkách s kódem (`public/`, `src/` a další). Instalátor ověří, že adresář jde vytvořit, že není dostupný z webu, a přidá do něj `.htaccess` se zákazem přístupu.
    - **E-mail a heslo administrátora** (heslo aspoň 10 znaků).
    - **Časová zóna** (výchozí Europe/Prague).
 5. Instalátor vytvoří `config.php` s náhodným tajemstvím aplikace, databázi a účet. Na konci zobrazí přesný řádek pro cron. Pak se sám zablokuje: dokud existuje `config.php`, `install.php` odmítne běžet.
@@ -102,7 +102,7 @@ php bin/nordvarr.php reset-password <e-mail>  # nové heslo pro zapomenutý úč
 
 Do přihlášení admina může API vracet chybu 500 (nové tabulky ještě neexistují). Migrace jde spustit i ručně: `php bin/nordvarr.php migrate`.
 
-Žádné další upgrade skripty ani ruční kroky nejsou potřeba. Soubory, které nová verze už nepoužívá, nevadí; čistší je ale nahrát novou verzi do prázdného adresáře a přenést jen `config.php`.
+Žádné další upgrade skripty ani ruční kroky nejsou potřeba. Pokud je datový adresář `nordvarr-data` uvnitř adresáře aplikace, při aktualizaci ho nemažte (nahrání souborů přes staré ho nechá beze změny). Soubory, které nová verze už nepoužívá, nevadí; čistší je ale nahrát novou verzi do prázdného adresáře a přenést jen `config.php`.
 
 ## 6. Zálohy a obnova
 
