@@ -131,3 +131,14 @@ Vlastník fázi zadal výslovně ("jen linux, nvidia ano, teploty ano, stav opot
 2. **Návrh datového adresáře** bere první použitelnou možnost: `nordvarr-data` vedle aplikace, potom `nordvarr-data` v adresáři aplikace. Použitelná je možnost, kterou webový server smí vytvořit nebo do ní zapisovat a kterou povoluje `open_basedir`; přednost mají možnosti mimo webroot.
 3. **Instalátor ověří zapisovatelnost** datového adresáře už při kontrole formuláře a srozumitelně napíše, proč adresář nejde použít (dřív se zobrazila jen technická chyba "Adresář nelze vytvořit").
 
+## 2026-10-23 (F7 Rychlé nastavení monitoringu)
+
+Vlastník po nasazení napsal, že má objekty bez kontrol a neví, jak hlídání zapnout, a zadal pokračování dalšími milníky. SPEC nic takového nepředepisuje, `SPEC.md` se nemění.
+
+1. **Nic se nezakládá samo.** Návrhy se jen ukážou a admin je potvrdí (na kartě objektu výběrem, v inventáři výběrem objektů). Jinak by úprava názvu nebo atributu tiše přidávala kontroly a alerty.
+2. **Pravidla návrhů:** web -> HTTP na atribut `url`/`adresa`, jinak `https://<název>/` (jen když název je jméno hosta s tečkou, ne IP), u https certifikát TLS; doména -> expirace domény z názvu; server, VM, síťové zařízení -> ping na `ip`/`ipv4`/`ipv6`/`host`/`hostname`, jinak na název (IP nebo jméno s tečkou); služba, databáze, jiné -> HTTP na `url` (+ TLS), bez `url` TCP na `host`/`ip`/`server` a `port`. U služby se z názvu nic nehádá. Klíče atributů se porovnávají bez ohledu na velikost písmen, použije se platná hodnota (při rozporu ruční).
+3. **Ping místo TCP u serverů:** nevyžaduje znát port. Kde ping na serveru Nordvarru nejde (hosting), návod doporučuje TCP.
+4. **Nové kontroly mají výchozí nastavení typu** (interval, práh, notifikace), stejně jako ruční formulář bez úprav. Duplicita se pozná podle typu a cíle kontroly.
+5. **Hromadné tlačítko v inventáři** používá stejný formulář jako hromadná úprava (`formaction`), aby výběr objektů fungoval bez JavaScriptu.
+6. **Verze 0.3.0:** nová funkce nad 0.2.1.
+
