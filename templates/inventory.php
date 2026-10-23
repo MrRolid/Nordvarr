@@ -102,6 +102,7 @@ $back = http_build_query(array_filter($filter, static fn (string $x): bool => $x
         <label for="bulk-tag"><?= $v->t('inventory.bulk_tag') ?></label>
         <input id="bulk-tag" name="tag" type="text" maxlength="50" required>
         <button type="submit"><?= $v->t('inventory.bulk_submit') ?></button>
+        <button type="submit" formaction="<?= $v->url('/inventory/checks') ?>" formnovalidate data-test="bulk-suggested"><?= $v->t('suggest.bulk') ?></button>
     </div>
     <?php endif; ?>
 </form>

@@ -6,6 +6,7 @@ namespace Nordvarr\Ui;
 
 use Nordvarr\Checks\CheckTypes;
 use Nordvarr\Checks\ObjectStatus;
+use Nordvarr\Checks\Suggestions;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Router;
 use Nordvarr\Repository\CheckRepository;
@@ -29,6 +30,7 @@ final class CheckController
     {
         $router->get('/objects/{id}/checks/new', fn (array $p): Response => $this->withObject($p['id'], fn (array $o): Response => $this->newForm($o)));
         $router->post('/objects/{id}/checks', fn (array $p): Response => $this->withObject($p['id'], fn (array $o): Response => $this->create($o)));
+        $router->post('/objects/{id}/checks/suggested', fn (array $p): Response => $this->withObject($p['id'], fn (array $o): Response => $this->addSuggested($o)));
         $router->get('/checks/{id}', fn (array $p): Response => $this->withCheck($p['id'], fn (array $c): Response => $this->show($c)));
         $router->get('/checks/{id}/edit', fn (array $p): Response => $this->withCheck($p['id'], fn (array $c): Response => $this->form($c, null, $c['type'], self::formValues($c), [])));
         $router->post('/checks/{id}/edit', fn (array $p): Response => $this->withCheck($p['id'], fn (array $c): Response => $this->update($c)));
@@ -149,6 +151,26 @@ final class CheckController
         $this->ctx->flash('check.created');
 
         return $this->ctx->redirect('/checks/' . $id);
+    }
+
+    /**
+     * Založí vybrané doporučené kontroly objektu.
+     *
+     * @param array<string, mixed> $object
+     */
+    private function addSuggested(array $object): Response
+    {
+        $keys = $this->ctx->request->post['keys'] ?? [];
+        $keys = is_array($keys) ? array_values(array_filter($keys, 'is_string')) : [];
+        $created = $keys === [] ? [] : Suggestions::apply($this->ctx->pdo, (string) $object['id'], $keys);
+        foreach ($created as $c) {
+            $this->ctx->audit('check.create', ['id' => $c['id'], 'object_id' => $object['id'], 'type' => $c['type'], 'suggested' => true]);
+        }
+        $this->ctx->flash('suggest.added', ['count' => count($created)]);
+        $response = $this->ctx->redirect('/objects/' . $object['id']);
+        $response->headers['Location'] .= '#checks';
+
+        return $response;
     }
 
     /**

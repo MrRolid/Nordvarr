@@ -181,6 +181,7 @@ final class ObjectController
 
         return $this->ctx->page('object', $this->diagnosis($object, $checks) + [
             'host' => $host,
+            'suggestions' => \Nordvarr\Checks\Suggestions::load($this->ctx->pdo, $id),
             'title' => 'object.detail',
             'object' => $object,
             'checks' => $checks,

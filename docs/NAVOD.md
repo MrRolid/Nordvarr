@@ -91,9 +91,30 @@ php bin/nordvarr.php reset-password <e-mail>  # nové heslo pro zapomenutý úč
 2. **Nastavení -> Notifikace:** adresa aplikace pro odkazy v notifikacích (vyplní se sama při prvním přihlášení), jazyk notifikací a interval připomínek.
 3. **Nastavení -> Kanály:** e-mail (SMTP), Telegram nebo webhook. Po uložení použijte "Odeslat test".
 4. **Inventář:** objekty ručně, importem JSON nebo přes API. Vztahy "závisí na" a "obsahuje" určují okolí v topologii a potlačení alertů.
-5. **Kontroly** na detailu objektu: HTTP, TCP, ping, certifikát TLS, expirace domény, heartbeat.
+5. **Kontroly** na detailu objektu: HTTP, TCP, ping, certifikát TLS, expirace domény, heartbeat. Rychlejší cesta je popsaná níže v části "Jak zapnout hlídání".
 6. **Topologie:** graf okolí objektu nebo objektů podle filtru.
 7. U incidentu: karta objektu ukazuje stav a důvod, pravděpodobnou příčinu, poslední změnu v okolí a stav závislostí. Tlačítko **"Zkopírovat pro LLM"** připraví kontext k vložení do libovolného LLM (tajné údaje jsou maskované, Nordvarr sám žádné LLM nevolá).
+
+### Jak zapnout hlídání
+
+Nordvarr hlídá dvěma způsoby:
+
+- **Kontroly ze serveru Nordvarru.** Worker (cron každou minutu) se z vašeho serveru připojuje k cílům: web (HTTP), port (TCP), ping, certifikát TLS, expirace domény. Na hlídaných strojích nic instalovat nemusíte.
+- **Agent na hlídaném serveru.** Skript na Linuxu každou minutu pošle CPU, RAM, disky, teploty, GPU a stav disků ze SMART (kapitola 12). Hodí se i pro server, na kterém běží sám Nordvarr.
+
+Postup:
+
+1. **Doporučené kontroly.** Na kartě objektu (část Kontroly) Nordvarr navrhne kontroly podle typu objektu a atributů a přidají se jedním tlačítkem. Návrhy:
+   - web: HTTP na atribut `url`, jinak `https://<název>/`, u https i certifikát TLS,
+   - doména: expirace domény podle názvu,
+   - server, VM, síťové zařízení: ping na atribut `ip` (případně `ipv6`, `host`, `hostname`), jinak na název, pokud je to IP nebo jméno hosta,
+   - služba, databáze, jiné: HTTP na atribut `url`, jinak TCP na `host` (nebo `ip`, `server`) a `port`.
+
+   Návrh, který už existující kontrola pokrývá, se nenabízí. Pokud se nic nenavrhne, doplňte objektu atribut (např. `url` nebo `ip`) nebo přidejte kontrolu ručně tlačítkem "Přidat kontrolu".
+2. **Hromadně z inventáře.** V inventáři vyberte objekty a použijte "Přidat doporučené kontroly". Přehled ukazuje počet objektů bez kontrol s odkazem na jejich seznam.
+3. **Ping na hostingu.** Pokud kontrola ping končí důvodem `tool_missing` (na serveru Nordvarru není program `ping` nebo ho PHP nesmí spustit), použijte místo něj kontrolu TCP na otevřený port (např. 22 nebo 443).
+4. **Agent** pro metriky serverů nainstalujte podle kapitoly 12. Na kartě serveru bez agenta je odkaz na návod v Nastavení -> Agent pro servery.
+5. **Notifikace.** Bez kanálu se o výpadku dozvíte jen v aplikaci: nastavte kanál a použijte "Odeslat test" (kroky 2 a 3 výše).
 
 ## 5. Aktualizace
 

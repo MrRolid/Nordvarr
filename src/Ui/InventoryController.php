@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nordvarr\Ui;
 
 use Nordvarr\Checks\ObjectStatus;
+use Nordvarr\Checks\Suggestions;
 use Nordvarr\Checks\Status;
 use Nordvarr\Http\Response;
 use Nordvarr\Http\Router;
@@ -28,6 +29,7 @@ final class InventoryController
     {
         $router->get('/inventory', fn (): Response => $this->index());
         $router->post('/inventory/tags', fn (): Response => $this->bulkTag());
+        $router->post('/inventory/checks', fn (): Response => $this->bulkChecks());
     }
 
     private function index(): Response
@@ -104,6 +106,38 @@ final class InventoryController
             return $count;
         });
         $this->ctx->flash('inventory.bulk_done', ['tag' => $tag, 'count' => $count]);
+
+        return $this->ctx->redirect('/inventory', $query);
+    }
+
+    /**
+     * Hromadně přidá doporučené kontroly vybraným objektům.
+     */
+    private function bulkChecks(): Response
+    {
+        $r = $this->ctx->request;
+        $ids = $r->post['ids'] ?? [];
+        $ids = is_array($ids) ? array_values(array_filter($ids, 'is_string')) : [];
+        $query = [];
+        parse_str($r->input('back'), $query);
+        $query = array_filter($query, static fn ($v, $k): bool => in_array($k, ['type', 'tag', 'q', 'status', 'lifecycle'], true) && is_string($v), ARRAY_FILTER_USE_BOTH);
+        if ($ids === []) {
+            $this->ctx->flash('inventory.bulk_err_none');
+
+            return $this->ctx->redirect('/inventory', $query);
+        }
+        $checks = 0;
+        $objects = 0;
+        $without = 0;
+        foreach (array_keys($this->inventory->objects->findMany($ids)) as $id) {
+            $created = Suggestions::apply($this->ctx->pdo, (string) $id);
+            foreach ($created as $c) {
+                $this->ctx->audit('check.create', ['id' => $c['id'], 'object_id' => $id, 'type' => $c['type'], 'suggested' => true]);
+            }
+            $checks += count($created);
+            $created === [] ? $without++ : $objects++;
+        }
+        $this->ctx->flash('suggest.bulk_done', ['checks' => $checks, 'objects' => $objects, 'without' => $without]);
 
         return $this->ctx->redirect('/inventory', $query);
     }

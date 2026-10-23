@@ -1,8 +1,20 @@
 # Stav práce
 
-Aktualizováno: 2026-10-21
+Aktualizováno: 2026-10-23
 
 ## Hotové fáze
+
+### F7 Rychlé nastavení monitoringu (větev `faze-7-rychle-nastaveni`)
+
+Fáze nad rámec SPEC na přání vlastníka po nasazení 0.2.1 ("jak tam přidám reálné monitoringy"). Cíl: z inventáře bez kontrol se k hlídání dostat na pár kliknutí.
+
+- `Checks\Suggestions`: doporučené kontroly podle typu objektu, názvu a atributů (pravidla v ROZHODNUTI F7). Návrhy se validují stejně jako ruční kontroly a nenabízí se to, co už existující kontrola pokrývá.
+- Karta objektu: blok "Doporučené kontroly" se zaškrtávátky a tlačítkem pro přidání vybraných; u serveru a VM bez agenta odkaz na Nastavení -> Agent pro servery.
+- Inventář: hromadné tlačítko "Přidat doporučené kontroly" pro vybrané objekty (výsledek ve flash zprávě: kolik kontrol, u kolika objektů, kolik objektů bez návrhu).
+- Přehled: počet objektů bez kontrol s odkazem na filtr inventáře.
+- Každá přidaná kontrola se zapisuje do auditu (`check.create`, příznak `suggested`).
+- `docs/NAVOD.md`: část "Jak zapnout hlídání" v kapitole 4.
+- Testy: `SuggestionsTest` (pravidla, duplicity, neplatné cíle), `SuggestionsUiTest` (karta, hromadné přidání, tip v přehledu), e2e `suggestions.spec.js`. Výsledek: `composer test` a `npm run e2e` zelené.
 
 ### Oprava 0.2.1 (větev `oprava-datovy-adresar`)
 
@@ -237,5 +249,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.2.0 (F0 až F6) je vydaný z `main` tagem `v0.2.0`, zip sestavilo CI.
+- Release 0.3.0 (F7) vydat z `main` tagem `v0.3.0` (tag vytvoří vlastník přes web GitHubu, CI k němu přiloží zip).
 - Další fáze nejsou v plánu. Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

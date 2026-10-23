@@ -25,6 +25,7 @@ $id = (string) $object['id'];
 /** @var array<string, array<string, mixed>> $lastChangeObjects */
 /** @var int $alertCount90 */
 /** @var array<string, mixed>|null $host */
+/** @var list<array{key: string, type: string, input: array<string, string>, target: string}> $suggestions */
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
@@ -76,6 +77,22 @@ $id = (string) $object['id'];
         <h2><?= $v->t('object.checks') ?></h2>
         <a class="button" href="<?= $v->url('/objects/' . $id . '/checks/new') ?>" data-test="add-check"><?= $v->t('check.add') ?></a>
     </div>
+    <?php if ($suggestions !== []): ?>
+    <form method="post" action="<?= $v->url('/objects/' . $id . '/checks/suggested') ?>" class="suggestions" data-test="suggestions">
+        <?= $v->csrfField() ?>
+        <p><strong><?= $v->t('suggest.title') ?></strong> <span class="muted small-text"><?= $v->t('suggest.help') ?></span></p>
+        <ul class="plain">
+            <?php foreach ($suggestions as $i => $s): ?>
+            <li><label class="check-label"><input type="checkbox" name="keys[]" value="<?= $v->e($s['key']) ?>" checked>
+                <?= $v->t('checktype.' . $s['type']) ?> <code><?= $v->e($s['target']) ?></code></label></li>
+            <?php endforeach; ?>
+        </ul>
+        <button type="submit" class="primary" data-test="add-suggested"><?= $v->t('suggest.add') ?></button>
+    </form>
+    <?php endif; ?>
+    <?php if ($host === null && in_array($object['type'], ['server', 'vm'], true)): ?>
+    <p class="muted small-text" data-test="agent-hint"><?= $v->t('suggest.agent_hint') ?> <a href="<?= $v->url('/settings/agent') ?>"><?= $v->t('settings.agent_guide') ?></a></p>
+    <?php endif; ?>
     <?php if ($checks === []): ?>
     <p class="muted"><?= $v->t('check.none') ?></p>
     <?php else: ?>
