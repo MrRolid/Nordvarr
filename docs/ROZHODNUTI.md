@@ -155,3 +155,16 @@ Vlastník navrhl 3D zobrazení vrstev infrastruktury. Rozbor a návrh jsou v `do
 7. **Volba rozvržení** je parametr adresy `layout=floors` (žádné ukládání do profilu). Výchozí zůstává automatické rozvržení.
 8. **Verze 0.4.0.**
 
+## 2026-11-02 (F9 3D pohled na patra)
+
+Krok B z `docs/NAVRH-3D-MAPA.md`. Vlastník po sloučení F8 napsal "slouč a pokračuj", 3D tedy vzniklo bez vyzkoušení pater na jeho datech (návrh to doporučoval). `SPEC.md` se nemění.
+
+1. **three.js 0.170.0** jako jediný soubor `three.module.min.js` (od verze 0.171 je knihovna rozdělená do více souborů). Vložená beze změny, se záznamem ve `VERSIONS.md`.
+2. **Bez doplňků z `examples/` (OrbitControls, CSS2DRenderer).** Importují modul `three` holým jménem, což bez buildu vyžaduje import mapu, a ta musí být inline skript, který CSP zakazuje. Ovládání kamery a popisky jsou proto vlastní, přímo v `topology3d.js`.
+3. **Modul se načítá dynamicky** (`import()`) až při přepnutí na 3D, ostatní pohledy tak nestahují 700 kB navíc. Adresa modulu přichází ze šablony s parametrem verze, aby se po aktualizaci nenačetla stará verze z mezipaměti.
+4. **Tvar: patra nad sebou** (varianta C návrhu). Úhel na obvodu = vodorovná poloha z F8, výška = patro. Zalomené patro (víc než 10 objektů) dá další řádky na menším poloměru. Poloměr roste s počtem sloupců, rozestup pater s poloměrem.
+5. **Popisky jako HTML nad plátnem**, polohu nastavuje skript přes CSSOM (`style.transform`). CSP (`style-src 'self'`) to dovoluje, zakázané jsou jen inline styly v HTML. Při více než 60 objektech se ukazují jen popisky objektů s problémem, vybraného objektu a jeho sousedů.
+6. **Vykreslování jen při změně** (pohyb, animace, nová data), ne v každém snímku. Mapa v klidu nezatěžuje procesor.
+7. **Bez WebGL** se 3D nezapne: mapa přejde do pater a ukáže upozornění. Volba `layout=3d` v adrese se v takovém prohlížeči přepíše na `layout=floors`.
+8. **Verze 0.5.0.**
+

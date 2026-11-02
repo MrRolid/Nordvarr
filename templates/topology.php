@@ -125,9 +125,14 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
                 <div class="seg seg-small" role="group" aria-label="<?= $v->t('topology.layout') ?>" data-test="layout-switch">
                     <button type="button" class="small" data-layout="auto" aria-pressed="<?= $params['layout'] === 'auto' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_auto') ?></button>
                     <button type="button" class="small" data-layout="floors" aria-pressed="<?= $params['layout'] === 'floors' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_floors') ?></button>
+                    <button type="button" class="small" data-layout="3d" aria-pressed="<?= $params['layout'] === '3d' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_3d') ?></button>
                 </div>
+                <button type="button" class="small" data-3d="top" data-3d-only hidden><?= $v->t('topology.top_view') ?></button>
+                <button type="button" class="small" data-3d="spread" data-3d-only hidden aria-pressed="false"><?= $v->t('topology.spread') ?></button>
                 <button type="button" class="small" data-cy="fit"><?= $v->t('topology.fit') ?></button>
             </div>
+            <div id="map3d" class="map3d" data-test="map3d" hidden data-module="<?= $v->asset('js/topology3d.js') ?>" aria-label="<?= $v->t('topology.map3d') ?>"></div>
+            <p class="map3d-missing" data-webgl-missing data-test="webgl-missing" hidden><?= $v->t('topology.webgl_missing') ?></p>
             <?php endif; ?>
         </section>
 

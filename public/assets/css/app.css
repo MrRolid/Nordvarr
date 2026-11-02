@@ -476,6 +476,7 @@ input[type="radio"] { margin: 0; }
 .topo-empty { padding: 3rem 1.5rem; text-align: center; color: var(--map-muted); min-height: 300px; }
 .topo-legend {
     position: absolute;
+    z-index: 2;
     left: .6rem;
     bottom: .6rem;
     display: flex;
@@ -492,8 +493,24 @@ input[type="radio"] { margin: 0; }
 .leg-line.dashed { border-top-style: dashed; }
 .leg-line.causal { border-top: 3px solid var(--map-causal); }
 .leg-ring { width: 12px; height: 12px; border-radius: 50%; border: 3px solid var(--st-healthy); border-right-color: var(--st-unhealthy); display: inline-block; }
-.topo-tools { position: absolute; right: .6rem; top: .6rem; display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.topo-tools { position: absolute; z-index: 2; right: .6rem; top: .6rem; display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
 .seg-small { gap: 0; flex-wrap: nowrap; }
+.topo-tools button[data-3d="spread"][aria-pressed="true"] { background: var(--map-center); border-color: var(--map-center); color: var(--map-node); }
+.seg-small button + button { margin-left: -1px; }
+.cy[hidden], .map3d[hidden], .map3d-missing[hidden], .topo-tools [hidden] { display: none; }
+.map3d { position: relative; width: 100%; height: calc(100vh - 150px); min-height: 520px; overflow: hidden; touch-action: none; }
+.map3d canvas { display: block; }
+.map3d canvas.pointer { cursor: pointer; }
+.map3d-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.map3d-label, .map3d-floor { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: .72rem; line-height: 1.2; }
+.map3d-label { color: var(--map-text); font-weight: 600; padding: 0 .25rem; border-radius: 4px; background: color-mix(in srgb, var(--map-bg) 70%, transparent); pointer-events: auto; cursor: pointer; }
+.map3d-label.st-unhealthy { color: var(--st-unhealthy); }
+.map3d-label.st-degraded { color: var(--st-degraded); }
+.map3d-label.active { outline: 2px solid var(--map-center); }
+.map3d-label.dim { opacity: .3; }
+.map3d-label.hidden-far { display: none; }
+.map3d-floor { color: var(--map-muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; padding-right: .5rem; }
+.map3d-missing { position: absolute; left: .6rem; bottom: 2.4rem; margin: 0; padding: .3rem .5rem; border-radius: 6px; background: var(--surface); color: var(--muted); font-size: .85rem; }
 .seg-small button { border-radius: 0; }
 .seg-small button:first-child { border-radius: 6px 0 0 6px; }
 .seg-small button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
@@ -524,7 +541,7 @@ input[type="radio"] { margin: 0; }
     .topo-left { order: 2; }
     .topo-map { order: 1; }
     .topo-right { order: 3; }
-    .cy { height: 65vh; min-height: 380px; }
+    .cy, .map3d { height: 65vh; min-height: 380px; }
     .node-list { max-height: 18rem; overflow-y: auto; }
 }
 

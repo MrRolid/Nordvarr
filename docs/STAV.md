@@ -4,6 +4,18 @@ Aktualizováno: 2026-11-02
 
 ## Hotové fáze
 
+### F9 3D pohled na patra (větev `faze-9-3d-mapa`)
+
+Krok B z `docs/NAVRH-3D-MAPA.md` (vlastník: "slouč a pokračuj", 2. 11. 2026): 3D prototyp jen pro čtení nad daty z F8.
+
+- `public/assets/js/topology3d.js` nad three.js 0.170.0 (`assets/vendor/three-0.170.0`, MIT, záznam ve `VERSIONS.md`). Modul se načte až při prvním přepnutí na 3D.
+- Patra jako průhledné disky nad sebou s osou, objekty jako koule na obvodu (úhel z vodorovné polohy F8, zalomená patra na menším poloměru), barva podle stavu, centrum okolí větší, vybraný objekt s obrysem. Hrany: "závisí na" plná čára, "obsahuje" čárkovaná, cesta k příčině oranžová.
+- Popisky objektů a pater jako HTML nad plátnem (ostrý text). Klik na popisek vybere objekt.
+- Ovládání bez další knihovny: tažení otáčí, kolečko a dva prsty přibližují, klik vybere (karta vpravo), dvojklik otevře kartu, najetí ztlumí vše mimo sousedy. Klik v seznamu natočí mapu k objektu. Tlačítka Pohled shora, Roztáhnout patra, Celý graf.
+- Obnovování dat (ETag) aktualizuje i 3D: barvy beze změny scény, při změně objektů nebo vztahů se scéna postaví znovu.
+- Bez WebGL zůstane mapa v patrech s upozorněním.
+- Testy: `TopologyTest` (přepínač 3D, modul s verzí v adrese, skryté ovládání), `ReleaseBuildTest` (soubory three.js a modulu v zipu), e2e `topology.spec.js` (3D scéna, klik na kouli otevře kartu, výběr ze seznamu, tlačítka, znovunačtení, návrat do pater, prohlížeč bez WebGL).
+
 ### F8 Patra v mapě (větev `faze-8-patra`)
 
 Krok A z `docs/NAVRH-3D-MAPA.md` (vlastník s návrhem souhlasil 2. 11. 2026): ověřit model vrstev ve 2D, než se začne s 3D.
@@ -255,10 +267,11 @@ Nic.
 - Záznamy auditu (včetně neúspěšných přihlášení) se nemažou; při dlouhodobém zkoušení hesel tabulka `audit_log` roste. Tabulku pokusů o přihlášení worker čistí.
 - Agent: jen Linux s bash 4.4+. Bez root práv a bez `smartmontools` chybí stav disků (karta to napíše). Virtuální disky ve VM obvykle SMART nemají. Disky za RAID řadičem vyžadují pro `smartctl` zvláštní typ zařízení (`-d megaraid,N` apod.), který `smartctl --scan` někdy nenabídne.
 - Agent: popisy problémů (např. "přemapované sektory: 1872") jsou uložené česky i pro anglické UI, stejně jako detaily ostatních kontrol.
+- 3D pohled: popisky se při mnoha objektech na jednom patře překrývají (pomůže přiblížení nebo Roztáhnout patra). Čáry mají v WebGL vždy šířku 1 px, cesta k příčině se proto liší jen barvou. Výkon je ověřený na ukázkových datech (40 objektů), ne na stovkách.
 - Cytoscape vkládá na stránku vlastní `<style>`, který CSP blokuje. Obchází se to prázdným prvkem s id, které knihovna hledá, a pravidlem v `app.css` (ROZHODNUTI F4 bod 7). Při aktualizaci knihovny je potřeba to ověřit (e2e test hlídá chyby v konzoli).
 
 ## Další krok
 
-- Release 0.4.0 (F8) vydat z `main` tagem `v0.4.0` přes web GitHubu, až bude F8 sloučená do `main` (tag musí ukazovat na commit, kde je `VERSION` 0.4.0, jinak CI zip nesestaví).
-- Krok B z `docs/NAVRH-3D-MAPA.md`: 3D prototyp pater jen pro čtení (three.js v `assets/vendor`). Začít až po vyzkoušení pater na skutečných datech vlastníka.
+- Release 0.5.0 (F8 a F9) vydat z `main` tagem `v0.5.0` přes web GitHubu, až bude F9 sloučená (tag musí ukazovat na commit s `VERSION` 0.5.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat.
+- Krok C z `docs/NAVRH-3D-MAPA.md`: hledání s přeletem kamery, režim problému (ztlumit vše mimo cestu k příčině), vypínání jednotlivých pater, plynulý přechod mezi 3D a 2D. Začít po zkušenosti vlastníka s 3D na skutečných datech.
 - Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

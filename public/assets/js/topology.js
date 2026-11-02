@@ -1,7 +1,8 @@
 // Nordvarr - mapa topologie (Cytoscape + dagre). ES modul bez buildu; knihovny jsou
 // načtené jako běžné skripty z assets/vendor a dostupné jako globální proměnné.
-// Dvě rozvržení: automatické (dagre, u velkých grafů silové) a patra (polohy spočítané
-// serverem, viz Nordvarr\Topology\Floors, s pásy pater v pozadí).
+// Tři pohledy: automatické rozvržení (dagre, u velkých grafů silové), patra (polohy spočítané
+// serverem, viz Nordvarr\Topology\Floors, s pásy pater v pozadí) a 3D (topology3d.js, načte
+// se až při prvním přepnutí, bez WebGL zůstane mapa v patrech).
 
 const el = document.getElementById('cy');
 const panel = document.getElementById('node-panel');
@@ -162,8 +163,10 @@ if (el && window.cytoscape) {
 
     const initial = JSON.parse(el.dataset.graph);
     compact = initial.nodes.length > 24;
-    let mode = el.dataset.layout === 'floors' ? 'floors' : 'auto';
+    const MODES = ['auto', 'floors', '3d'];
+    let mode = MODES.includes(el.dataset.layout) ? el.dataset.layout : 'auto';
     let floors = initial.floors ?? [];
+    let lastGraph = initial;
     const objects = () => cy.elements().not('.band');
     const cy = window.cytoscape({
         container: el,
@@ -210,6 +213,7 @@ if (el && window.cytoscape) {
 
     // Rozložení po vrstvách shora dolů, nebo zleva doprava, pokud se tak graf do mapy vejde větší.
     const layout = () => {
+        if (mode === '3d') return;
         if (mode === 'floors') {
             floorsLayout();
             if (cy.zoom() > 1.25) {
@@ -244,6 +248,25 @@ if (el && window.cytoscape) {
         }
     };
     layout();
+
+    // 3D pohled (modul se načte při prvním použití).
+    const box3d = document.getElementById('map3d');
+    const tools3d = document.querySelectorAll('[data-3d-only]');
+    const fallback3d = document.querySelector('[data-webgl-missing]');
+    let map3d = null;
+    const webgl = () => {
+        try {
+            const canvas = document.createElement('canvas');
+            return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+        } catch {
+            return false;
+        }
+    };
+    const show3d = (on) => {
+        el.hidden = on;
+        if (box3d) box3d.hidden = !on;
+        for (const t of tools3d) t.hidden = !on;
+    };
 
     // Zvýraznění okolí uzlu (při najetí a výběru).
     // Vybraný uzel: obarvené hrany. Najetí myší: navíc ztlumí zbytek grafu.
@@ -282,7 +305,9 @@ if (el && window.cytoscape) {
         const ext = cy.extent();
         const bb = node.boundingBox();
         const visible = bb.x1 >= ext.x1 && bb.x2 <= ext.x2 && bb.y1 >= ext.y1 && bb.y2 <= ext.y2;
-        if (center && !visible) cy.animate({ center: { eles: node }, duration: 250 });
+        if (center && !visible && mode !== '3d') cy.animate({ center: { eles: node }, duration: 250 });
+        map3d?.select(id);
+        if (center && mode === '3d') map3d?.focus(id);
         for (const item of listItems()) item.classList.toggle('active', item.dataset.node === id);
         loadCard(id);
     };
@@ -302,23 +327,64 @@ if (el && window.cytoscape) {
     for (const item of listItems()) {
         item.addEventListener('click', () => select(item.dataset.node, true));
     }
-    document.querySelector('[data-cy="fit"]')?.addEventListener('click', () => cy.fit(undefined, 30));
+    document.querySelector('[data-cy="fit"]')?.addEventListener('click', () => {
+        if (mode === '3d') map3d?.reset();
+        else cy.fit(undefined, 30);
+    });
+    document.querySelector('[data-3d="top"]')?.addEventListener('click', () => map3d?.topView());
+    const spreadButton = document.querySelector('[data-3d="spread"]');
+    spreadButton?.addEventListener('click', () => {
+        const on = spreadButton.getAttribute('aria-pressed') !== 'true';
+        spreadButton.setAttribute('aria-pressed', String(on));
+        map3d?.setSpread(on);
+    });
 
     // Přepínač rozvržení: zapamatuje se v adrese a ve formuláři (pro další zobrazení).
     const layoutButtons = document.querySelectorAll('.topo-tools [data-layout]');
+    const enter3d = async () => {
+        if (!box3d || !webgl()) {
+            // Bez WebGL zůstane mapa v patrech s upozorněním.
+            if (fallback3d) fallback3d.hidden = false;
+            setMode('floors');
+            return;
+        }
+        show3d(true);
+        if (!map3d) {
+            const module = await import(box3d.dataset.module);
+            if (mode !== '3d') return;
+            map3d = module.createMap3d(box3d, lastGraph, {
+                onSelect: (id) => select(id),
+                onOpen: (id) => { window.location.href = urlFor(el.dataset.objectUrl, id); },
+            });
+            box3d.map3d = map3d;
+        } else {
+            map3d.resize();
+            map3d.update(lastGraph);
+        }
+        if (selected) map3d.select(selected);
+    };
     const setMode = (next) => {
-        mode = next === 'floors' ? 'floors' : 'auto';
+        const previous = mode;
+        mode = MODES.includes(next) ? next : 'auto';
         el.dataset.layout = mode;
         for (const b of layoutButtons) b.setAttribute('aria-pressed', String(b.dataset.layout === mode));
         const input = document.querySelector('[data-layout-input]');
         if (input) input.value = mode;
         try {
             const url = new URL(window.location.href);
-            if (mode === 'floors') url.searchParams.set('layout', 'floors');
-            else url.searchParams.delete('layout');
+            if (mode === 'auto') url.searchParams.delete('layout');
+            else url.searchParams.set('layout', mode);
             window.history.replaceState(null, '', url);
         } catch {
             // Bez změny adresy.
+        }
+        if (mode === '3d') {
+            enter3d();
+            return;
+        }
+        if (previous === '3d') {
+            show3d(false);
+            cy.resize();
         }
         layout();
         restore();
@@ -328,6 +394,7 @@ if (el && window.cytoscape) {
     // Výchozí výběr: centrum okolí, v režimu filtru první uzel seznamu (seřazený od nejhoršího stavu).
     const first = el.dataset.center || document.querySelector('.node-item[data-node]')?.dataset.node;
     if (first) select(first);
+    if (mode === '3d') enter3d();
 
     // Přepnutí světlého a tmavého režimu.
     window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => cy.style(style()));
@@ -347,6 +414,8 @@ if (el && window.cytoscape) {
                 const graph = await response.json();
                 etag = response.headers.get('ETag');
                 floors = graph.floors ?? [];
+                lastGraph = graph;
+                map3d?.update(graph);
                 const elements = prepare(graph);
                 const ids = new Set(elements.map((e) => e.data.id));
                 const same = ids.size === objects().length && objects().every((e) => ids.has(e.id()));
