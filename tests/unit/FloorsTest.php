@@ -27,6 +27,8 @@ final class FloorsTest extends TestCase
         self::assertSame('hardware', Floors::floorOf('server'));
         self::assertSame('hardware', Floors::floorOf('network_device'));
         self::assertSame('virtual', Floors::floorOf('vm'));
+        self::assertSame('containers', Floors::floorOf('container'));
+        self::assertSame('containers', Floors::floorOf('cluster'));
         self::assertSame('services', Floors::floorOf('database'));
         self::assertSame('web', Floors::floorOf('website'));
         self::assertSame('domains', Floors::floorOf('domain'));

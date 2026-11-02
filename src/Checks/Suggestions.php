@@ -16,7 +16,7 @@ use PDO;
  * - web: HTTP na atribut url, jinak https://<název>/; u https certifikát TLS,
  * - doména: expirace domény podle názvu,
  * - server, VM, síťové zařízení: ping na atribut ip, jinak na název (IP nebo jméno hosta),
- * - služba a databáze: HTTP na atribut url, TCP na host/ip + port.
+ * - služba, databáze, kontejner a cluster: HTTP na atribut url, TCP na host/ip + port.
  * Návrh, který už existující kontrola pokrývá (stejný typ a cíl), se vynechá.
  */
 final class Suggestions
@@ -98,6 +98,8 @@ final class Suggestions
                 break;
             case 'service':
             case 'database':
+            case 'container':
+            case 'cluster':
             case 'other':
                 self::addHttp($suggestions, $url);
                 $port = $attr('port');

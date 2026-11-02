@@ -127,7 +127,7 @@ final class InventoryUiTest extends TestCase
     {
         (new DemoData(new Inventory($this->pdo())))->load();
         $all = $this->ui('GET', '/inventory');
-        self::assertStringContainsString('Nalezeno objektů: 40', $all->body);
+        self::assertStringContainsString('Nalezeno objektů: 43', $all->body);
         self::assertStringContainsString('Nalezeno objektů: 6', $this->ui('GET', '/inventory', [], ['type' => 'website'])->body);
         self::assertStringContainsString('Nalezeno objektů: 1', $this->ui('GET', '/inventory', [], ['q' => '192.0.2.35'])->body);
         $eshop = $this->ui('GET', '/inventory', [], ['tag' => 'eshop', 'type' => 'website'])->body;
@@ -175,7 +175,7 @@ final class InventoryUiTest extends TestCase
         self::assertSame(200, $export->status);
         self::assertStringStartsWith('attachment; filename="nordvarr-inventar-', $export->headers['Content-Disposition']);
         $data = self::json($export);
-        self::assertCount(40, $data['objects']);
+        self::assertCount(43, $data['objects']);
 
         $file = $this->tmp . '/export.json';
         file_put_contents($file, $export->body);
@@ -188,7 +188,7 @@ final class InventoryUiTest extends TestCase
 
         $this->post('/settings/import', ['confirm' => '1'], $upload);
         self::assertSame('settings.imported', $this->flash());
-        self::assertSame(40, (int) $this->pdo()->query('SELECT COUNT(*) FROM objects')->fetchColumn());
+        self::assertSame(43, (int) $this->pdo()->query('SELECT COUNT(*) FROM objects')->fetchColumn());
         self::assertCount(1, glob($this->tmp . '/nordvarr-data/backups/*-pred-importem-*.sqlite') ?: []);
 
         $again = self::json($this->ui('GET', '/settings/export'));
@@ -198,7 +198,7 @@ final class InventoryUiTest extends TestCase
         file_put_contents($file, '{"format":"jine"}');
         $this->post('/settings/import', ['confirm' => '1'], $upload);
         self::assertSame('err.invalid_format', $this->flash());
-        self::assertSame(40, (int) $this->pdo()->query('SELECT COUNT(*) FROM objects')->fetchColumn());
+        self::assertSame(43, (int) $this->pdo()->query('SELECT COUNT(*) FROM objects')->fetchColumn());
     }
 
     public function testTimezoneSetting(): void

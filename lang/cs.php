@@ -94,6 +94,8 @@ return [
     'type.domain' => 'Doména',
     'type.network_device' => 'Síťové zařízení',
     'type.other' => 'Ostatní',
+    'type.cluster' => 'Cluster',
+    'type.container' => 'Kontejner',
 
     'lifecycle.active' => 'Aktivní',
     'lifecycle.archived' => 'Archivované',

@@ -93,6 +93,8 @@ return [
     'type.domain' => 'Domain',
     'type.network_device' => 'Network device',
     'type.other' => 'Other',
+    'type.cluster' => 'Cluster',
+    'type.container' => 'Container',
 
     'lifecycle.active' => 'Active',
     'lifecycle.archived' => 'Archived',

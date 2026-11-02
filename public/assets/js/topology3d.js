@@ -59,6 +59,22 @@ export function createMap3d(container, graph, options = {}) {
 
     const statusColor = (status) => color(STATUS_VARS[status] ?? 'map-node-ring');
 
+    // Popisek uzlu: název, u serveru s agentem pod ním vytížení (CPU, RAM, GPU) z posledního hlášení.
+    const fillLabel = (label, d) => {
+        label.className = `map3d-label st-${d.status}`;
+        const name = document.createElement('span');
+        name.textContent = d.name;
+        name.dataset.node = d.id;
+        label.replaceChildren(name);
+        if (d.host && d.subtitle) {
+            const metrics = document.createElement('span');
+            metrics.className = 'map3d-metrics';
+            metrics.dataset.node = d.id;
+            metrics.textContent = d.subtitle.split('\n').join(', ');
+            label.append(metrics);
+        }
+    };
+
     const clear = () => {
         for (const child of [...world.children]) {
             world.remove(child);
@@ -134,9 +150,8 @@ export function createMap3d(container, graph, options = {}) {
             mesh.userData.id = d.id;
             world.add(mesh);
             const label = document.createElement('div');
-            label.className = `map3d-label st-${d.status}`;
-            label.textContent = d.name;
             label.dataset.node = d.id;
+            fillLabel(label, d);
             labelLayer.appendChild(label);
             nodes.set(d.id, { mesh, label, data: d, pos, many });
         }
@@ -449,7 +464,7 @@ export function createMap3d(container, graph, options = {}) {
                 const node = nodes.get(n.data.id);
                 node.data = n.data;
                 node.mesh.material.color = statusColor(n.data.status);
-                node.label.className = `map3d-label st-${n.data.status}`;
+                fillLabel(node.label, n.data);
             }
             for (const e of edges) {
                 const fresh = next.edges.find((x) => x.data.id === e.data.id);
