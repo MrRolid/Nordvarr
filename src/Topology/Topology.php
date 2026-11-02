@@ -11,6 +11,7 @@ use Nordvarr\Checks\Status;
 use Nordvarr\I18n;
 use Nordvarr\Repository\AgentRepository;
 use Nordvarr\Repository\AlertRepository;
+use Nordvarr\Repository\AttributeRepository;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\ObjectRepository;
 use Nordvarr\Repository\TagRepository;
@@ -19,7 +20,8 @@ use PDO;
 
 /**
  * Data pro graf topologie: okolí vybraného objektu (1 nebo 2 kroky) nebo objekty
- * podle filtru (nejvýš 300 uzlů). Výsledek je ve tvaru prvků pro Cytoscape.
+ * podle filtru (nejvýš 300 uzlů). Výsledek je ve tvaru prvků pro Cytoscape,
+ * včetně rozvržení do pater (Floors) pro pohled "patra".
  */
 final class Topology
 {
@@ -89,7 +91,7 @@ final class Topology
         }
         $total = count($objects);
         if ($total > self::MAX_NODES) {
-            return ['nodes' => [], 'edges' => [], 'truncated' => true, 'total' => $total];
+            return ['nodes' => [], 'edges' => [], 'floors' => [], 'truncated' => true, 'total' => $total];
         }
 
         return $this->graph(array_map(static fn (array $o): string => (string) $o['id'], $objects), null) + ['truncated' => false, 'total' => $total];
@@ -107,12 +109,12 @@ final class Topology
 
     /**
      * @param list<string> $ids
-     * @return array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>}
+     * @return array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>, floors: list<array<string, mixed>>}
      */
     private function graph(array $ids, ?string $centerId): array
     {
         if ($ids === []) {
-            return ['nodes' => [], 'edges' => []];
+            return ['nodes' => [], 'edges' => [], 'floors' => []];
         }
         $now = Time::toDb(Time::now());
         $maintenance = MaintenanceState::load($this->pdo, $now);
@@ -120,6 +122,7 @@ final class Topology
         $objects = (new ObjectRepository($this->pdo))->findMany($ids);
         $tags = (new TagRepository($this->pdo))->forObjects($ids);
         $hosts = (new AgentRepository($this->pdo))->hosts($ids);
+        $floorOverrides = (new AttributeRepository($this->pdo))->validValues($ids, Floors::ATTRIBUTE_KEYS);
 
         $checksByObject = [];
         foreach ((new CheckRepository($this->pdo))->all() as $check) {
@@ -159,6 +162,7 @@ final class Topology
             }
             $worst = $state['check'];
             $status = $state['status'];
+            $floor = Floors::floorOf((string) $object['type'], $floorOverrides[$id] ?? null);
             $nodes[] = ['data' => [
                 'id' => $id,
                 'name' => (string) $object['name'],
@@ -179,6 +183,7 @@ final class Topology
                 'center' => $id === $centerId,
                 'subtitle' => isset($hosts[$id]) ? $this->hostSubtitle($hosts[$id]) : $this->subtitle($object, $status, $latency, count($checks)),
                 'host' => isset($hosts[$id]),
+                'floor' => $floor,
             ]];
         }
 
@@ -207,7 +212,18 @@ final class Topology
             ]];
         }
 
-        return ['nodes' => $nodes, 'edges' => $edges];
+        $layout = Floors::layout(
+            array_map(static fn (array $n): array => ['id' => $n['data']['id'], 'name' => $n['data']['name'], 'floor' => $n['data']['floor']], $nodes),
+            array_map(static fn (array $e): array => ['source' => $e['data']['source'], 'target' => $e['data']['target']], $edges)
+        );
+        foreach ($nodes as &$node) {
+            $node['data']['fx'] = $layout['positions'][$node['data']['id']]['x'];
+            $node['data']['fy'] = $layout['positions'][$node['data']['id']]['y'];
+        }
+        unset($node);
+        $floors = array_map(fn (array $b): array => $b + ['label' => $this->i18n->t('floor.' . $b['floor'])], $layout['bands']);
+
+        return ['nodes' => $nodes, 'edges' => $edges, 'floors' => $floors];
     }
 
     /**

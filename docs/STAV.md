@@ -1,8 +1,18 @@
 # Stav práce
 
-Aktualizováno: 2026-10-23
+Aktualizováno: 2026-11-02
 
 ## Hotové fáze
+
+### F8 Patra v mapě (větev `faze-8-patra`)
+
+Krok A z `docs/NAVRH-3D-MAPA.md` (vlastník s návrhem souhlasil 2. 11. 2026): ověřit model vrstev ve 2D, než se začne s 3D.
+
+- `Topology\Floors`: patro podle typu objektu, přepis atributem `vrstva` (klíč patra nebo číslo 1 až 7), deterministické rozvržení do řádků a sloupců (průměr poloh sousedů v jiných patrech, několik průchodů), zalomení patra s více než 10 objekty.
+- Data topologie (stránka i `/topology/data`) mají u uzlu patro a polohu a seznam pater s popisky.
+- Mapa: přepínač Automaticky / Patra, pásy pater v pozadí s popisky, řádky se roztáhnou na výšku mapy. Volba je v adrese (`layout=floors`) a formulář ji zachová.
+- `AttributeRepository::validValues` načte platnou hodnotu atributu pro více objektů jedním dotazem.
+- Testy: `FloorsTest` (patra, přepis, sloupce, rozestupy, determinismus, zalomení), `TopologyTest` (patra v datech, přepis atributem s rozporem zdrojů, přepínač na stránce), e2e v `topology.spec.js` (pásy, pořadí pater, klik na uzel, zachování volby).
 
 ### F7 Rychlé nastavení monitoringu (větev `faze-7-rychle-nastaveni`)
 
@@ -249,5 +259,6 @@ Nic.
 
 ## Další krok
 
-- Release 0.3.0 (F7) vydat z `main` tagem `v0.3.0` (tag vytvoří vlastník přes web GitHubu, CI k němu přiloží zip).
-- Další fáze nejsou v plánu. Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
+- Release 0.4.0 (F8) vydat z `main` tagem `v0.4.0` přes web GitHubu, až bude F8 sloučená do `main` (tag musí ukazovat na commit, kde je `VERSION` 0.4.0, jinak CI zip nesestaví).
+- Krok B z `docs/NAVRH-3D-MAPA.md`: 3D prototyp pater jen pro čtení (three.js v `assets/vendor`). Začít až po vyzkoušení pater na skutečných datech vlastníka.
+- Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

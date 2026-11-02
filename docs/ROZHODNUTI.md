@@ -142,3 +142,16 @@ Vlastník po nasazení napsal, že má objekty bez kontrol a neví, jak hlídán
 5. **Hromadné tlačítko v inventáři** používá stejný formulář jako hromadná úprava (`formaction`), aby výběr objektů fungoval bez JavaScriptu.
 6. **Verze 0.3.0:** nová funkce nad 0.2.1.
 
+## 2026-11-02 (F8 Patra v mapě)
+
+Vlastník navrhl 3D zobrazení vrstev infrastruktury. Rozbor a návrh jsou v `docs/NAVRH-3D-MAPA.md`. Vlastník s doporučeními souhlasil: patra nad sebou (ne slupky v sobě), projekty jako tagy, logy mimo rozsah, 3D jako druhý pohled vedle 2D, začít krokem A (patra ve 2D). `SPEC.md` se nemění.
+
+1. **Patra nejdřív ve 2D** ve stávající mapě Cytoscape. Ověří model vrstev na skutečných datech bez nové knihovny. Výpočet rozvržení je na serveru a použije ho i případný 3D pohled.
+2. **Sedm pater zdola:** hardware a síť (`server`, `network_device`), virtuální stroje a VPS (`vm`), kontejnery, služby a databáze (`service`, `database`), weby a API (`website`), domény (`domain`), internet a externí služby (`other`).
+3. **Nové typy objektů (kontejner, cluster) se zatím nepřidávají.** Vyžadovaly by přestavbu tabulky `objects` (omezení CHECK) a úpravy všude, kde se typy vyjmenovávají. Místo toho jde patro přepsat atributem `vrstva` (také `patro` nebo `layer`), takže služba v Dockeru může ležet v patře kontejnerů. Neplatná hodnota se ignoruje. Při rozporu zdrojů platí ruční hodnota, stejně jako u ostatních atributů.
+4. **Rozvržení je deterministické** (řádek = patro, vodorovná poloha = průměr poloh sousedů v jiných patrech, šest průchodů střídavě zdola a shora, minimální rozestup 1, shody podle názvu). Vazby uvnitř patra polohu neurčují. Stejná data dají vždy stejnou mapu, ruční pozice se dál neukládají (SPEC kap. 14).
+5. **Patro s více než 10 objekty se zalomí** do dalších řádků, jinak by byl pás při filtru přes celý inventář příliš široký a text nečitelný.
+6. **Prázdná patra se nekreslí.** Řádky se v prohlížeči roztáhnou podle poměru stran mapy (nejvýš na dvojnásobek), aby široký graf nezůstal plochý.
+7. **Volba rozvržení** je parametr adresy `layout=floors` (žádné ukládání do profilu). Výchozí zůstává automatické rozvržení.
+8. **Verze 0.4.0.**
+

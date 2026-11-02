@@ -88,4 +88,43 @@ final class AttributeRepository
 
         return $result;
     }
+
+    /**
+     * Platná hodnota prvního z klíčů (bez ohledu na velikost písmen) pro více objektů najednou.
+     * Ruční hodnota má přednost, jinak jen shodná hodnota zdrojů (jako grouped()).
+     *
+     * @param list<string> $objectIds
+     * @param list<string> $keys malými písmeny, v pořadí přednosti
+     * @return array<string, string> id objektu => hodnota
+     */
+    public function validValues(array $objectIds, array $keys): array
+    {
+        if ($objectIds === [] || $keys === []) {
+            return [];
+        }
+        $idMarks = implode(', ', array_fill(0, count($objectIds), '?'));
+        $keyMarks = implode(', ', array_fill(0, count($keys), '?'));
+        $stmt = $this->pdo->prepare("SELECT object_id, lower(key) AS k, value, source FROM object_attributes
+            WHERE object_id IN ($idMarks) AND lower(key) IN ($keyMarks) ORDER BY object_id, key, source");
+        $stmt->execute([...$objectIds, ...$keys]);
+        $rows = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $rows[(string) $row['object_id']][(string) $row['k']][] = $row;
+        }
+        $result = [];
+        foreach ($rows as $objectId => $byKey) {
+            foreach ($keys as $key) {
+                $values = $byKey[$key] ?? [];
+                $manual = array_values(array_filter($values, static fn (array $r): bool => $r['source'] === Vocabulary::MANUAL_SOURCE));
+                $distinct = array_unique(array_map(static fn (array $r): string => (string) $r['value'], $values));
+                $valid = $manual !== [] ? (string) $manual[0]['value'] : (count($distinct) === 1 ? (string) $values[0]['value'] : null);
+                if ($valid !== null && trim($valid) !== '') {
+                    $result[(string) $objectId] = trim($valid);
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
 }
