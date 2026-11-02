@@ -41,7 +41,7 @@ final class TopologyController
     /**
      * Parametry pohledu z dotazu (neplatné hodnoty se nahradí výchozími).
      *
-     * @return array{mode: string, center: string, depth: int, type: string, tag: string, status: string}
+     * @return array{mode: string, center: string, depth: int, type: string, tag: string, status: string, layout: string}
      */
     private function params(): array
     {
@@ -59,11 +59,12 @@ final class TopologyController
             'type' => in_array($r->queryString('type'), Vocabulary::OBJECT_TYPES, true) ? $r->queryString('type') : '',
             'tag' => Vocabulary::normalizeTag($r->queryString('tag')) ?? '',
             'status' => in_array($r->queryString('status'), [...Status::ALL, Status::NONE], true) ? $r->queryString('status') : '',
+            'layout' => $r->queryString('layout') === 'floors' ? 'floors' : 'auto',
         ];
     }
 
     /**
-     * @param array{mode: string, center: string, depth: int, type: string, tag: string, status: string} $params
+     * @param array{mode: string, center: string, depth: int, type: string, tag: string, status: string, layout: string} $params
      * @return array<string, mixed>
      */
     private function graph(array $params): array
@@ -73,7 +74,7 @@ final class TopologyController
             return $topology->filtered(array_filter(['type' => $params['type'], 'tag' => $params['tag'], 'status' => $params['status']]));
         }
         if ($params['center'] === '') {
-            return ['nodes' => [], 'edges' => [], 'truncated' => false, 'total' => 0];
+            return ['nodes' => [], 'edges' => [], 'floors' => [], 'truncated' => false, 'total' => 0];
         }
 
         return $topology->neighborhood($params['center'], $params['depth']);
@@ -100,7 +101,7 @@ final class TopologyController
             'dataUrl' => $this->ctx->urls->route('/topology/data', $query),
             'nodeUrl' => $this->ctx->urls->route('/topology/node/__ID__'),
             'objectUrl' => $this->ctx->urls->route('/objects/__ID__'),
-            'centerUrl' => $this->ctx->urls->route('/topology', ['center' => '__ID__', 'depth' => (string) $params['depth']]),
+            'centerUrl' => $this->ctx->urls->route('/topology', array_filter(['center' => '__ID__', 'depth' => (string) $params['depth'], 'layout' => $params['layout'] === 'floors' ? 'floors' : ''])),
             'objectNames' => $inventory->objects->names(),
             'allTags' => $inventory->tags->all(),
             'center' => $params['center'] !== '' ? $inventory->objects->find($params['center']) : null,

@@ -169,3 +169,53 @@ test('mapa se v prohlížeči sama obnovuje', async ({ page }) => {
   await page.waitForFunction(() => document.getElementById('cy').dataset.refreshedAt !== undefined);
   expect(await page.evaluate(() => document.getElementById('cy').cy.nodes().length)).toBe(2);
 });
+
+test('rozvržení do pater: pásy pater, web nad databází, volba se pamatuje v adrese', async ({ page }) => {
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', (err) => consoleErrors.push(String(err)));
+  await loginOk(page);
+  await page.goto(`/topology?center=${idOf(webUrl)}`);
+  await page.waitForFunction(() => document.getElementById('cy')?.cy !== undefined);
+  const switcher = page.getByTestId('layout-switch');
+  await expect(switcher.getByRole('button', { name: 'Automaticky' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => document.getElementById('cy').cy.nodes('.band').length)).toBe(0);
+
+  await switcher.getByRole('button', { name: 'Patra' }).click();
+  await expect(switcher.getByRole('button', { name: 'Patra' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).toHaveURL(/layout=floors/);
+  const floors = () => page.evaluate(() => {
+    const { cy } = document.getElementById('cy');
+    const y = (name) => cy.nodes().filter((n) => n.data('name') === name)[0].position('y');
+    return {
+      bands: cy.nodes('.band').sort((a, b) => a.position('y') - b.position('y')).map((b) => b.data('label')),
+      webAboveDb: y('topo-web') < y('topo-db'),
+    };
+  });
+  expect(await floors()).toEqual({ bands: ['Weby a API', 'Služby a databáze'], webAboveDb: true });
+
+  // Klik na uzel funguje i v patrech (pásy klikání nezachytí).
+  const card = page.getByTestId('node-panel').getByTestId('node-card');
+  const pos = await page.evaluate(() => {
+    const { cy } = document.getElementById('cy');
+    return cy.nodes().filter((n) => n.data('name') === 'topo-db')[0].renderedPosition();
+  });
+  const box = await page.getByTestId('graph').boundingBox();
+  await page.mouse.click(box.x + pos.x, box.y + pos.y);
+  await expect(card).toHaveAttribute('data-node-id', idOf(dbUrl));
+
+  // Volba přežije znovunačtení i odeslání formuláře.
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('cy')?.cy !== undefined);
+  expect(await floors()).toEqual({ bands: ['Weby a API', 'Služby a databáze'], webAboveDb: true });
+  await page.locator('#t-depth').selectOption('1');
+  await page.getByRole('button', { name: 'Zobrazit', exact: true }).click();
+  await expect(page).toHaveURL(/layout=floors/);
+
+  await page.getByTestId('layout-switch').getByRole('button', { name: 'Automaticky' }).click();
+  await expect(page).not.toHaveURL(/layout=floors/);
+  expect(await page.evaluate(() => document.getElementById('cy').cy.nodes('.band').length)).toBe(0);
+  expect(consoleErrors).toEqual([]);
+});

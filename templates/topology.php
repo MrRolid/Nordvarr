@@ -1,6 +1,6 @@
 <?php
 /** @var \Nordvarr\View\View $v */
-/** @var array{mode: string, center: string, depth: int, type: string, tag: string, status: string} $params */
+/** @var array{mode: string, center: string, depth: int, type: string, tag: string, status: string, layout: string} $params */
 /** @var array<string, mixed> $graph */
 /** @var string $dataUrl */
 /** @var string $nodeUrl */
@@ -39,6 +39,7 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
         <aside class="topo-panel topo-left">
             <form method="get" action="<?= $v->url('/topology') ?>" class="topo-form" data-test="topology-form">
                 <?php if ($v->shared('pretty_urls') !== true): ?><input type="hidden" name="r" value="/topology"><?php endif; ?>
+                <input type="hidden" name="layout" value="<?= $v->e($params['layout']) ?>" data-layout-input>
                 <div class="seg" role="radiogroup" aria-label="<?= $v->t('topology.mode') ?>">
                     <label><input type="radio" name="mode" value="neighborhood"<?= $params['mode'] === 'neighborhood' ? ' checked' : '' ?>> <?= $v->t('topology.mode_neighborhood') ?></label>
                     <label><input type="radio" name="mode" value="filter"<?= $params['mode'] === 'filter' ? ' checked' : '' ?>> <?= $v->t('topology.mode_filter') ?></label>
@@ -107,7 +108,8 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
             <div class="topo-empty"><?= $v->t('topology.empty') ?></div>
             <?php else: ?>
             <div id="cy" class="cy" data-test="graph"
-                 data-graph="<?= $v->e(json_encode(['nodes' => $graph['nodes'], 'edges' => $graph['edges']], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>"
+                 data-graph="<?= $v->e(json_encode(['nodes' => $graph['nodes'], 'edges' => $graph['edges'], 'floors' => $graph['floors']], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>"
+                 data-layout="<?= $v->e($params['layout']) ?>"
                  data-refresh-graph="<?= $v->e($dataUrl) ?>"
                  data-node-url="<?= $v->e($nodeUrl) ?>"
                  data-object-url="<?= $v->e($objectUrl) ?>"
@@ -120,6 +122,10 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
                 <span><i class="leg-ring"></i><?= $v->t('topology.ring') ?></span>
             </div>
             <div class="topo-tools">
+                <div class="seg seg-small" role="group" aria-label="<?= $v->t('topology.layout') ?>" data-test="layout-switch">
+                    <button type="button" class="small" data-layout="auto" aria-pressed="<?= $params['layout'] === 'auto' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_auto') ?></button>
+                    <button type="button" class="small" data-layout="floors" aria-pressed="<?= $params['layout'] === 'floors' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_floors') ?></button>
+                </div>
                 <button type="button" class="small" data-cy="fit"><?= $v->t('topology.fit') ?></button>
             </div>
             <?php endif; ?>

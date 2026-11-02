@@ -1,5 +1,7 @@
 // Nordvarr - mapa topologie (Cytoscape + dagre). ES modul bez buildu; knihovny jsou
 // načtené jako běžné skripty z assets/vendor a dostupné jako globální proměnné.
+// Dvě rozvržení: automatické (dagre, u velkých grafů silové) a patra (polohy spočítané
+// serverem, viz Nordvarr\Topology\Floors, s pásy pater v pozadí).
 
 const el = document.getElementById('cy');
 const panel = document.getElementById('node-panel');
@@ -53,7 +55,7 @@ if (el && window.cytoscape) {
         const size = compact ? 46 : 100;
         const c = Object.fromEntries(
             ['map-node', 'map-node-ring', 'map-text', 'map-muted', 'map-edge', 'map-causal', 'map-center',
-                'st-healthy', 'st-degraded', 'st-unhealthy', 'st-unknown', 'st-paused', 'map-bg']
+                'st-healthy', 'st-degraded', 'st-unhealthy', 'st-unknown', 'st-paused', 'map-bg', 'map-band']
                 .map((k) => [k, css(`--${k}`)])
         );
         return [
@@ -127,11 +129,42 @@ if (el && window.cytoscape) {
             { selector: 'edge.hl', style: { label: 'data(label)', width: 2.4, 'line-color': c['map-center'], 'target-arrow-color': c['map-center'], 'source-arrow-color': c['map-center'], color: c['map-text'] } },
             { selector: 'edge.hl[?causal]', style: { 'line-color': c['map-causal'], 'target-arrow-color': c['map-causal'], 'source-arrow-color': c['map-causal'], width: 3.2 } },
             { selector: '.faded', style: { opacity: 0.3 } },
+            {
+                selector: 'node.band',
+                style: {
+                    shape: 'round-rectangle',
+                    width: 'data(w)',
+                    height: 'data(h)',
+                    // Barvy Cytoscape neberou průhlednost z rgba(), proto zvlášť krytí.
+                    'background-color': c['map-band'],
+                    'background-opacity': 0.07,
+                    'border-width': 1,
+                    'border-color': c['map-band'],
+                    'border-opacity': 0.3,
+                    label: 'data(label)',
+                    color: c['map-muted'],
+                    'font-size': compact ? 18 : 14,
+                    'font-weight': 600,
+                    'text-wrap': 'wrap',
+                    'text-max-width': compact ? 330 : 260,
+                    'text-halign': 'left',
+                    'text-valign': 'center',
+                    'text-justification': 'right',
+                    'text-margin-x': -12,
+                    'min-zoomed-font-size': 0,
+                    events: 'no',
+                    'z-compound-depth': 'bottom',
+                    'pie-size': 0,
+                },
+            },
         ];
     };
 
     const initial = JSON.parse(el.dataset.graph);
     compact = initial.nodes.length > 24;
+    let mode = el.dataset.layout === 'floors' ? 'floors' : 'auto';
+    let floors = initial.floors ?? [];
+    const objects = () => cy.elements().not('.band');
     const cy = window.cytoscape({
         container: el,
         elements: prepare(initial),
@@ -143,8 +176,49 @@ if (el && window.cytoscape) {
         autoungrabify: false,
     });
 
+    // Patra: polohy uzlů ze serveru (jednotky = rozestup uzlů a řádek), pásy pater v pozadí.
+    const floorsLayout = () => {
+        cy.nodes('.band').remove();
+        // Rozestupy podle velikosti uzlu a popisku (ve velkém grafu je popisek pod uzlem).
+        // Řádky se roztáhnou, aby kresba využila výšku mapy (široký graf by jinak zůstal plochý).
+        const gapX = compact ? 130 : 140;
+        const baseY = compact ? 120 : 165;
+        const nodes = cy.nodes();
+        const fxs = nodes.map((n) => n.data('fx') ?? 0);
+        const minX = Math.min(...fxs) * gapX;
+        const maxX = Math.max(...fxs) * gapX;
+        const rows = floors.reduce((sum, f) => sum + f.rows, 0) || 1;
+        const aspect = el.clientWidth > 0 ? el.clientHeight / el.clientWidth : 0.6;
+        const gapY = Math.min(baseY * 2, Math.max(baseY, ((maxX - minX + gapX + 200) * aspect) / rows));
+        nodes.layout({
+            name: 'preset',
+            positions: (n) => ({ x: (n.data('fx') ?? 0) * gapX, y: (n.data('fy') ?? 0) * gapY }),
+            fit: false,
+            animate: false,
+        }).run();
+        cy.add(floors.map((f) => ({
+            group: 'nodes',
+            classes: 'band',
+            grabbable: false,
+            selectable: false,
+            locked: true,
+            data: { id: `floor:${f.floor}`, label: f.label, floor: f.floor, w: maxX - minX + gapX, h: f.rows * gapY - 16 },
+            position: { x: (minX + maxX) / 2, y: (f.y + (f.rows - 1) / 2) * gapY },
+        })));
+        cy.fit(undefined, 30);
+    };
+
     // Rozložení po vrstvách shora dolů, nebo zleva doprava, pokud se tak graf do mapy vejde větší.
     const layout = () => {
+        if (mode === 'floors') {
+            floorsLayout();
+            if (cy.zoom() > 1.25) {
+                cy.zoom(1.25);
+                cy.center();
+            }
+            return;
+        }
+        cy.nodes('.band').remove();
         const run = (rankDir) => {
             cy.layout({
                 name: window.cytoscapeDagre ? 'dagre' : 'breadthfirst',
@@ -177,7 +251,7 @@ if (el && window.cytoscape) {
         cy.elements().removeClass('faded hl');
         if (!node) return;
         const keep = node.closedNeighborhood();
-        if (fade) cy.elements().not(keep).addClass('faded');
+        if (fade) objects().not(keep).addClass('faded');
         keep.edges().addClass('hl');
     };
     const restore = () => highlight(selected ? cy.getElementById(selected) : null);
@@ -230,6 +304,27 @@ if (el && window.cytoscape) {
     }
     document.querySelector('[data-cy="fit"]')?.addEventListener('click', () => cy.fit(undefined, 30));
 
+    // Přepínač rozvržení: zapamatuje se v adrese a ve formuláři (pro další zobrazení).
+    const layoutButtons = document.querySelectorAll('.topo-tools [data-layout]');
+    const setMode = (next) => {
+        mode = next === 'floors' ? 'floors' : 'auto';
+        el.dataset.layout = mode;
+        for (const b of layoutButtons) b.setAttribute('aria-pressed', String(b.dataset.layout === mode));
+        const input = document.querySelector('[data-layout-input]');
+        if (input) input.value = mode;
+        try {
+            const url = new URL(window.location.href);
+            if (mode === 'floors') url.searchParams.set('layout', 'floors');
+            else url.searchParams.delete('layout');
+            window.history.replaceState(null, '', url);
+        } catch {
+            // Bez změny adresy.
+        }
+        layout();
+        restore();
+    };
+    for (const b of layoutButtons) b.addEventListener('click', () => setMode(b.dataset.layout));
+
     // Výchozí výběr: centrum okolí, v režimu filtru první uzel seznamu (seřazený od nejhoršího stavu).
     const first = el.dataset.center || document.querySelector('.node-item[data-node]')?.dataset.node;
     if (first) select(first);
@@ -251,9 +346,10 @@ if (el && window.cytoscape) {
             if (response.status === 200) {
                 const graph = await response.json();
                 etag = response.headers.get('ETag');
+                floors = graph.floors ?? [];
                 const elements = prepare(graph);
                 const ids = new Set(elements.map((e) => e.data.id));
-                const same = ids.size === cy.elements().length && cy.elements().every((e) => ids.has(e.id()));
+                const same = ids.size === objects().length && objects().every((e) => ids.has(e.id()));
                 if (same) {
                     for (const e of elements) cy.getElementById(e.data.id).data(e.data);
                 } else {

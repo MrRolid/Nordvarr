@@ -132,6 +132,36 @@ final class TopologyTest extends TestCase
         self::assertSame([$web, $db, 'depends_on', 'závisí na', true], [$edge['source'], $edge['target'], $edge['kind'], $edge['label'], $edge['causal']]);
     }
 
+    public function testGraphHasFloorsAndLayerOverride(): void
+    {
+        $host = $this->object('hv1.example.net', 'server');
+        $app = $this->object('shop-app', 'service');
+        $web = $this->object('shop.example.com', 'website');
+        $this->inventory->relate($host, $app, 'contains', '', 'manual');
+        $this->inventory->relate($web, $app, 'depends_on', '', 'manual');
+        $this->inventory->attributes->set($app, 'Vrstva', 'containers', false, 'manual');
+        // Hodnota z importu v rozporu s ruční: platí ruční.
+        $this->inventory->attributes->set($app, 'Vrstva', 'services', false, 'import');
+
+        $graph = $this->topology()->neighborhood($app, 1);
+        $nodes = array_column(array_column($graph['nodes'], 'data'), null, 'id');
+        self::assertSame(['hardware', 'containers', 'web'], [$nodes[$host]['floor'], $nodes[$app]['floor'], $nodes[$web]['floor']]);
+        self::assertSame(
+            [['web', 0, 'Weby a API'], ['containers', 1, 'Kontejnery (Docker, Kubernetes)'], ['hardware', 2, 'Hardware a síť']],
+            array_map(static fn (array $f): array => [$f['floor'], $f['y'], $f['label']], $graph['floors'])
+        );
+        self::assertSame([0, 1, 2], [$nodes[$web]['fy'], $nodes[$app]['fy'], $nodes[$host]['fy']]);
+        self::assertEqualsWithDelta($nodes[$host]['fx'], $nodes[$app]['fx'], 0.01, 'Sloupec: služba nad svým serverem.');
+
+        self::assertSame(['nodes' => [], 'edges' => [], 'floors' => [], 'truncated' => false, 'total' => 0], $this->topology()->filtered(['type' => 'domain']));
+
+        $page = $this->get('/topology', ['center' => $app, 'layout' => 'floors'])->body;
+        self::assertStringContainsString('data-layout="floors"', $page);
+        self::assertStringContainsString('name="layout" value="floors"', $page);
+        self::assertStringContainsString('data-layout="floors" aria-pressed="true"', $page);
+        self::assertStringContainsString('data-layout="auto" aria-pressed="true"', $this->get('/topology', ['center' => $app, 'layout' => 'x'])->body, 'Neznámá hodnota -> automaticky.');
+    }
+
     public function testDefaultCenterPrefersUnsuppressedUnhealthyAlert(): void
     {
         $hub = $this->object('hub');

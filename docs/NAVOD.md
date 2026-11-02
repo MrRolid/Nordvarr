@@ -92,7 +92,9 @@ php bin/nordvarr.php reset-password <e-mail>  # nové heslo pro zapomenutý úč
 3. **Nastavení -> Kanály:** e-mail (SMTP), Telegram nebo webhook. Po uložení použijte "Odeslat test".
 4. **Inventář:** objekty ručně, importem JSON nebo přes API. Vztahy "závisí na" a "obsahuje" určují okolí v topologii a potlačení alertů.
 5. **Kontroly** na detailu objektu: HTTP, TCP, ping, certifikát TLS, expirace domény, heartbeat. Rychlejší cesta je popsaná níže v části "Jak zapnout hlídání".
-6. **Topologie:** graf okolí objektu nebo objektů podle filtru.
+6. **Topologie:** graf okolí objektu nebo objektů podle filtru. Přepínač nad mapou volí rozvržení:
+   - **Automaticky:** rozvržení podle vztahů.
+   - **Patra:** objekty ve vodorovných pásech podle vrstvy infrastruktury, zdola: hardware a síť, virtuální stroje a VPS, kontejnery, služby a databáze, weby a API, domény, internet a externí služby. Objekty spojené vztahem leží nad sebou ve sloupci (VM nad svým serverem, web nad službou). Patro určuje typ objektu. Jiné patro nastavíte atributem `vrstva` s hodnotou `hardware`, `virtual`, `containers`, `services`, `web`, `domains`, `external` nebo číslem 1 až 7 (zdola), například `vrstva = containers` u služby běžící v Dockeru. Volba rozvržení zůstává v adrese stránky.
 7. U incidentu: karta objektu ukazuje stav a důvod, pravděpodobnou příčinu, poslední změnu v okolí a stav závislostí. Tlačítko **"Zkopírovat pro LLM"** připraví kontext k vložení do libovolného LLM (tajné údaje jsou maskované, Nordvarr sám žádné LLM nevolá).
 
 ### Jak zapnout hlídání

@@ -1,6 +1,6 @@
 # Návrh: vrstvená 3D mapa infrastruktury
 
-Stav: návrh k rozhodnutí, nic z toho není implementované. Datum: 2026-11-02.
+Stav: vlastník s doporučeními souhlasil 2. 11. 2026. Krok A (patra ve 2D) je hotový ve fázi F8, rozhodnutí jsou v `docs/ROZHODNUTI.md` (F8). Datum: 2026-11-02.
 
 ## 1. Nápad
 
