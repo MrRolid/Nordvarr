@@ -288,3 +288,59 @@ test('bez WebGL zůstane mapa v patrech s upozorněním', async ({ page }) => {
   await expect(page.getByTestId('map3d')).toBeHidden();
   await page.waitForFunction(() => document.getElementById('cy')?.cy?.nodes('.band').length === 2);
 });
+
+test('hledání v mapě, vypínání pater a režim problému ve 2D i 3D', async ({ page }) => {
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', (err) => consoleErrors.push(String(err)));
+  await loginOk(page);
+  await page.goto(`/topology?center=${idOf(webUrl)}&layout=floors`);
+  await page.waitForFunction(() => document.getElementById('cy')?.cy !== undefined);
+  const card = page.getByTestId('node-panel').getByTestId('node-card');
+  const list = page.getByTestId('node-list');
+
+  // Hledání: filtr seznamu bez ohledu na diakritiku a velikost písmen, Enter vybere shodu.
+  const search = page.getByTestId('map-search');
+  await search.fill('TOPO-DB');
+  await expect(list.getByRole('button', { name: /topo-web/ })).toBeHidden();
+  await search.press('Enter');
+  await expect(card).toHaveAttribute('data-node-id', idOf(dbUrl));
+  await search.fill('nic takového');
+  await expect(page.getByText('Žádný objekt neodpovídá.')).toBeVisible();
+  await search.press('Escape');
+  await expect(list.getByRole('button', { name: /topo-web/ })).toBeVisible();
+
+  // Režim problému: cesta od webu k databázi, karta příčiny, druhé kliknutí ho vypne.
+  const cause = page.getByTestId('cause-mode');
+  await expect(cause).toBeVisible();
+  await cause.click();
+  await expect(cause).toHaveAttribute('aria-pressed', 'true');
+  await expect(card).toHaveAttribute('data-node-id', idOf(dbUrl));
+  expect(await page.evaluate(() => document.getElementById('cy').dataset.causePath)).toBe('topo-web > topo-db');
+  await cause.click();
+  await expect(cause).toHaveAttribute('aria-pressed', 'false');
+
+  // Vypnuté patro zmizí ve 2D.
+  const floorFilter = page.getByTestId('floor-filter');
+  await floorFilter.getByLabel('Weby a API').uncheck();
+  const webDisplay = () => page.evaluate(() => document.getElementById('cy').cy.nodes().filter((n) => n.data('name') === 'topo-web')[0].style('display'));
+  expect(await webDisplay()).toBe('none');
+
+  // Ve 3D platí vypnuté patro taky, režim problému zvýrazní cestu.
+  await page.getByTestId('layout-switch').getByRole('button', { name: '3D' }).click();
+  await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
+  expect(await page.evaluate(() => document.getElementById('map3d').map3d.stats().visibleNodes)).toBe(1);
+  await floorFilter.getByLabel('Weby a API').check();
+  expect(await page.evaluate(() => document.getElementById('map3d').map3d.stats().visibleNodes)).toBe(2);
+  expect(await webDisplay()).toBe('element');
+  await cause.click();
+  const path = await page.evaluate(() => document.getElementById('map3d').map3d.stats().path);
+  expect(path).toEqual([idOf(dbUrl), idOf(webUrl)].sort());
+  // Výběr jiného objektu režim problému ukončí.
+  await list.getByRole('button', { name: /topo-web/ }).click();
+  await expect(cause).toHaveAttribute('aria-pressed', 'false');
+  expect(await page.evaluate(() => document.getElementById('map3d').map3d.stats().path)).toBeNull();
+  expect(consoleErrors).toEqual([]);
+});

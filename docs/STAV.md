@@ -4,6 +4,15 @@ Aktualizováno: 2026-11-02
 
 ## Hotové fáze
 
+### F10 Hledání, patra a režim problému v mapě (větev `faze-10-hledani-problem`)
+
+Krok C z `docs/NAVRH-3D-MAPA.md` (vlastník: "slouč a pokračuj" po F9).
+
+- Hledání nad seznamem objektů v topologii: filtr bez ohledu na diakritiku a velikost písmen, Enter vybere první shodu a ukáže ji (ve 3D přelet kamery), Esc zruší.
+- Patra v mapě: zaškrtávátka pater z dat, vypnuté patro zmizí v automatickém rozvržení, v patrech i ve 3D (s pásem, popisky a hranami). Seznam pater se obnovuje s daty.
+- Režim problému (tlačítko K příčině): nejkratší cesta od objektu k pravděpodobné příčině (Cytoscape aStar, bez ohledu na směr vztahů), ztlumení zbytku, výběr příčiny, ve 2D přiblížení na cestu, ve 3D natočení kamery a zvýraznění cesty. Vypne se druhým kliknutím, výběrem jiného objektu nebo změnou grafu.
+- Testy: `TopologyTest` (nové ovládací prvky), e2e v `topology.spec.js` (hledání s diakritikou a prázdným výsledkem, režim problému ve 2D i 3D, vypnutí patra ve 2D i 3D, ukončení režimu výběrem).
+
 ### F9 3D pohled na patra (větev `faze-9-3d-mapa`)
 
 Krok B z `docs/NAVRH-3D-MAPA.md` (vlastník: "slouč a pokračuj", 2. 11. 2026): 3D prototyp jen pro čtení nad daty z F8.
@@ -272,6 +281,6 @@ Nic.
 
 ## Další krok
 
-- Release 0.5.0 (F8 a F9) vydat z `main` tagem `v0.5.0` přes web GitHubu, až bude F9 sloučená (tag musí ukazovat na commit s `VERSION` 0.5.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat.
-- Krok C z `docs/NAVRH-3D-MAPA.md`: hledání s přeletem kamery, režim problému (ztlumit vše mimo cestu k příčině), vypínání jednotlivých pater, plynulý přechod mezi 3D a 2D. Začít po zkušenosti vlastníka s 3D na skutečných datech.
+- Release 0.6.0 (F8 až F10) vydat z `main` tagem `v0.6.0` přes web GitHubu, až bude F10 sloučená (tag musí ukazovat na commit s `VERSION` 0.6.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat.
+- Návrh 3D mapy je tím hotový až na volitelný krok D (typy objektů kontejner a cluster, metriky agenta přímo na uzlech ve 3D). Pokračovat podle zkušenosti vlastníka se skutečnými daty.
 - Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

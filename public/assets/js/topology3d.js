@@ -43,6 +43,10 @@ export function createMap3d(container, graph, options = {}) {
     let levels = 1;
     let hovered = null;
     let selected = null;
+    // Režim problému: zvýrazněná cesta (uzly a hrany), ostatní ztlumené.
+    let path = null;
+    // Vypnutá patra (klíče pater).
+    let hiddenFloors = new Set();
     let dirty = true;
     let running = true;
 
@@ -106,7 +110,7 @@ export function createMap3d(container, graph, options = {}) {
             el.className = 'map3d-floor';
             el.textContent = f.label;
             labelLayer.appendChild(el);
-            floorLabels.push({ el, y: y - NODE_R - 1 });
+            floorLabels.push({ el, y: y - NODE_R - 1, floor: f.floor, disc, rim });
         }
         const axis = new THREE.Line(
             new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -NODE_R, 0), new THREE.Vector3(0, (levels - 1) * floorGap() + NODE_R, 0)]),
@@ -167,7 +171,38 @@ export function createMap3d(container, graph, options = {}) {
     marker.visible = false;
 
     // Zvýraznění: vybraný nebo najetý uzel a jeho sousedé, ostatní ztlumené.
+    // V režimu problému má přednost cesta k příčině. Vypnutá patra se nekreslí.
     const applyHighlight = () => {
+        for (const [, n] of nodes) {
+            n.off = hiddenFloors.has(n.data.floor);
+            n.mesh.visible = !n.off;
+        }
+        for (const f of floorLabels) {
+            f.off = hiddenFloors.has(f.floor);
+            f.disc.visible = !f.off;
+            f.rim.visible = !f.off;
+        }
+        for (const e of edges) {
+            e.line.visible = !nodes.get(e.source).off && !nodes.get(e.target).off;
+        }
+        if (path) {
+            for (const [id, n] of nodes) {
+                n.mesh.material.opacity = path.nodes.has(id) ? 1 : 0.15;
+                n.label.classList.toggle('dim', !path.nodes.has(id));
+                n.label.classList.toggle('hidden-far', false);
+                n.label.classList.toggle('active', id === selected);
+            }
+            for (const e of edges) {
+                const on = path.edges.has(e.data.id);
+                e.line.material.color = color(on ? 'map-causal' : 'map-edge');
+                e.line.material.opacity = on ? 1 : 0.08;
+            }
+            const sel = selected ? nodes.get(selected) : null;
+            marker.visible = !!sel && !sel.off;
+            if (sel) marker.position.copy(sel.pos);
+            dirty = true;
+            return;
+        }
         const focus = hovered ?? selected;
         const keep = new Set();
         if (focus && nodes.has(focus)) {
@@ -188,7 +223,7 @@ export function createMap3d(container, graph, options = {}) {
             e.line.material.opacity = dim && !touches ? 0.12 : 0.85;
         }
         const sel = selected ? nodes.get(selected) : null;
-        marker.visible = !!sel;
+        marker.visible = !!sel && !sel.off;
         if (sel) marker.position.copy(sel.pos);
         for (const [id, n] of nodes) {
             const important = keep.has(id) || !['healthy', 'none', 'paused'].includes(n.data.status) || n.data.center;
@@ -273,14 +308,14 @@ export function createMap3d(container, graph, options = {}) {
     const placeLabels = () => {
         for (const n of nodes.values()) {
             const p = project(n.pos);
-            n.label.hidden = !p.visible;
+            n.label.hidden = !p.visible || n.off;
             n.label.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y + NODE_R * 2 + 4)}px) translateX(-50%)`;
         }
         // Popisek patra na levém okraji disku z pohledu kamery.
         const left = new THREE.Vector3(-Math.sin(view.azimuth), 0, Math.cos(view.azimuth)).multiplyScalar(radius + 16);
         for (const f of floorLabels) {
             const p = project(new THREE.Vector3(left.x, f.y, left.z));
-            f.el.hidden = !p.visible;
+            f.el.hidden = !p.visible || f.off;
             // Popisek vlevo od okraje disku, ale ne přes levý okraj mapy.
             const x = Math.max(f.el.offsetWidth + 4, p.x);
             f.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(p.y)}px) translate(-100%, -50%)`;
@@ -311,7 +346,7 @@ export function createMap3d(container, graph, options = {}) {
         const rect = renderer.domElement.getBoundingClientRect();
         const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
         raycaster.setFromCamera(ndc, camera);
-        const hit = raycaster.intersectObjects([...nodes.values()].map((n) => n.mesh), false)[0];
+        const hit = raycaster.intersectObjects([...nodes.values()].filter((n) => !n.off).map((n) => n.mesh), false)[0];
         return hit ? hit.object.userData.id : null;
     };
     const canvas = renderer.domElement;
@@ -425,6 +460,16 @@ export function createMap3d(container, graph, options = {}) {
         reset() {
             reset();
         },
+        // Režim problému: cesta (id uzlů a hran) se zvýrazní, kamera se natočí k příčině.
+        setPath(nodeIds, edgeIds, focusId) {
+            path = nodeIds ? { nodes: new Set(nodeIds), edges: new Set(edgeIds ?? []) } : null;
+            applyHighlight();
+            if (path && focusId) focusNode(focusId);
+        },
+        setHiddenFloors(keys) {
+            hiddenFloors = new Set(keys);
+            applyHighlight();
+        },
         topView,
         setSpread(on) {
             spread = !!on;
@@ -438,7 +483,14 @@ export function createMap3d(container, graph, options = {}) {
             return n ? project(n.pos) : null;
         },
         stats() {
-            return { nodes: nodes.size, edges: edges.length, floors: floorLabels.map((f) => f.el.textContent), selected };
+            return {
+                nodes: nodes.size,
+                edges: edges.length,
+                floors: floorLabels.map((f) => f.el.textContent),
+                selected,
+                visibleNodes: [...nodes.values()].filter((n) => !n.off).length,
+                path: path ? [...path.nodes].sort() : null,
+            };
         },
         dispose() {
             running = false;

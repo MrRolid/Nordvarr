@@ -168,3 +168,14 @@ Krok B z `docs/NAVRH-3D-MAPA.md`. Vlastník po sloučení F8 napsal "slouč a po
 7. **Bez WebGL** se 3D nezapne: mapa přejde do pater a ukáže upozornění. Volba `layout=3d` v adrese se v takovém prohlížeči přepíše na `layout=floors`.
 8. **Verze 0.5.0.**
 
+## 2026-11-02 (F10 Hledání, patra a režim problému)
+
+Krok C z `docs/NAVRH-3D-MAPA.md`. `SPEC.md` se nemění.
+
+1. **Hledání filtruje seznam objektů v levém panelu**, ne graf. Seznam je stejný ve všech rozvrženích a funguje i na mobilu. Hledá se v názvu, typu a důvodu stavu, bez diakritiky a velikosti písmen.
+2. **Cesta k příčině se hledá v prohlížeči** nejkratší cestou v zobrazeném grafu bez ohledu na směr vztahů. Server zná jen příčinu (F3/F4), ne cestu k ní. Když příčina v zobrazeném grafu není (okolí s hloubkou 1), tlačítko se neukáže.
+3. **Zdroj režimu problému:** vybraný objekt s příčinou, jinak první takový objekt v seznamu (seřazeném od nejhoršího stavu). Režim se nezapíná sám při načtení: mapa by jinak po každém výpadku skákala.
+4. **Vypnutá patra se nepamatují** (ani v adrese, ani v prohlížeči). Jde o pomůcku při zkoumání, výchozí stav má ukazovat všechno.
+5. **Plynulý přechod mezi 3D a 2D (z návrhu) se nedělá.** Tlačítko Pohled shora ve 3D dává podobný výsledek a animace přechodu mezi dvěma knihovnami by vyžadovala vlastní vykreslování 2D grafu.
+6. **Verze 0.6.0.**
+

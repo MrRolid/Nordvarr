@@ -167,6 +167,11 @@ final class TopologyTest extends TestCase
         self::assertMatchesRegularExpression('#data-module="[^"]*/assets/js/topology3d\.js\?v=#', $page);
         self::assertStringContainsString('data-3d="top" data-3d-only hidden', $page);
         self::assertStringContainsString('data-webgl-missing data-test="webgl-missing" hidden', $page);
+
+        // Hledání, filtr pater a režim problému (tlačítko zobrazí skript, jen když je co ukázat).
+        self::assertStringContainsString('data-test="map-search"', $page);
+        self::assertStringContainsString('data-test="floor-filter" hidden', $page);
+        self::assertStringContainsString('data-test="cause-mode" hidden aria-pressed="false"', $page);
     }
 
     public function testDefaultCenterPrefersUnsuppressedUnhealthyAlert(): void

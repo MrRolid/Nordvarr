@@ -84,6 +84,15 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
             </form>
 
             <h2 class="topo-h"><?= $v->t('topology.in_view', ['count' => count($nodes)]) ?></h2>
+            <?php if ($nodes !== []): ?>
+            <label for="t-search" class="visually-hidden"><?= $v->t('topology.search') ?></label>
+            <input type="search" id="t-search" class="topo-search" placeholder="<?= $v->t('topology.search') ?>" autocomplete="off" data-test="map-search">
+            <p class="small-text muted" data-search-empty hidden><?= $v->t('topology.search_empty') ?></p>
+            <fieldset class="topo-floor-filter" data-test="floor-filter" hidden>
+                <legend><?= $v->t('topology.floors_shown') ?></legend>
+                <div data-floor-boxes></div>
+            </fieldset>
+            <?php endif; ?>
             <?php if ($graph['truncated'] && $params['mode'] === 'neighborhood'): ?>
             <p class="small-text muted" data-test="truncated"><?= $v->t('topology.truncated', ['max' => \Nordvarr\Topology\Topology::MAX_NODES, 'count' => (int) $graph['total']]) ?></p>
             <?php endif; ?>
@@ -127,6 +136,7 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
                     <button type="button" class="small" data-layout="floors" aria-pressed="<?= $params['layout'] === 'floors' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_floors') ?></button>
                     <button type="button" class="small" data-layout="3d" aria-pressed="<?= $params['layout'] === '3d' ? 'true' : 'false' ?>"><?= $v->t('topology.layout_3d') ?></button>
                 </div>
+                <button type="button" class="small" data-cy="cause" data-test="cause-mode" hidden aria-pressed="false"><?= $v->t('topology.to_cause') ?></button>
                 <button type="button" class="small" data-3d="top" data-3d-only hidden><?= $v->t('topology.top_view') ?></button>
                 <button type="button" class="small" data-3d="spread" data-3d-only hidden aria-pressed="false"><?= $v->t('topology.spread') ?></button>
                 <button type="button" class="small" data-cy="fit"><?= $v->t('topology.fit') ?></button>
