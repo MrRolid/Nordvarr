@@ -59,7 +59,7 @@ final class TopologyController
             'type' => in_array($r->queryString('type'), Vocabulary::OBJECT_TYPES, true) ? $r->queryString('type') : '',
             'tag' => Vocabulary::normalizeTag($r->queryString('tag')) ?? '',
             'status' => in_array($r->queryString('status'), [...Status::ALL, Status::NONE], true) ? $r->queryString('status') : '',
-            'layout' => $r->queryString('layout') === 'floors' ? 'floors' : 'auto',
+            'layout' => in_array($r->queryString('layout'), ['floors', '3d'], true) ? $r->queryString('layout') : 'auto',
         ];
     }
 
@@ -101,7 +101,7 @@ final class TopologyController
             'dataUrl' => $this->ctx->urls->route('/topology/data', $query),
             'nodeUrl' => $this->ctx->urls->route('/topology/node/__ID__'),
             'objectUrl' => $this->ctx->urls->route('/objects/__ID__'),
-            'centerUrl' => $this->ctx->urls->route('/topology', array_filter(['center' => '__ID__', 'depth' => (string) $params['depth'], 'layout' => $params['layout'] === 'floors' ? 'floors' : ''])),
+            'centerUrl' => $this->ctx->urls->route('/topology', array_filter(['center' => '__ID__', 'depth' => (string) $params['depth'], 'layout' => $params['layout'] === 'auto' ? '' : $params['layout']])),
             'objectNames' => $inventory->objects->names(),
             'allTags' => $inventory->tags->all(),
             'center' => $params['center'] !== '' ? $inventory->objects->find($params['center']) : null,

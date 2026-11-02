@@ -1,6 +1,6 @@
 # Návrh: vrstvená 3D mapa infrastruktury
 
-Stav: vlastník s doporučeními souhlasil 2. 11. 2026. Krok A (patra ve 2D) je hotový ve fázi F8, rozhodnutí jsou v `docs/ROZHODNUTI.md` (F8). Datum: 2026-11-02.
+Stav: vlastník s doporučeními souhlasil 2. 11. 2026. Krok A (patra ve 2D) je hotový ve fázi F8, krok B (3D prototyp) ve fázi F9. Rozhodnutí jsou v `docs/ROZHODNUTI.md` (F8, F9). Datum: 2026-11-02.
 
 ## 1. Nápad
 

@@ -54,6 +54,9 @@ final class ReleaseBuildTest extends TestCase
             'nordvarr/public/assets/vendor/cytoscape-3.34.2/LICENSE',
             'nordvarr/public/assets/vendor/dagre-0.8.5/dagre.min.js',
             'nordvarr/public/assets/vendor/cytoscape-dagre-2.5.0/cytoscape-dagre.js',
+            'nordvarr/public/assets/vendor/three-0.170.0/three.module.min.js',
+            'nordvarr/public/assets/vendor/three-0.170.0/LICENSE',
+            'nordvarr/public/assets/js/topology3d.js',
         ] as $expected) {
             self::assertContains($expected, $files);
         }

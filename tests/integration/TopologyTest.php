@@ -160,6 +160,13 @@ final class TopologyTest extends TestCase
         self::assertStringContainsString('name="layout" value="floors"', $page);
         self::assertStringContainsString('data-layout="floors" aria-pressed="true"', $page);
         self::assertStringContainsString('data-layout="auto" aria-pressed="true"', $this->get('/topology', ['center' => $app, 'layout' => 'x'])->body, 'Neznámá hodnota -> automaticky.');
+
+        // 3D: modul s verzí v adrese (kvůli mezipaměti po aktualizaci), ovládání jen pro 3D skryté.
+        $page = $this->get('/topology', ['center' => $app, 'layout' => '3d'])->body;
+        self::assertStringContainsString('data-layout="3d" aria-pressed="true"', $page);
+        self::assertMatchesRegularExpression('#data-module="[^"]*/assets/js/topology3d\.js\?v=#', $page);
+        self::assertStringContainsString('data-3d="top" data-3d-only hidden', $page);
+        self::assertStringContainsString('data-webgl-missing data-test="webgl-missing" hidden', $page);
     }
 
     public function testDefaultCenterPrefersUnsuppressedUnhealthyAlert(): void

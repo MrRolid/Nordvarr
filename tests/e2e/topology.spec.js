@@ -219,3 +219,72 @@ test('rozvržení do pater: pásy pater, web nad databází, volba se pamatuje v
   expect(await page.evaluate(() => document.getElementById('cy').cy.nodes('.band').length)).toBe(0);
   expect(consoleErrors).toEqual([]);
 });
+
+test('3D pohled: patra v prostoru, klik na objekt otevře kartu, seznam vybírá, návrat do 2D', async ({ page }) => {
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', (err) => consoleErrors.push(String(err)));
+  await loginOk(page);
+  await page.goto(`/topology?center=${idOf(webUrl)}`);
+  await page.waitForFunction(() => document.getElementById('cy')?.cy !== undefined);
+  const switcher = page.getByTestId('layout-switch');
+  await expect(page.getByRole('button', { name: 'Pohled shora' })).toBeHidden();
+
+  await switcher.getByRole('button', { name: '3D' }).click();
+  await expect(page).toHaveURL(/layout=3d/);
+  await expect(page.getByTestId('map3d')).toBeVisible();
+  await expect(page.getByTestId('graph')).toBeHidden();
+  await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
+  const stats = await page.evaluate(() => document.getElementById('map3d').map3d.stats());
+  expect(stats).toMatchObject({ nodes: 2, edges: 1, floors: ['Weby a API', 'Služby a databáze'], selected: idOf(webUrl) });
+
+  // Klik na kouli databáze v prostoru.
+  await page.waitForFunction(() => Number(document.getElementById('map3d').dataset.frames ?? 0) > 0);
+  const card = page.getByTestId('node-panel').getByTestId('node-card');
+  const clickNode = async (id) => {
+    const pos = await page.evaluate((nodeId) => document.getElementById('map3d').map3d.screenPosition(nodeId), id);
+    const box = await page.getByTestId('map3d').boundingBox();
+    await page.mouse.click(box.x + pos.x, box.y + pos.y);
+  };
+  await clickNode(idOf(dbUrl));
+  await expect(card).toHaveAttribute('data-node-id', idOf(dbUrl));
+  expect(await page.evaluate(() => document.getElementById('map3d').map3d.stats().selected)).toBe(idOf(dbUrl));
+
+  // Seznam objektů vybírá i ve 3D, ovládací tlačítka fungují.
+  await page.getByTestId('node-list').getByRole('button', { name: /topo-web/ }).click();
+  await expect(card).toHaveAttribute('data-node-id', idOf(webUrl));
+  await page.getByRole('button', { name: 'Pohled shora' }).click();
+  await page.getByRole('button', { name: 'Roztáhnout patra' }).click();
+  await expect(page.getByRole('button', { name: 'Roztáhnout patra' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Celý graf' }).click();
+
+  // Volba přežije znovunačtení.
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
+  await expect(page.getByTestId('map3d')).toBeVisible();
+
+  // Zpět do pater.
+  await page.getByTestId('layout-switch').getByRole('button', { name: 'Patra' }).click();
+  await expect(page.getByTestId('map3d')).toBeHidden();
+  await expect(page.getByTestId('graph')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pohled shora' })).toBeHidden();
+  expect(await page.evaluate(() => document.getElementById('cy').cy.nodes('.band').length)).toBe(2);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('bez WebGL zůstane mapa v patrech s upozorněním', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function getContext(type, ...rest) {
+      return String(type).startsWith('webgl') ? null : original.call(this, type, ...rest);
+    };
+  });
+  await loginOk(page);
+  await page.goto(`/topology?center=${idOf(webUrl)}&layout=3d`);
+  await expect(page.getByTestId('webgl-missing')).toBeVisible();
+  await expect(page).toHaveURL(/layout=floors/);
+  await expect(page.getByTestId('map3d')).toBeHidden();
+  await page.waitForFunction(() => document.getElementById('cy')?.cy?.nodes('.band').length === 2);
+});
