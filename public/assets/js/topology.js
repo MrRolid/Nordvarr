@@ -167,6 +167,8 @@ if (el && window.cytoscape) {
     let mode = MODES.includes(el.dataset.layout) ? el.dataset.layout : 'auto';
     let floors = initial.floors ?? [];
     let lastGraph = initial;
+    // Vypnutá patra (klíče pater), platí ve všech pohledech.
+    const hiddenFloors = new Set();
     const objects = () => cy.elements().not('.band');
     const cy = window.cytoscape({
         container: el,
@@ -208,6 +210,9 @@ if (el && window.cytoscape) {
             data: { id: `floor:${f.floor}`, label: f.label, floor: f.floor, w: maxX - minX + gapX, h: f.rows * gapY - 16 },
             position: { x: (minX + maxX) / 2, y: (f.y + (f.rows - 1) / 2) * gapY },
         })));
+        for (const b of cy.nodes('.band')) {
+            if (hiddenFloors.has(b.data('floor'))) b.style('display', 'none');
+        }
         cy.fit(undefined, 30);
     };
 
@@ -277,7 +282,17 @@ if (el && window.cytoscape) {
         if (fade) objects().not(keep).addClass('faded');
         keep.edges().addClass('hl');
     };
-    const restore = () => highlight(selected ? cy.getElementById(selected) : null);
+    const restore = () => {
+        if (causePath) showPath2d(causePath);
+        else highlight(selected ? cy.getElementById(selected) : null);
+    };
+    // Režim problému: cesta od objektu k pravděpodobné příčině, zbytek grafu ztlumený.
+    let causePath = null;
+    const showPath2d = (path) => {
+        cy.elements().removeClass('faded hl');
+        objects().not(path).addClass('faded');
+        path.edges().addClass('hl');
+    };
 
     let selected = null;
     const listItems = () => document.querySelectorAll('.node-item[data-node]');
@@ -294,13 +309,15 @@ if (el && window.cytoscape) {
             panel.removeAttribute('aria-busy');
         }
     };
-    const select = (id, center = false) => {
+    const select = (id, center = false, keepCause = false) => {
         const node = cy.getElementById(id);
         if (node.empty()) return;
+        if (!keepCause) clearCause();
         selected = id;
         cy.$(':selected').unselect();
         node.select();
-        highlight(node);
+        if (causePath) showPath2d(causePath);
+        else highlight(node);
         // Posunout mapu jen tehdy, když uzel není celý vidět.
         const ext = cy.extent();
         const bb = node.boundingBox();
@@ -318,6 +335,7 @@ if (el && window.cytoscape) {
     cy.on('mouseout', 'node', () => { restore(); el.classList.remove('pointer'); });
     cy.on('tap', (evt) => {
         if (evt.target === cy) {
+            clearCause();
             selected = null;
             cy.$(':selected').unselect();
             highlight(null);
@@ -357,6 +375,8 @@ if (el && window.cytoscape) {
                 onOpen: (id) => { window.location.href = urlFor(el.dataset.objectUrl, id); },
             });
             box3d.map3d = map3d;
+            map3d.setHiddenFloors([...hiddenFloors]);
+            if (causePath) map3d.setPath(causePath.nodes().map((n) => n.id()), causePath.edges().map((e) => e.id()), selected);
         } else {
             map3d.resize();
             map3d.update(lastGraph);
@@ -391,6 +411,107 @@ if (el && window.cytoscape) {
     };
     for (const b of layoutButtons) b.addEventListener('click', () => setMode(b.dataset.layout));
 
+    // Hledání: filtruje seznam objektů, Enter vybere první shodu a ukáže ji v mapě, Esc hledání zruší.
+    const search = document.getElementById('t-search');
+    const searchEmpty = document.querySelector('[data-search-empty]');
+    const fold = (text) => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const filterList = () => {
+        const query = fold(search.value.trim());
+        let shown = 0;
+        for (const item of listItems()) {
+            const match = query === '' || fold(item.textContent).includes(query);
+            item.closest('li').hidden = !match;
+            if (match) shown += 1;
+        }
+        if (searchEmpty) searchEmpty.hidden = shown > 0;
+    };
+    search?.addEventListener('input', filterList);
+    search?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const hit = [...listItems()].find((item) => !item.closest('li').hidden);
+            if (hit) select(hit.dataset.node, true);
+        } else if (event.key === 'Escape') {
+            search.value = '';
+            filterList();
+        }
+    });
+
+    // Patra v mapě: zaškrtávátka podle pater v datech, vypnuté patro se skryje ve 2D i ve 3D.
+    const floorFilter = document.querySelector('[data-test="floor-filter"]');
+    const applyFloors = () => {
+        cy.batch(() => {
+            for (const n of cy.nodes()) n.style('display', hiddenFloors.has(n.data('floor')) ? 'none' : 'element');
+        });
+        map3d?.setHiddenFloors([...hiddenFloors]);
+    };
+    let floorKeys = '';
+    const renderFloorFilter = () => {
+        if (!floorFilter) return;
+        const keys = floors.map((f) => f.floor).join(',');
+        if (keys === floorKeys) return;
+        floorKeys = keys;
+        for (const key of [...hiddenFloors]) {
+            if (!floors.some((f) => f.floor === key)) hiddenFloors.delete(key);
+        }
+        const boxes = floorFilter.querySelector('[data-floor-boxes]');
+        boxes.replaceChildren(...floors.map((f) => {
+            const label = document.createElement('label');
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.value = f.floor;
+            input.checked = !hiddenFloors.has(f.floor);
+            input.addEventListener('change', () => {
+                if (input.checked) hiddenFloors.delete(f.floor);
+                else hiddenFloors.add(f.floor);
+                applyFloors();
+            });
+            label.append(input, ` ${f.label}`);
+            return label;
+        }));
+        floorFilter.hidden = floors.length < 2;
+    };
+    renderFloorFilter();
+
+    // Tlačítko "K příčině": vybraný objekt s pravděpodobnou příčinou, jinak první takový v seznamu
+    // (seznam je seřazený od nejhoršího stavu).
+    const causeButton = document.querySelector('[data-cy="cause"]');
+    const causeSource = () => {
+        const candidates = [selected, ...[...listItems()].map((item) => item.dataset.node)];
+        for (const id of candidates) {
+            const node = id ? cy.getElementById(id) : null;
+            if (node && !node.empty() && node.data('cause') && !cy.getElementById(node.data('cause')).empty()) return node;
+        }
+        return null;
+    };
+    const updateCauseButton = () => {
+        if (causeButton) causeButton.hidden = !causePath && causeSource() === null;
+    };
+    const clearCause = () => {
+        if (!causePath) return;
+        causePath = null;
+        causeButton?.setAttribute('aria-pressed', 'false');
+        map3d?.setPath(null);
+        restore();
+        updateCauseButton();
+    };
+    const showCause = () => {
+        const from = causeSource();
+        if (!from) return;
+        const to = cy.getElementById(from.data('cause'));
+        const found = objects().aStar({ root: from, goal: to, directed: false });
+        const path = found.found ? found.path : from.union(to);
+        select(to.id(), false, true);
+        causePath = path;
+        causeButton?.setAttribute('aria-pressed', 'true');
+        showPath2d(path);
+        el.dataset.causePath = path.nodes().map((n) => n.data('name')).join(' > ');
+        if (mode === '3d') map3d?.setPath(path.nodes().map((n) => n.id()), path.edges().map((e) => e.id()), to.id());
+        else cy.animate({ fit: { eles: path, padding: 80 }, duration: 300 });
+    };
+    causeButton?.addEventListener('click', () => (causePath ? clearCause() : showCause()));
+    updateCauseButton();
+
     // Výchozí výběr: centrum okolí, v režimu filtru první uzel seznamu (seřazený od nejhoršího stavu).
     const first = el.dataset.center || document.querySelector('.node-item[data-node]')?.dataset.node;
     if (first) select(first);
@@ -422,12 +543,16 @@ if (el && window.cytoscape) {
                 if (same) {
                     for (const e of elements) cy.getElementById(e.data.id).data(e.data);
                 } else {
+                    clearCause();
                     cy.elements().remove();
                     cy.add(elements);
                     compact = graph.nodes.length > 24;
                     cy.style(style());
                     layout();
                 }
+                renderFloorFilter();
+                applyFloors();
+                updateCauseButton();
                 for (const item of listItems()) {
                     const node = cy.getElementById(item.dataset.node);
                     const dot = item.querySelector('.dot');

@@ -439,6 +439,12 @@ input[type="radio"] { margin: 0; }
 .seg label { font-weight: 400; display: inline-flex; gap: .3rem; align-items: center; }
 .topo-h { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 1rem 0 .4rem; }
 .node-list { list-style: none; margin: 0; padding: 0; }
+.topo-search { width: 100%; margin-bottom: .4rem; }
+.topo-floor-filter { border: 1px solid var(--border); border-radius: 6px; padding: .3rem .6rem .5rem; margin: 0 0 .6rem; font-size: .85rem; }
+.topo-floor-filter legend { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 0 .25rem; }
+.topo-floor-filter label { display: flex; gap: .4rem; align-items: center; font-weight: 400; margin: .1rem 0; }
+.topo-floor-filter[hidden], .node-list li[hidden], [data-search-empty][hidden] { display: none; }
+.topo-tools button[data-cy="cause"][aria-pressed="true"] { background: var(--map-causal); border-color: var(--map-causal); color: var(--map-node); }
 .node-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
