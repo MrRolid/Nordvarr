@@ -130,9 +130,16 @@ final class DemoData
             $vm('db1', '192.0.2.35', ['databaze', 'eshop'], ['db:shop', 'db:wiki'], '16 GB'),
             $vm('db2', '192.0.2.36', ['databaze', 'crm'], ['db:crm', 'db:mail'], '16 GB'),
             $vm('mail1', '192.0.2.37', ['posta'], ['svc:postfix']),
-            $vm('mon1', '192.0.2.38', ['monitoring'], ['svc:monitoring']),
+            $vm('mon1', '192.0.2.38', ['monitoring'], ['svc:monitoring', 'cluster:k3s']),
             $vm('ci1', '192.0.2.39', ['ci'], ['svc:ci-runner']),
             $vm('files1', '192.0.2.41', ['soubory'], ['svc:backup-job']),
+
+            // Kontejnery: malý cluster k3s na mon1
+            self::obj('cluster:k3s', 'cluster', 'k3s na mon1', ['distribuce' => 'k3s', 'nodes' => 1], ['monitoring'],
+                [['contains', 'ct:prometheus'], ['contains', 'ct:grafana']]),
+            self::obj('ct:prometheus', 'container', 'prometheus', ['image' => 'prom/prometheus', 'port' => 9090], ['monitoring']),
+            self::obj('ct:grafana', 'container', 'grafana', ['image' => 'grafana/grafana', 'port' => 3000], ['monitoring'],
+                [['depends_on', 'ct:prometheus']]),
 
             // Databáze
             self::obj('db:shop', 'database', 'shop (PostgreSQL)', ['engine' => 'PostgreSQL 17', 'port' => 5432, 'size' => '42 GB'], ['eshop', 'kriticke'], [],

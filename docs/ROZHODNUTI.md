@@ -179,3 +179,14 @@ Krok C z `docs/NAVRH-3D-MAPA.md`. `SPEC.md` se nemění.
 5. **Plynulý přechod mezi 3D a 2D (z návrhu) se nedělá.** Tlačítko Pohled shora ve 3D dává podobný výsledek a animace přechodu mezi dvěma knihovnami by vyžadovala vlastní vykreslování 2D grafu.
 6. **Verze 0.6.0.**
 
+## 2026-11-02 (F11 Kontejnery a clustery, metriky ve 3D)
+
+Krok D z `docs/NAVRH-3D-MAPA.md`. `SPEC.md` se nemění. SPEC kap. 5 uvádí pevný seznam typů objektů, `cluster` a `container` jsou jeho rozšíření na přání vlastníka (seznam zůstává pevný, jen delší).
+
+1. **Typy `container` a `cluster`** nahrazují F8 bod 3 (patro kontejnerů jen přes atribut `vrstva`). Atribut `vrstva` zůstává pro výjimky. Kontejner a cluster mají stejné patro, cluster kontejnery obsahuje (vztah "obsahuje"), a proto leží ve stejném sloupci.
+2. **Migrace 0006 přestaví tabulku `objects`** stejně jako 0005 tabulku `checks`. Migrator vypne cizí klíče mimo transakci a po migraci ověří `PRAGMA foreign_key_check`, takže DROP TABLE nesmaže atributy, vztahy, kontroly ani historii. Ověřeno testem nad daty z předchozích migrací.
+3. **Doporučené kontroly** pro kontejner a cluster jako pro službu. Ping se nenavrhuje, kontejner obvykle nemá vlastní adresu dosažitelnou ze serveru Nordvarru.
+4. **Metriky ve 3D** jsou text pod názvem serveru (stejný jako druhý řádek popisku ve 2D), ne pruhy. Pruhy u stovek koulí by byly nečitelné a text se obnovuje se stejnými daty.
+5. **Ukázková data** mají cluster a dva kontejnery, aby patro kontejnerů nebylo v ukázce prázdné. Testy s počtem ukázkových objektů upraveny ze 40 na 43.
+6. **Verze 0.7.0.**
+

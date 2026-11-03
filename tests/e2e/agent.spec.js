@@ -87,6 +87,12 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   await page.getByRole('link', { name: 'e2e-gpu.example.com' }).click();
   await page.getByTestId('show-topology').click();
   await expect(page.getByTestId('node-panel').getByTestId('node-host')).toContainText('GPU 0');
+
+  // Ve 3D má server pod názvem vytížení z posledního hlášení.
+  await page.getByTestId('layout-switch').getByRole('button', { name: '3D' }).click();
+  await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
+  const label = page.locator('.map3d-label').filter({ hasText: 'e2e-gpu.example.com' });
+  await expect(label.locator('.map3d-metrics')).toHaveText(/^CPU \d+ %, RAM \d+ %, GPU \d+ %$/);
 });
 
 test('skript agenta jde stáhnout bez přihlášení', async ({ request }) => {

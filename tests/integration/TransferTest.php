@@ -64,11 +64,11 @@ final class TransferTest extends TestCase
     {
         $source = $this->filled();
         $first = (new Transfer($source))->export();
-        self::assertSame(41, count($first['objects']));
+        self::assertSame(44, count($first['objects']));
 
         $target = new Inventory(TestDb::memory());
         $counts = (new Transfer($target))->import(json_decode(json_encode($first, JSON_THROW_ON_ERROR), true));
-        self::assertSame(['objects' => 41, 'relationships' => count($first['relationships']), 'events' => count($first['events'])], $counts);
+        self::assertSame(['objects' => 44, 'relationships' => count($first['relationships']), 'events' => count($first['events'])], $counts);
 
         $second = (new Transfer($target))->export();
         self::assertSame($this->withoutTimestamp($first), $this->withoutTimestamp($second));

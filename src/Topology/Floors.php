@@ -28,6 +28,8 @@ final class Floors
         'server' => 'hardware',
         'network_device' => 'hardware',
         'vm' => 'virtual',
+        'cluster' => 'containers',
+        'container' => 'containers',
         'service' => 'services',
         'database' => 'services',
         'website' => 'web',

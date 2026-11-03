@@ -60,6 +60,9 @@ final class SuggestionsTest extends TestCase
         self::assertSame(['http:GET https://api.example.com/health', 'tls_expiry:api.example.com:443'],
             self::keys('service', 'api', ['url' => 'https://api.example.com/health', 'port' => '8080', 'host' => '192.0.2.5']), 'S url se TCP nenavrhuje.');
         self::assertSame([], self::keys('service', 'shop-api.example.com'), 'U služby se z názvu nic nehádá.');
+        self::assertSame(['tcp:192.0.2.38:3000'], self::keys('container', 'grafana', ['host' => '192.0.2.38', 'port' => '3000']));
+        self::assertSame(['http:GET https://k3s.example.net:6443/readyz', 'tls_expiry:k3s.example.net:6443'],
+            self::keys('cluster', 'k3s', ['url' => 'https://k3s.example.net:6443/readyz']));
     }
 
     public function testExistingChecksAreNotSuggestedAgain(): void

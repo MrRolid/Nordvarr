@@ -4,6 +4,16 @@ Aktualizováno: 2026-11-02
 
 ## Hotové fáze
 
+### F11 Kontejnery a clustery, metriky ve 3D (větev `faze-11-kontejnery`)
+
+Krok D z `docs/NAVRH-3D-MAPA.md` (vlastník: "slouč a pokračuj" po F10). Tím je návrh 3D mapy celý hotový.
+
+- Nové typy objektů `cluster` a `container` (UI, API, import, filtry). Migrace `0006_kontejnery.sql` přestaví tabulku `objects` (nové omezení CHECK), data i cizí klíče zůstávají.
+- Oba typy leží v patře kontejnerů. Doporučené kontroly jako u služby (HTTP na `url`, jinak TCP na `host` + `port`).
+- Ukázková data: cluster `k3s na mon1` (ve VM mon1) s kontejnery prometheus a grafana (43 objektů místo 40).
+- 3D: server s agentem má pod názvem vytížení CPU, RAM a GPU z posledního hlášení, obnovuje se s daty.
+- Testy: `ContainerTypesMigrationTest` (migrace nad daty ze 0001 až 0005: objekty, vztahy, atributy a kontroly zůstanou, nové typy projdou, kaskádové mazání funguje, `foreign_key_check` je prázdný), `FloorsTest`, `SuggestionsTest`, upravené počty ukázkových dat (`DemoDataTest`, `TransferTest`, `InventoryUiTest`), e2e `agent.spec.js` (metriky u serveru ve 3D).
+
 ### F10 Hledání, patra a režim problému v mapě (větev `faze-10-hledani-problem`)
 
 Krok C z `docs/NAVRH-3D-MAPA.md` (vlastník: "slouč a pokračuj" po F9).
@@ -281,6 +291,6 @@ Nic.
 
 ## Další krok
 
-- Release 0.6.0 (F8 až F10) vydat z `main` tagem `v0.6.0` přes web GitHubu, až bude F10 sloučená (tag musí ukazovat na commit s `VERSION` 0.6.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat.
-- Návrh 3D mapy je tím hotový až na volitelný krok D (typy objektů kontejner a cluster, metriky agenta přímo na uzlech ve 3D). Pokračovat podle zkušenosti vlastníka se skutečnými daty.
-- Kandidáti podle provozu: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
+- Release 0.7.0 (F8 až F11) vydat z `main` tagem `v0.7.0` přes web GitHubu, až bude F11 sloučená (tag musí ukazovat na commit s `VERSION` 0.7.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat.
+- Návrh 3D mapy je celý hotový. Další práce podle zkušenosti vlastníka se skutečnými daty.
+- Kandidáti: hlášení kontejnerů agentem (seznam kontejnerů Dockeru jako objekty typu kontejner), retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

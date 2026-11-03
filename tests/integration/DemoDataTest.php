@@ -15,13 +15,13 @@ final class DemoDataTest extends TestCase
     {
         $pdo = TestDb::memory();
         $inventory = new Inventory($pdo);
-        self::assertSame(['objects' => 40, 'events' => 8], (new DemoData($inventory))->load());
+        self::assertSame(['objects' => 43, 'events' => 8], (new DemoData($inventory))->load());
         $counts = static fn (): array => array_map(
             static fn (string $t): int => (int) $pdo->query("SELECT COUNT(*) FROM $t")->fetchColumn(),
             ['objects' => 'objects', 'relationships' => 'relationships', 'events' => 'events', 'attrs' => 'object_attributes', 'revs' => 'doc_revisions']
         );
         $before = $counts();
-        self::assertSame(40, $before['objects']);
+        self::assertSame(43, $before['objects']);
         (new DemoData($inventory))->load();
         self::assertSame($before, $counts());
     }
