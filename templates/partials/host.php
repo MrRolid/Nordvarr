@@ -128,4 +128,28 @@ $gauge = static function (string $label, ?float $pct, string $level, string $val
         <?php foreach ($h['network'] as $i => $n): ?><?= $i > 0 ? '; ' : '' ?><?= $v->e($n['iface']) ?> <?= $v->t('host.rx') ?> <?= $v->bytes($n['rx_bps']) ?>/s, <?= $v->t('host.tx') ?> <?= $v->bytes($n['tx_bps']) ?>/s<?php endforeach; ?>
     </p>
     <?php endif; ?>
+
+    <?php if ($h['containers_reported'] || $h['containers_error'] !== ''): ?>
+    <h3><?= $v->t('host.containers', ['count' => count($h['containers'])]) ?></h3>
+    <?php if ($h['containers_error'] !== ''): ?>
+    <p class="muted" data-test="host-containers-error"><?= $v->t('host.containers_unavailable') ?></p>
+    <?php elseif ($h['containers'] === []): ?>
+    <p class="muted"><?= $v->t('host.containers_none') ?></p>
+    <?php else: ?>
+    <div class="table-wrap">
+    <table class="list" data-test="host-containers">
+        <thead><tr><th><?= $v->t('host.container') ?></th><th><?= $v->t('host.image') ?></th><th><?= $v->t('host.container_state') ?></th></tr></thead>
+        <tbody>
+        <?php foreach ($h['containers'] as $c): ?>
+        <tr>
+            <td><?= $v->e($c['name']) ?><?php if ($c['project'] !== ''): ?> <span class="muted small-text">(<?= $v->e($c['project']) ?>)</span><?php endif; ?></td>
+            <td class="small-text"><?= $v->e($c['image']) ?></td>
+            <td class="lvl-<?= $v->e($c['level']) ?>"><?= $v->e($c['status'] !== '' ? $c['status'] : $c['state']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
 </section>

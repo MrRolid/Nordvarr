@@ -1,0 +1,11 @@
+#!/bin/sh
+# Falešný docker: "docker ps -a --format {{json .}}" vypíše kontejnery v různých stavech.
+[ "$1" = "ps" ] || exit 1
+cat <<'JSON'
+{"Command":"\"php-fpm\"","CreatedAt":"2026-10-20 10:00:00 +0000 UTC","ID":"a1b2c3","Image":"example/shop-api:1.4","Labels":"com.docker.compose.project=shop,com.docker.compose.service=api","Names":"shop-api","Ports":"0.0.0.0:8080->8080/tcp","RunningFor":"2 days ago","State":"running","Status":"Up 2 hours (healthy)"}
+{"Command":"\"redis-server\"","ID":"d4e5f6","Image":"redis:7","Labels":"com.docker.compose.project=shop","Names":"shop-redis","State":"running","Status":"Up 2 hours"}
+{"Command":"\"worker\"","ID":"a7b8c9","Image":"example/worker:2","Labels":"","Names":"queue-worker","State":"restarting","Status":"Restarting (1) 5 seconds ago"}
+{"Command":"\"migrate\"","ID":"0a0b0c","Image":"example/shop-api:1.4","Labels":"","Names":"shop-migrate","State":"exited","Status":"Exited (0) 3 days ago"}
+{"Command":"\"backup\"","ID":"0d0e0f","Image":"example/backup:1","Labels":"","Names":"nightly-backup","State":"exited","Status":"Exited (137) 10 minutes ago"}
+{"Command":"\"grafana\"","ID":"1a1b1c","Image":"grafana/grafana:11","Labels":"","Names":"grafana","State":"running","Status":"Up 5 minutes (unhealthy)"}
+JSON

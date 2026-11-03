@@ -46,6 +46,7 @@ final class AgentScriptTest extends TestCase
             'NORDVARR_CONF' => $this->tmp . '/neexistuje.conf',
             'NORDVARR_SMARTCTL' => $this->fixtures . '/bin/smartctl',
             'NORDVARR_NVIDIA_SMI' => $this->fixtures . '/bin/nvidia-smi',
+            'NORDVARR_DOCKER' => $this->fixtures . '/bin/docker',
             'LC_ALL' => 'C',
         ];
         $process = proc_open(['bash', $this->script, ...($arg === '' ? [] : [$arg])], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
@@ -73,7 +74,7 @@ final class AgentScriptTest extends TestCase
     {
         exec('bash -n ' . escapeshellarg($this->script) . ' 2>&1', $out, $code);
         self::assertSame(0, $code, implode("\n", $out));
-        self::assertSame([0, "nordvarr-agent 1.0.0\n"], array_slice($this->agent('--version'), 0, 2));
+        self::assertSame([0, "nordvarr-agent 1.1.0\n"], array_slice($this->agent('--version'), 0, 2));
     }
 
     public function testCollectsMetricsAndRatesFromTwoRuns(): void
@@ -112,6 +113,28 @@ final class AgentScriptTest extends TestCase
         self::assertSame(['/dev/sda', '/dev/sdb', '/dev/nvme0'], array_column($report['smart'], 'device'));
         self::assertFalse($report['smart'][1]['health_passed']);
         self::assertSame(95.0, Report::sample($report['snapshot'])['disk_max_pct']);
+    }
+
+    public function testDockerContainers(): void
+    {
+        $data = $this->dryRun();
+        self::assertSame(['shop-api', 'shop-redis', 'queue-worker', 'shop-migrate', 'nightly-backup', 'grafana'], array_column($data['containers'], 'Names'));
+        self::assertArrayNotHasKey('containers_error', $data);
+
+        // Server výstup dockeru rozebere: stav, healthcheck, návratový kód, projekt compose.
+        $containers = Report::normalize($data, $data['collected_at'])['containers'];
+        self::assertSame(['name' => 'shop-api', 'image' => 'example/shop-api:1.4', 'state' => 'running', 'health' => 'healthy', 'exit_code' => null, 'project' => 'shop', 'status' => 'Up 2 hours (healthy)'], $containers[0]);
+        self::assertSame([0, 137], [$containers[3]['exit_code'], $containers[4]['exit_code']]);
+        self::assertSame(['restarting', 'unhealthy'], [$containers[2]['state'], $containers[5]['health']]);
+
+        // Vypnuté hlášení kontejnerů, docker bez přístupu, docker vůbec není.
+        self::assertArrayNotHasKey('containers', $this->dryRun(['NORDVARR_DOCKER' => '0']));
+        $denied = $this->dryRun(['NORDVARR_DOCKER' => '/bin/false']);
+        self::assertSame('docker_unavailable', $denied['containers_error']);
+        self::assertArrayNotHasKey('containers', $denied);
+        $none = $this->dryRun(['NORDVARR_DOCKER' => $this->tmp . '/nic/docker']);
+        self::assertArrayNotHasKey('containers', $none);
+        self::assertArrayNotHasKey('containers_error', $none);
     }
 
     public function testMissingSmartctlAndSmartInterval(): void

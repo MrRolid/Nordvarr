@@ -36,6 +36,8 @@ final class Reason
     public const DISK_FAILING = 'disk_failing';
     public const DISK_WEAR = 'disk_wear';
     public const DISK_ERRORS = 'disk_errors';
+    // Kontejnery Dockeru hlášené agentem (F12).
+    public const CONTAINER_DOWN = 'container_down';
 
     public const ALL = [
         self::DNS_FAILURE, self::TCP_REFUSED, self::TCP_TIMEOUT, self::TLS_ERROR, self::HTTP_4XX, self::HTTP_5XX,
@@ -43,5 +45,6 @@ final class Reason
         self::DOMAIN_EXPIRED, self::RDAP_NO_EXPIRY, self::HEARTBEAT_MISSED, self::CHECK_TIMEOUT, self::TOOL_MISSING,
         self::DEPENDENCY_UNHEALTHY, self::UNKNOWN_ERROR, self::AGENT_MISSING, self::CPU_HIGH, self::MEMORY_HIGH,
         self::DISK_FULL, self::TEMPERATURE_HIGH, self::DISK_FAILING, self::DISK_WEAR, self::DISK_ERRORS,
+        self::CONTAINER_DOWN,
     ];
 }

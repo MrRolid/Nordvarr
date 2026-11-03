@@ -116,6 +116,13 @@ final class HostView
             'smart_at' => $smartAt,
             'smart_stale' => $smartAt !== null && $now->getTimestamp() - Time::fromDb($smartAt)->getTimestamp() > self::SMART_STALE_S,
             'smart_error' => (string) $host['smart_error'],
+            // Kontejnery Dockeru: null = agent je nehlásí (starší agent nebo server bez dockeru).
+            'containers' => array_map(static fn (array $c): array => $c + [
+                'level' => $c['state'] === 'restarting' || $c['state'] === 'dead' || $c['health'] === 'unhealthy'
+                    || ($c['state'] === 'exited' && $c['exit_code'] !== null && $c['exit_code'] !== 0) ? 'warn' : ($c['state'] === 'running' ? 'ok' : 'none'),
+            ], $s['containers'] ?? []),
+            'containers_reported' => ($s['containers'] ?? null) !== null,
+            'containers_error' => (string) ($s['containers_error'] ?? ''),
             'problems' => HostEvaluator::problems($s, $host['smart'], $config),
             'chart' => $samples === [] ? null : self::chart($samples, $now, $chartLabel),
             'has_gpu_series' => $s['gpus'] !== [],
