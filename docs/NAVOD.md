@@ -312,8 +312,9 @@ Agent je jeden skript pro bash (`agent/nordvarr-agent.sh`), který každou minut
 | NVIDIA GPU: vytížení, VRAM, teplota, příkon, ventilátor | `nvidia-smi` |
 | Síťový provoz rozhraní (průměr za minutu) | `/proc/net/dev` |
 | Stav disků ze SMART: zdraví, opotřebení SSD a NVMe, teplota, provozní hodiny, přemapované a čekající sektory, chyby média a chyby v logu disku | `smartctl -j` jednou za 15 minut |
+| Kontejnery Dockeru: jméno, obraz, stav, healthcheck, návratový kód, projekt docker compose | `docker ps -a` (když je docker nainstalovaný) |
 
-Výstup `smartctl` posílá agent v původní podobě JSON, rozbor (ATA/SATA i NVMe) dělá server.
+Výstup `smartctl` a `docker ps` posílá agent v původní podobě JSON, rozbor (ATA/SATA i NVMe, stav kontejneru) dělá server.
 
 ### Instalace
 
@@ -353,6 +354,7 @@ Bez `mod_rewrite` nastavte `NORDVARR_URL=https://nordvarr.example.com/index.php?
 | `NORDVARR_HOSTNAME` | jméno serveru, výchozí `hostname -f` |
 | `NORDVARR_SMART_INTERVAL` | sekundy mezi čteními SMART (výchozí 900, 0 = nečíst) |
 | `NORDVARR_SMARTCTL`, `NORDVARR_NVIDIA_SMI` | jiná cesta k příkazům |
+| `NORDVARR_DOCKER` | jiná cesta k příkazu `docker`, `0` = kontejnery nehlásit |
 
 Soubor se jen čte jako dvojice `KLÍČ=hodnota`, nic z něj se nespouští. Token se curl předává přes soubor s právy 600, takže není vidět v seznamu procesů. Poslední chyba odeslání je v `/var/lib/nordvarr-agent/last-error`.
 
@@ -362,6 +364,19 @@ Soubor se jen čte jako dvojice `KLÍČ=hodnota`, nic z něj se nespouští. Tok
 - Karta objektu ukáže sekci **Server (agent)**: ukazatele CPU, RAM, swapu, nejplnějšího disku, nejvyšší teploty a každé GPU, graf za 24 h, zaplnění disků, stav disků ze SMART a všechna teplotní čidla.
 - V topologii má uzel serveru v popisku CPU, RAM a GPU a panel uzlu ukazuje pruhy hodnot.
 - Export pro LLM obsahuje sekci se stavem serveru.
+
+### Kontejnery Dockeru
+
+Když je na serveru `docker` a agent k němu má přístup (běží jako root), hlásí každou minutu seznam kontejnerů (nejvýš 200):
+
+- Každý kontejner je v inventáři objekt typu **Kontejner**, který server **obsahuje**. Atributy se zdrojem `agent`: `image`, `docker_state`, `health` (výsledek healthchecku) a `compose_project`. V mapě leží na patře kontejnerů ve sloupci svého serveru.
+- Kontejner, který v hlášení chybí (smazaný), se archivuje. Když se se stejným jménem vrátí, archivace se zruší a objekt (dokumentace, vztahy, historie) zůstává stejný.
+- Karta serveru má tabulku **Kontejnery Dockeru** se stavem každého kontejneru.
+- Kontrola Agent hlásí problém `container_down` (omezeně), když se kontejner opakovaně restartuje, je ve stavu `dead`, skončil s nenulovým kódem nebo jeho healthcheck hlásí `unhealthy`. Kontejner ukončený s kódem 0 (jednorázová úloha) problém není.
+- Když agent na docker nedosáhne (neběží jako root), karta serveru to napíše. Přidat agenta do skupiny `docker` funguje taky, ale skupina dává práva roota, takže rozdíl v bezpečnosti není.
+- Hlášení kontejnerů vypnete v konfiguraci: `NORDVARR_DOCKER=0`.
+
+Kontejnery hlásí agent od verze 1.1.0. Na serverech se starším agentem stáhněte skript znovu (první řádek v návodu k instalaci).
 
 ### Prahy kontroly Agent
 
@@ -377,6 +392,7 @@ Nastavují se na detailu kontroly (Upravit). Problém se hlásí po 3 hlášení
 | opotřebení SSD/NVMe | `disk_wear` | omezeně (nefunguje při 100 %) | 80 % |
 | SMART hlásí selhání, atribut pod prahem výrobce, kritické varování NVMe | `disk_failing` | nefunguje | - |
 | přemapované, čekající nebo neopravitelné sektory, chyby média, chyby v logu disku | `disk_errors` | omezeně | - |
+| kontejner Dockeru se restartuje, je mrtvý, skončil s chybou nebo má neúspěšný healthcheck | `container_down` | omezeně | - |
 
 Kontrola posílá notifikace i při stavu omezeně (lze vypnout). Hodnoty se ukládají 48 h po minutách a 400 dní jako hodinové souhrny.
 

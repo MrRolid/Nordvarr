@@ -190,3 +190,15 @@ Krok D z `docs/NAVRH-3D-MAPA.md`. `SPEC.md` se nemění. SPEC kap. 5 uvádí pev
 5. **Ukázková data** mají cluster a dva kontejnery, aby patro kontejnerů nebylo v ukázce prázdné. Testy s počtem ukázkových objektů upraveny ze 40 na 43.
 6. **Verze 0.7.0.**
 
+## 2026-11-03 (F12 Kontejnery Dockeru z agenta)
+
+Vlastník napsal "slouč a pokračuj" po F11, pokračuje se kandidátem uvedeným v F11. SPEC hostového agenta nemá (F6 je nad rámec), `SPEC.md` se nemění.
+
+1. **Agent posílá syrový výstup `docker ps -a --format {{json .}}`**, rozbor dělá server, stejně jako u SMART (F6 bod 3). Skript zůstává bez dalších závislostí (žádné jq). Řádky, které nezačínají `{`, nebo delší než 20 kB se zahodí; zbytek ověří server.
+2. **Bez přístupu k dockeru** (agent neběží jako root ani není ve skupině docker) posílá agent `containers_error` a karta serveru to napíše. Když docker není nainstalovaný, agent o kontejnerech nic neposílá.
+3. **Kontejnery jsou objekty typu kontejner**, které server obsahuje. Identita podle jména kontejneru na daném serveru (externí id `docker:<externí id serveru>/<jméno>` se zdrojem tokenu agenta), protože id kontejneru se mění při každém novém vytvoření (`docker compose up` po aktualizaci obrazu). Dokumentace a vztahy u objektu kontejneru tak přežijí aktualizace.
+4. **Zmizelý kontejner se archivuje, nemaže.** Smazání by vzalo i ručně doplněnou dokumentaci a historii. Když se kontejner se stejným jménem vrátí, archivace se zruší.
+5. **Atributy jen se stálými hodnotami** (`image`, `docker_state`, `health`, `compose_project`), ne text `Up 2 hours`, který se mění každou minutu. Atribut se zapisuje jen při změně, prázdná hodnota se odstraní.
+6. **Problémy kontejnerů hlásí kontrola Agent serveru** (`container_down`, omezeně), ne vlastní kontrola kontejneru: vlastní kontrola by potřebovala nový typ kontroly (přestavba tabulky `checks`) a stav kontejneru se stejně dozvídáme jen z hlášení serveru. Kontejner ukončený s kódem 0 se za problém nepovažuje (jednorázové úlohy, migrace).
+7. **Verze 0.8.0, agent 1.1.0.**
+

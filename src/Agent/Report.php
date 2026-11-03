@@ -18,10 +18,13 @@ final class Report
     public const MAX_GPUS = 16;
     public const MAX_INTERFACES = 32;
     public const MAX_SMART = 32;
+    public const MAX_CONTAINERS = 200;
+    /** Stavy kontejneru podle dockeru; jiná hodnota je unknown. */
+    public const CONTAINER_STATES = ['running', 'restarting', 'paused', 'exited', 'created', 'dead', 'removing'];
 
     /**
      * @param array<string, mixed> $input
-     * @return array{snapshot: array<string, mixed>, smart: list<array<string, mixed>>|null, smart_error: string, external_id: string, object_id: ?string}
+     * @return array{snapshot: array<string, mixed>, smart: list<array<string, mixed>>|null, smart_error: string, containers: list<array<string, mixed>>|null, external_id: string, object_id: ?string}
      */
     public static function normalize(array $input, string $nowDb): array
     {
@@ -116,12 +119,57 @@ final class Report
             }
         }
 
+        // Kontejnery Dockeru (výstup docker ps); null = agent je neposlal (starší agent, bez dockeru).
+        $containers = null;
+        if (is_array($input['containers'] ?? null) && array_is_list($input['containers'])) {
+            $containers = self::list($input['containers'], self::MAX_CONTAINERS, static fn (array $c): ?array => self::container($c));
+            // Docker jména jsou jedinečná, duplicitu z poškozeného vstupu zahodit.
+            $containers = array_values(array_column($containers, null, 'name'));
+        }
+        $snapshot['containers'] = $containers;
+        $snapshot['containers_error'] = self::str($input['containers_error'] ?? null, 60);
+
         return [
             'snapshot' => $snapshot,
+            'containers' => $containers,
             'smart' => $smart,
             'smart_error' => self::str($input['smart_error'] ?? null, 60),
             'external_id' => $externalId,
             'object_id' => $objectId,
+        ];
+    }
+
+    /**
+     * Jeden kontejner z docker ps: jméno, obraz, stav, healthcheck, návratový kód, projekt compose.
+     *
+     * @param array<string, mixed> $c
+     * @return array{name: string, image: string, state: string, health: string, exit_code: ?int, project: string, status: string}|null
+     */
+    private static function container(array $c): ?array
+    {
+        $name = trim(explode(',', self::str($c['Names'] ?? $c['name'] ?? null, 300))[0]);
+        if ($name === '' || strlen($name) > 128 || preg_match('/^[A-Za-z0-9][A-Za-z0-9_.\-]*$/', $name) !== 1) {
+            return null;
+        }
+        $status = self::str($c['Status'] ?? $c['status'] ?? null, 120);
+        $state = strtolower(self::str($c['State'] ?? $c['state'] ?? null, 20));
+        $health = match (true) {
+            str_contains($status, '(unhealthy)') => 'unhealthy',
+            str_contains($status, '(healthy)') => 'healthy',
+            str_contains($status, '(health: starting)') => 'starting',
+            default => '',
+        };
+        $exit = preg_match('/^Exited \((-?\d{1,4})\)/', $status, $m) === 1 ? (int) $m[1] : null;
+        $project = preg_match('/(?:^|,)com\.docker\.compose\.project=([^,]{1,100})/', self::str($c['Labels'] ?? null, 4000), $p) === 1 ? $p[1] : '';
+
+        return [
+            'name' => $name,
+            'image' => self::str($c['Image'] ?? $c['image'] ?? null, 200),
+            'state' => in_array($state, self::CONTAINER_STATES, true) ? $state : 'unknown',
+            'health' => $health,
+            'exit_code' => $exit,
+            'project' => $project,
+            'status' => $status,
         ];
     }
 

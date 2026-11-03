@@ -20,9 +20,13 @@ use PDO;
 /**
  * Příjem hlášení hostového agenta: najde nebo založí objekt serveru, uloží metriky,
  * založí kontrolu typu "agent" a hned ji vyhodnotí. Worker pak hlídá, jestli hlášení chodí.
+ * Kontejnery Dockeru z hlášení udržuje jako objekty typu kontejner pod serverem.
  */
 final class AgentService
 {
+    /** Zdroj atributů a vztahů, které spravuje agent. */
+    public const SOURCE = 'agent';
+
     private Inventory $inventory;
     private AgentRepository $agents;
     private CheckService $checks;
@@ -49,6 +53,9 @@ final class AgentService
             [$objectId, $created] = $this->resolveObject($report, $source);
             $this->agents->saveReport($objectId, $snapshot, $report['smart'], $report['smart_error'], $at);
             $this->agents->insertSample($objectId, $at, Report::sample($snapshot));
+            if ($report['containers'] !== null) {
+                $this->syncContainers($objectId, $report['external_id'], $report['containers'], $source);
+            }
 
             return [$objectId, $created, $this->ensureCheck($objectId)];
         });
@@ -130,6 +137,48 @@ final class AgentService
         $inv->externalIds->add($id, $source, $report['external_id']);
 
         return [$id, true];
+    }
+
+    /**
+     * Kontejnery z hlášení jako objekty typu kontejner: server je obsahuje, atributy (obraz, stav,
+     * healthcheck, projekt compose) spravuje agent. Kontejner, který v hlášení chybí, se archivuje;
+     * když se vrátí, archivace se zruší. Externí id: docker:<externí id serveru>/<jméno kontejneru>.
+     *
+     * @param list<array<string, mixed>> $containers
+     */
+    private function syncContainers(string $hostId, string $hostExternalId, array $containers, string $source): void
+    {
+        $inv = $this->inventory;
+        $prefix = 'docker:' . $hostExternalId . '/';
+        $known = $inv->externalIds->withPrefix($source, $prefix);
+        $seen = [];
+        foreach ($containers as $ct) {
+            $externalId = $prefix . $ct['name'];
+            $id = $known[$externalId] ?? null;
+            if ($id === null) {
+                $id = $inv->objects->create(['type' => 'container', 'name' => $ct['name'], 'description' => '']);
+                $inv->externalIds->add($id, $source, $externalId);
+            } else {
+                $inv->objects->update($id, ['lifecycle' => 'active']);
+            }
+            $seen[$externalId] = true;
+            if ($id !== $hostId && $inv->relationships->findEdge($hostId, $id, 'contains') === null
+                && !$inv->relationships->wouldCreateContainsCycle($hostId, $id)) {
+                $inv->relate($hostId, $id, 'contains', '', self::SOURCE);
+            }
+            foreach (['image' => $ct['image'], 'docker_state' => $ct['state'], 'health' => $ct['health'], 'compose_project' => $ct['project']] as $key => $value) {
+                if ($value === '') {
+                    $inv->attributes->remove($id, $key, self::SOURCE);
+                } else {
+                    $inv->attributes->set($id, $key, $value, false, self::SOURCE);
+                }
+            }
+        }
+        foreach ($known as $externalId => $id) {
+            if (!isset($seen[$externalId])) {
+                $inv->objects->update($id, ['lifecycle' => 'archived']);
+            }
+        }
     }
 
     /**

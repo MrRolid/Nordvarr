@@ -58,6 +58,23 @@ final class ExternalIdRepository
         return $missing;
     }
 
+    /**
+     * Externí id zdroje začínající předponou (externí id => id objektu).
+     *
+     * @return array<string, string>
+     */
+    public function withPrefix(string $source, string $prefix): array
+    {
+        $stmt = $this->pdo->prepare('SELECT external_id, object_id FROM object_external_ids WHERE source = ? AND substr(external_id, 1, ?) = ?');
+        $stmt->execute([$source, strlen($prefix), $prefix]);
+        $result = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $result[(string) $row['external_id']] = (string) $row['object_id'];
+        }
+
+        return $result;
+    }
+
     public function objectId(string $source, string $externalId): ?string
     {
         $stmt = $this->pdo->prepare('SELECT object_id FROM object_external_ids WHERE source = ? AND external_id = ?');

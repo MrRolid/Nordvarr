@@ -1,8 +1,19 @@
 # Stav práce
 
-Aktualizováno: 2026-11-02
+Aktualizováno: 2026-11-03
 
 ## Hotové fáze
+
+### F12 Kontejnery Dockeru z agenta (větev `faze-12-docker`)
+
+Další krok po návrhu 3D mapy (vlastník: "slouč a pokračuj" po F11, kandidát z F11).
+
+- Agent 1.1.0: když je na serveru `docker` a agent k němu má přístup, posílá výstup `docker ps -a --format {{json .}}` (nejvýš 200 kontejnerů, časový limit 10 s). Bez přístupu posílá `containers_error`. `NORDVARR_DOCKER` mění cestu, `0` hlášení vypne.
+- Server: `Report` z výstupu dockeru udělá jméno, obraz, stav, healthcheck, návratový kód a projekt compose. Neplatná jména a duplicity zahodí.
+- `AgentService` udržuje kontejnery jako objekty typu kontejner pod serverem (vztah obsahuje, atributy se zdrojem `agent`, externí id `docker:<externí id serveru>/<jméno>`). Zmizelý kontejner se archivuje, vrácený se obnoví. Hlášení bez seznamu (starší agent) nic nemění.
+- `HostEvaluator`: problém `container_down` (omezeně) pro restartující se, mrtvé, s chybou ukončené kontejnery a neúspěšný healthcheck.
+- Karta serveru: tabulka kontejnerů, upozornění na chybějící přístup k dockeru.
+- Testy: `AgentScriptTest` (sběr z falešného dockeru, vypnutí, docker bez přístupu, docker chybí, rozbor na serveru), `AgentContainersTest` (objekty, atributy, archivace a obnovení, starší agent, problémy kontroly, karta, neplatné vstupy), e2e `agent.spec.js` (tabulka a vztah na kartě serveru).
 
 ### F11 Kontejnery a clustery, metriky ve 3D (větev `faze-11-kontejnery`)
 
@@ -285,12 +296,12 @@ Nic.
 - Maskování podle entropie je heuristika: krátké nebo slovníkové tajné hodnoty v textu bez klíče (např. "heslo je zahrada") nepozná. Atributy s citlivým klíčem a dvojice `klíč: hodnota` maskuje vždy.
 - Záznamy auditu (včetně neúspěšných přihlášení) se nemažou; při dlouhodobém zkoušení hesel tabulka `audit_log` roste. Tabulku pokusů o přihlášení worker čistí.
 - Agent: jen Linux s bash 4.4+. Bez root práv a bez `smartmontools` chybí stav disků (karta to napíše). Virtuální disky ve VM obvykle SMART nemají. Disky za RAID řadičem vyžadují pro `smartctl` zvláštní typ zařízení (`-d megaraid,N` apod.), který `smartctl --scan` někdy nenabídne.
+- Agent: objekty kontejnerů nemají vlastní kontrolu, jejich problém hlásí kontrola Agent jejich serveru (stav kontejneru je v atributech a v tabulce na kartě serveru). Archivované kontejnery se v okolí objektu v mapě dál zobrazují, stejně jako jiné archivované objekty se vztahy.
 - Agent: popisy problémů (např. "přemapované sektory: 1872") jsou uložené česky i pro anglické UI, stejně jako detaily ostatních kontrol.
 - 3D pohled: popisky se při mnoha objektech na jednom patře překrývají (pomůže přiblížení nebo Roztáhnout patra). Čáry mají v WebGL vždy šířku 1 px, cesta k příčině se proto liší jen barvou. Výkon je ověřený na ukázkových datech (40 objektů), ne na stovkách.
 - Cytoscape vkládá na stránku vlastní `<style>`, který CSP blokuje. Obchází se to prázdným prvkem s id, které knihovna hledá, a pravidlem v `app.css` (ROZHODNUTI F4 bod 7). Při aktualizaci knihovny je potřeba to ověřit (e2e test hlídá chyby v konzoli).
 
 ## Další krok
 
-- Release 0.7.0 (F8 až F11) vydat z `main` tagem `v0.7.0` přes web GitHubu, až bude F11 sloučená (tag musí ukazovat na commit s `VERSION` 0.7.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat.
-- Návrh 3D mapy je celý hotový. Další práce podle zkušenosti vlastníka se skutečnými daty.
-- Kandidáti: hlášení kontejnerů agentem (seznam kontejnerů Dockeru jako objekty typu kontejner), retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
+- Release 0.8.0 (F8 až F12) vydat z `main` tagem `v0.8.0` přes web GitHubu, až bude F12 sloučená (tag musí ukazovat na commit s `VERSION` 0.8.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: vlastní stav objektu kontejneru (dnes problém hlásí kontrola serveru), retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

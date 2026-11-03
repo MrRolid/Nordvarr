@@ -3,8 +3,8 @@
 #
 # Každou minutu (cron nebo systemd timer) pošle do Nordvarru stav serveru:
 # CPU, load, RAM, swap, zaplnění disků, teploty, NVIDIA GPU, síťový provoz
-# a jednou za 15 minut stav disků ze SMART (smartctl, vyžaduje root).
-# Závislosti: bash 4+, curl, coreutils (df), volitelně smartmontools a nvidia-smi.
+# a jednou za 15 minut stav disků ze SMART (smartctl, vyžaduje root), volitelně seznam kontejnerů Dockeru.
+# Závislosti: bash 4+, curl, coreutils (df, timeout), volitelně smartmontools, nvidia-smi a docker.
 #
 # Použití:
 #   nordvarr-agent.sh            jedno hlášení (pro cron / systemd timer)
@@ -20,11 +20,12 @@
 #   NORDVARR_HOSTNAME=srv1.example.com             (nepovinné, výchozí hostname -f)
 #   NORDVARR_SMART_INTERVAL=900                    (sekundy mezi čteními SMART, 0 = nečíst)
 #   NORDVARR_SMARTCTL=smartctl, NORDVARR_NVIDIA_SMI=nvidia-smi   (nepovinné: jiná cesta k příkazům)
+#   NORDVARR_DOCKER=docker                         (nepovinné: cesta k příkazu docker, 0 = kontejnery nehlásit)
 
 set -u
 umask 077
 
-AGENT_VERSION="1.0.0"
+AGENT_VERSION="1.1.0"
 MODE="send"
 case "${1:-}" in
     --dry-run) MODE="dry" ;;
@@ -42,7 +43,7 @@ if [ -r "$CONF" ]; then
         value="${value%$'\r'}"
         value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
         case "$key" in
-            NORDVARR_URL|NORDVARR_TOKEN|NORDVARR_EXTERNAL_ID|NORDVARR_OBJECT_ID|NORDVARR_HOSTNAME|NORDVARR_SMART_INTERVAL|NORDVARR_STATE_DIR|NORDVARR_SMARTCTL|NORDVARR_NVIDIA_SMI)
+            NORDVARR_URL|NORDVARR_TOKEN|NORDVARR_EXTERNAL_ID|NORDVARR_OBJECT_ID|NORDVARR_HOSTNAME|NORDVARR_SMART_INTERVAL|NORDVARR_STATE_DIR|NORDVARR_SMARTCTL|NORDVARR_NVIDIA_SMI|NORDVARR_DOCKER)
                 [ -z "${!key:-}" ] && printf -v "$key" '%s' "$value" ;;
         esac
     done < "$CONF"
@@ -56,6 +57,7 @@ URL="${NORDVARR_URL:-}"
 TOKEN="${NORDVARR_TOKEN:-}"
 SMARTCTL="${NORDVARR_SMARTCTL:-smartctl}"
 NVIDIA_SMI="${NORDVARR_NVIDIA_SMI:-nvidia-smi}"
+DOCKER="${NORDVARR_DOCKER:-docker}"
 
 if [ "$MODE" != "dry" ] && { [ -z "$URL" ] || [ -z "$TOKEN" ]; }; then
     echo "Chybí NORDVARR_URL nebo NORDVARR_TOKEN (soubor $CONF)." >&2
@@ -225,6 +227,27 @@ if [ "$SMART_INTERVAL" -gt 0 ] && [ $(( NOW_EPOCH - ${LAST_SMART:-0} )) -ge "$SM
     fi
 fi
 
+# --- Kontejnery Dockeru (je-li docker a má agent k němu přístup) ------------------
+
+CONTAINERS_JSON=""
+CONTAINERS_ERROR=""
+if [ "$DOCKER" != "0" ] && command -v "$DOCKER" >/dev/null 2>&1; then
+    if CT_OUT="$(timeout 10 "$DOCKER" ps -a --format '{{json .}}' 2>/dev/null)"; then
+        CT_ITEMS=()
+        while IFS= read -r line; do
+            # Každý řádek je objekt JSON od dockeru; rozbor dělá server. Nejvýš 200 kontejnerů.
+            if [ "${line:0:1}" = "{" ] && [ "${#line}" -lt 20000 ]; then
+                CT_ITEMS+=("$line")
+            fi
+            [ "${#CT_ITEMS[@]}" -ge 200 ] && break
+        done <<< "$CT_OUT"
+        CONTAINERS_JSON="[$(join_by_comma "${CT_ITEMS[@]}")]"
+    else
+        # Docker je nainstalovaný, ale agent na něj nedosáhne (práva, neběžící služba).
+        CONTAINERS_ERROR="docker_unavailable"
+    fi
+fi
+
 # --- Hlášení ------------------------------------------------------------------
 
 PAYLOAD="$STATE_DIR/payload.json"
@@ -243,6 +266,8 @@ PAYLOAD="$STATE_DIR/payload.json"
     printf '"network":[%s]' "$(join_by_comma "${NET_ITEMS[@]}")"
     [ -n "$SMART_JSON" ] && printf ',"smart":%s' "$SMART_JSON"
     [ -n "$SMART_ERROR" ] && printf ',"smart_error":%s' "$(jstr "$SMART_ERROR")"
+    [ -n "$CONTAINERS_JSON" ] && printf ',"containers":%s' "$CONTAINERS_JSON"
+    [ -n "$CONTAINERS_ERROR" ] && printf ',"containers_error":%s' "$(jstr "$CONTAINERS_ERROR")"
     printf '}\n'
 } > "$PAYLOAD"
 

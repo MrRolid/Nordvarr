@@ -33,6 +33,7 @@ async function agent(baseURL) {
     NORDVARR_CONF: join(work, 'neni.conf'),
     NORDVARR_SMARTCTL: join(fixtures, 'bin/smartctl'),
     NORDVARR_NVIDIA_SMI: join(fixtures, 'bin/nvidia-smi'),
+    NORDVARR_DOCKER: join(fixtures, 'bin/docker'),
     LC_ALL: 'C',
   };
   const script = join(process.env.E2E_SITE, 'nordvarr/agent/nordvarr-agent.sh');
@@ -74,6 +75,9 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   await expect(host.getByTestId('host-smart')).toContainText('EXAMPLE HDD 4TB');
   await expect(host.getByTestId('host-smart')).toContainText('selhává');
   await expect(host.getByTestId('host-smart')).toContainText('opotřebení', { ignoreCase: true });
+  // Kontejnery Dockeru: tabulka na kartě a objekty typu kontejner pod serverem.
+  await expect(host.getByTestId('host-containers')).toContainText('Restarting (1) 5 seconds ago');
+  await expect(page.getByTestId('relationships')).toContainText('queue-worker');
   await expect(page.getByTestId('diagnosis').getByTestId('object-status')).toContainText('nefunguje');
   await expect(page.getByTestId('diagnosis').getByTestId('object-status')).toContainText('disk_failing');
 
