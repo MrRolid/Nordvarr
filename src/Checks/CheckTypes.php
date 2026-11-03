@@ -9,10 +9,13 @@ namespace Nordvarr\Checks;
  */
 final class CheckTypes
 {
-    public const TYPES = ['http', 'tcp', 'ping', 'tls_expiry', 'domain_expiry', 'heartbeat', 'agent'];
+    public const TYPES = ['http', 'tcp', 'ping', 'tls_expiry', 'domain_expiry', 'heartbeat', 'agent', 'container'];
+
+    /** Typy, které jde založit ručně (kontrolu kontejneru zakládá agent). */
+    public const MANUAL_TYPES = ['http', 'tcp', 'ping', 'tls_expiry', 'domain_expiry', 'heartbeat', 'agent'];
 
     /** Typy, které vyhodnocuje příchozí signál, ne worker (worker hlídá jen, jestli signál chodí). */
-    public const PUSH_TYPES = ['heartbeat', 'agent'];
+    public const PUSH_TYPES = ['heartbeat', 'agent', 'container'];
 
     /** Typy, které spouští curl paralelně. */
     public const CURL_TYPES = ['http', 'tcp', 'tls_expiry'];
@@ -35,6 +38,8 @@ final class CheckTypes
             'heartbeat' => ['interval_s' => 3600, 'timeout_s' => 10, 'failure_threshold' => 1, 'notify_on_degraded' => false],
             // Agent hlásí každou minutu; jednorázová špička CPU nebo teploty se nehlásí (3 hlášení po sobě).
             'agent' => ['interval_s' => 60, 'timeout_s' => 10, 'failure_threshold' => 3, 'notify_on_degraded' => true],
+            // Kontejner: stav z hlášení agenta každou minutu, dvě hlášení po sobě (krátký restart se nehlásí).
+            'container' => ['interval_s' => 60, 'timeout_s' => 10, 'failure_threshold' => 2, 'notify_on_degraded' => false],
             default => ['interval_s' => 60, 'timeout_s' => 10, 'failure_threshold' => 2, 'notify_on_degraded' => false],
         };
     }
@@ -54,6 +59,7 @@ final class CheckTypes
             'domain_expiry' => ['domain' => '', 'degraded_days' => 30, 'unhealthy_days' => 7],
             'heartbeat' => ['grace_s' => 300],
             'agent' => \Nordvarr\Agent\HostEvaluator::DEFAULTS,
+            'container' => ['grace_s' => 180],
             default => [],
         };
     }
@@ -168,6 +174,14 @@ final class CheckTypes
                 if (!isset($errors['temp_unhealthy_c']) && $config['temp_unhealthy_c'] < $config['temp_degraded_c']) {
                     $errors['temp_unhealthy_c'] = 'invalid_agent_limit';
                 }
+                break;
+
+            case 'container':
+                $grace = self::int($input['grace_s'] ?? null, 180);
+                if ($grace === null || $grace < 0 || $grace > 86400) {
+                    $errors['grace_s'] = 'invalid_grace';
+                }
+                $config = ['grace_s' => (int) $grace];
                 break;
 
             case 'heartbeat':

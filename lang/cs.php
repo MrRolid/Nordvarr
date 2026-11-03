@@ -645,6 +645,8 @@ return [
     'err.password_mismatch' => 'Nová hesla se neshodují.',
 
     'checktype.agent' => 'Agent (server)',
+    'checktype.container' => 'Kontejner (agent)',
+    'check.container_help' => 'Kontrolu založí agent pro každý kontejner Dockeru. Stav podle hlášení serveru: běží -> funguje, healthcheck unhealthy, restartování, dead nebo konec s nenulovým kódem -> nefunguje, pozastavený nebo nespuštěný -> omezeně, konec s kódem 0 -> funguje. Smazaný kontejner -> neznámý (container_missing). Když server nehlásí po dobu intervalu + tolerance -> neznámý (agent_missing).',
     'check.agent_help' => 'Kontrolu založí agent sám při prvním hlášení. Bez hlášení po dobu intervalu + tolerance hlásí agent_missing. Prahy: CPU a RAM -> omezeně, zaplnění disku a teploty -> omezeně / nefunguje, opotřebení disku -> omezeně, selhávající disk podle SMART -> nefunguje.',
     'check.agent_grace' => 'Tolerance bez hlášení (s)',
     'check.cpu_pct' => 'CPU od (%)',

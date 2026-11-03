@@ -26,7 +26,7 @@ $field = static function (string $t, string $key, string $label, string $inputTy
         <?php if ($isNew): ?>
         <label for="check-type"><?= $v->t('check.type') ?></label>
         <select id="check-type" name="type" data-check-type>
-            <?php foreach (\Nordvarr\Checks\CheckTypes::TYPES as $t): ?>
+            <?php foreach (\Nordvarr\Checks\CheckTypes::MANUAL_TYPES as $t): ?>
             <?php $d = \Nordvarr\Checks\CheckTypes::defaults($t); ?>
             <option value="<?= $v->e($t) ?>"<?= $t === $type ? ' selected' : '' ?> data-interval="<?= $v->e($d['interval_s']) ?>"
                 data-threshold="<?= $v->e($d['failure_threshold']) ?>" data-notify="<?= $d['notify_on_degraded'] ? '1' : '0' ?>"><?= $v->t('checktype.' . $t) ?></option>
@@ -42,8 +42,7 @@ $field = static function (string $t, string $key, string $label, string $inputTy
         <p class="help"><?= $v->t('check.name_help') ?></p>
         <?= $v->raw($err('name')) ?>
 
-        <?php foreach (\Nordvarr\Checks\CheckTypes::TYPES as $t): ?>
-        <?php if (!$isNew && $t !== $type) { continue; } ?>
+        <?php foreach ($isNew ? \Nordvarr\Checks\CheckTypes::MANUAL_TYPES : [$type] as $t): ?>
         <fieldset data-type-fields="<?= $v->e($t) ?>">
             <legend><?= $v->t('checktype.' . $t) ?></legend>
             <?php if ($t === 'http'): ?>
@@ -80,6 +79,9 @@ $field = static function (string $t, string $key, string $label, string $inputTy
             <?= $v->raw($field('agent', $key, 'check.' . $key, 'number', ' min="1"')) ?>
             <?php endforeach; ?>
             <p class="help"><?= $v->t('check.agent_help') ?></p>
+            <?php elseif ($t === 'container'): ?>
+            <?= $v->raw($field('container', 'grace_s', 'check.agent_grace', 'number', ' min="0"')) ?>
+            <p class="help"><?= $v->t('check.container_help') ?></p>
             <?php elseif ($t === 'heartbeat'): ?>
             <?= $v->raw($field('heartbeat', 'grace_s', 'check.grace', 'number', ' min="0"')) ?>
             <p class="help"><?= $v->t('check.heartbeat_help') ?></p>

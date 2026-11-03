@@ -644,6 +644,8 @@ return [
     'err.password_mismatch' => 'The new passwords do not match.',
 
     'checktype.agent' => 'Agent (server)',
+    'checktype.container' => 'Container (agent)',
+    'check.container_help' => 'The agent creates this check for every Docker container. Status from the server report: running -> healthy, unhealthy healthcheck, restarting, dead or exit with a non-zero code -> unhealthy, paused or not started -> degraded, exit code 0 -> healthy. Removed container -> unknown (container_missing). When the server does not report for interval + grace -> unknown (agent_missing).',
     'check.agent_help' => 'The agent creates this check itself on its first report. Without a report for interval + grace it reports agent_missing. Limits: CPU and RAM -> degraded, disk usage and temperatures -> degraded / unhealthy, disk wear -> degraded, failing disk according to SMART -> unhealthy.',
     'check.agent_grace' => 'Grace without reports (s)',
     'check.cpu_pct' => 'CPU from (%)',

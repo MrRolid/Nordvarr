@@ -202,3 +202,14 @@ Vlastník napsal "slouč a pokračuj" po F11, pokračuje se kandidátem uvedený
 6. **Problémy kontejnerů hlásí kontrola Agent serveru** (`container_down`, omezeně), ne vlastní kontrola kontejneru: vlastní kontrola by potřebovala nový typ kontroly (přestavba tabulky `checks`) a stav kontejneru se stejně dozvídáme jen z hlášení serveru. Kontejner ukončený s kódem 0 se za problém nepovažuje (jednorázové úlohy, migrace).
 7. **Verze 0.8.0, agent 1.1.0.**
 
+## 2026-11-03 (F13 Vlastní stav kontejneru)
+
+Kandidát z F12. `SPEC.md` se nemění.
+
+1. **Nový typ kontroly `container`** nahrazuje F12 bod 6 (problémy kontejnerů na kontrole serveru). Kontejner tak má vlastní stav v mapě, historii, alerty a notifikace a funguje u něj potlačení alertů a pravděpodobná příčina (server kontejner obsahuje). Tabulka `checks` se kvůli omezení CHECK přestavěla migrací 0007.
+2. **Kontrolu zakládá jen agent** (stejně jako kontrolu Agent u serveru): ruční kontrola kontejneru by neměla odkud brát data. Ve formuláři pro novou kontrolu typ není, POST s ním skončí chybou.
+3. **Stavy:** healthcheck `unhealthy`, restartování, `dead` a konec s nenulovým kódem jsou "nefunguje", pozastavený a nespuštěný kontejner "omezeně", konec s kódem 0 "funguje" (jednorázové úlohy). Healthcheck ve stavu `starting` se počítá jako funguje, aby start kontejneru nevyvolal alert.
+4. **Práh 2 hlášení po sobě, notifikace jen při stavu nefunguje** (výchozí, jde změnit u kontroly). Krátký restart při nasazení se tak nehlásí.
+5. **Smazaný kontejner** dostane jednou výsledek `container_missing` (neznámý) při archivaci, pak už žádný. Když server přestane hlásit, worker dá kontrolám jeho kontejnerů stav neznámý (`agent_missing`), ne nefunguje: o kontejneru v tu chvíli nic nevíme a výpadek hlásí kontrola serveru.
+6. **Verze 0.9.0.**
+

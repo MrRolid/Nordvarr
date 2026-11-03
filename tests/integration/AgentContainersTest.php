@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Nordvarr\Tests\Integration;
 
+use Nordvarr\Agent\AgentService;
 use Nordvarr\Api\ApiTokens;
+use Nordvarr\Checks\ObjectStatus;
 use Nordvarr\Inventory\Inventory;
 use Nordvarr\Repository\ApiTokenRepository;
 use Nordvarr\Repository\CheckResultRepository;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Tests\AgentFixtures;
 use Nordvarr\Tests\InstalledApp;
+use Nordvarr\Time;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Kontejnery Dockeru z hlášení agenta: objekty typu kontejner pod serverem, atributy,
- * archivace zmizelých, problémy na kontrole agenta a tabulka na kartě serveru.
+ * archivace zmizelých, vlastní kontrola každého kontejneru a tabulka na kartě serveru.
  */
 final class AgentContainersTest extends TestCase
 {
@@ -126,29 +129,81 @@ final class AgentContainersTest extends TestCase
         self::assertSame('active', $this->containersOf($host)['shop-migrate']['lifecycle']);
     }
 
-    public function testBrokenContainersAreProblemsOfAgentCheck(): void
+    /**
+     * @return array<string, mixed> kontrola typu container u objektu kontejneru
+     */
+    private function containerCheck(string $containerId): array
     {
-        $body = $this->send([
+        $checks = (new CheckRepository($this->pdo()))->forObject($containerId);
+        self::assertSame(['container'], array_column($checks, 'type'), 'Kontejner má právě jednu kontrolu od agenta.');
+
+        return $checks[0];
+    }
+
+    public function testEachContainerHasOwnCheck(): void
+    {
+        $containers = [
             self::ct('queue-worker', 'restarting', 'Restarting (1) 5 seconds ago'),
             self::ct('nightly-backup', 'exited', 'Exited (137) 10 minutes ago'),
             self::ct('grafana', 'running', 'Up 5 minutes (unhealthy)'),
             self::ct('shop-redis', 'running', 'Up 2 hours'),
-        ]);
-        self::assertSame('degraded', $body['status']);
-        $check = (new CheckRepository($this->pdo()))->forObject($body['object_id'])[0];
-        $result = (new CheckResultRepository($this->pdo()))->recent((string) $check['id'], 1)[0];
-        self::assertSame('container_down', $result['reason_code']);
-        self::assertStringContainsString('kontejner queue-worker se opakovaně restartuje', (string) $result['reason_detail']);
-        self::assertStringContainsString('kontejner nightly-backup skončil s kódem 137', (string) $result['reason_detail']);
-        self::assertStringContainsString('kontejner grafana healthcheck hlásí unhealthy', (string) $result['reason_detail']);
-        self::assertStringNotContainsString('shop-redis', (string) $result['reason_detail']);
+            self::ct('shop-migrate', 'exited', 'Exited (0) 3 days ago'),
+            self::ct('paused-one', 'paused', 'Up 1 hour (Paused)'),
+        ];
+        $body = $this->send($containers);
+        self::assertSame('healthy', $body['status'], 'Problémy kontejnerů nejsou problémem serveru.');
+        // Práh selhání kontroly kontejneru je 2 hlášení po sobě.
+        $this->send($containers);
+
+        $expected = [
+            'grafana' => ['unhealthy', 'container_unhealthy'],
+            'nightly-backup' => ['unhealthy', 'container_down'],
+            'paused-one' => ['degraded', 'container_paused'],
+            'queue-worker' => ['unhealthy', 'container_down'],
+            'shop-migrate' => ['healthy', null],
+            'shop-redis' => ['healthy', null],
+        ];
+        $objects = $this->containersOf($body['object_id']);
+        foreach ($expected as $name => [$status, $reason]) {
+            $check = $this->containerCheck((string) $objects[$name]['id']);
+            self::assertSame($status, ObjectStatus::checkStatus($check), $name);
+            self::assertSame($reason, $check['reason_code'], $name);
+        }
+        $last = (new CheckResultRepository($this->pdo()))->recent((string) $this->containerCheck((string) $objects['nightly-backup']['id'])['id'], 1)[0];
+        self::assertSame('skončil s kódem 137', $last['reason_detail']);
+
+        // Smazaný kontejner: archivace a jednou výsledek container_missing.
+        $this->send(array_slice($containers, 1));
+        $check = $this->containerCheck((string) $objects['queue-worker']['id']);
+        self::assertSame('container_missing', (new CheckResultRepository($this->pdo()))->recent((string) $check['id'], 1)[0]['reason_code']);
+        $this->send(array_slice($containers, 1));
+        self::assertCount(3, (new CheckResultRepository($this->pdo()))->recent((string) $check['id'], 10), 'Při dalším hlášení se nic nepřidá.');
+
+        // Kontrolu kontejneru nejde založit ručně.
+        $this->loginAdmin();
+        $form = $this->ui('GET', '/objects/' . $objects['grafana']['id'] . '/checks/new')->body;
+        self::assertStringNotContainsString('value="container"', $form);
+        $response = $this->post('/objects/' . $objects['grafana']['id'] . '/checks', ['type' => 'container', 'grace_s' => '60']);
+        self::assertSame(422, $response->status, 'Formulář se vrátí s chybou.');
+        self::assertCount(1, (new CheckRepository($this->pdo()))->forObject((string) $objects['grafana']['id']));
 
         // Karta serveru: tabulka kontejnerů.
-        $this->loginAdmin();
         $page = $this->ui('GET', '/objects/' . $body['object_id'])->body;
-        self::assertStringContainsString('Kontejnery Dockeru (4)', $page);
+        self::assertStringContainsString('Kontejnery Dockeru (5)', $page);
         self::assertStringContainsString('data-test="host-containers"', $page);
-        self::assertStringContainsString('<td class="lvl-warn">Restarting (1) 5 seconds ago</td>', $page);
+        self::assertStringContainsString('<td class="lvl-warn">Exited (137) 10 minutes ago</td>', $page);
+    }
+
+    public function testWorkerMarksContainersUnknownWhenServerStopsReporting(): void
+    {
+        $body = $this->send([self::ct('shop-api', 'running', 'Up 2 hours')]);
+        $container = (string) $this->containersOf($body['object_id'])['shop-api']['id'];
+        $check = $this->containerCheck($container);
+        $service = new AgentService($this->pdo());
+        self::assertNull($service->evaluateContainerMissing($check, Time::now()->modify('+2 minutes')), 'V toleranci se nic nehlásí.');
+        $result = $service->evaluateContainerMissing($check, Time::now()->modify('+10 minutes'));
+        self::assertNotNull($result);
+        self::assertSame(['unknown', 'agent_missing'], [$result->status, $result->reasonCode]);
     }
 
     public function testInvalidContainersAreDroppedAndErrorIsShown(): void

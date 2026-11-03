@@ -28,7 +28,7 @@ final class HostEvaluator
     /** Pořadí důležitosti kódů při stejné závažnosti. */
     private const PRIORITY = [
         Reason::DISK_FAILING, Reason::TEMPERATURE_HIGH, Reason::DISK_FULL, Reason::DISK_WEAR, Reason::DISK_ERRORS,
-        Reason::MEMORY_HIGH, Reason::CPU_HIGH, Reason::CONTAINER_DOWN,
+        Reason::MEMORY_HIGH, Reason::CPU_HIGH,
     ];
 
     /**
@@ -100,21 +100,6 @@ final class HostEvaluator
             if ($disk['wear_pct'] !== null && $disk['wear_pct'] >= (float) $c['wear_degraded_pct']) {
                 $add($disk['wear_pct'] >= 100 ? Status::UNHEALTHY : Status::DEGRADED, Reason::DISK_WEAR,
                     sprintf('%s: opotřebení %s %%', $label, self::n($disk['wear_pct'])));
-            }
-        }
-
-        // Kontejnery: restartující se, mrtvé, ukončené s chybou nebo s neúspěšným healthcheckem.
-        // Kontejner ukončený s kódem 0 je běžný (jednorázové úlohy), problém není.
-        foreach ($snapshot['containers'] ?? [] as $ct) {
-            $text = match (true) {
-                $ct['state'] === 'restarting' => 'se opakovaně restartuje',
-                $ct['state'] === 'dead' => 'je ve stavu dead',
-                $ct['state'] === 'exited' && $ct['exit_code'] !== null && $ct['exit_code'] !== 0 => sprintf('skončil s kódem %d', $ct['exit_code']),
-                $ct['health'] === 'unhealthy' => 'healthcheck hlásí unhealthy',
-                default => null,
-            };
-            if ($text !== null) {
-                $add(Status::DEGRADED, Reason::CONTAINER_DOWN, sprintf('kontejner %s %s', $ct['name'], $text));
             }
         }
 

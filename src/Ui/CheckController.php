@@ -84,7 +84,7 @@ final class CheckController
     private function newForm(array $object): Response
     {
         $type = $this->ctx->request->queryString('type', 'http');
-        $type = in_array($type, CheckTypes::TYPES, true) ? $type : 'http';
+        $type = in_array($type, CheckTypes::MANUAL_TYPES, true) ? $type : 'http';
         $values = CheckTypes::defaults($type) + ['name' => '', 'enabled' => true, 'cfg' => []];
         foreach (CheckTypes::TYPES as $t) {
             $values['cfg'][$t] = CheckTypes::defaultConfig($t);
@@ -142,9 +142,12 @@ final class CheckController
     {
         $type = $this->ctx->request->input('type');
         $form = $this->readForm($type);
-        $valid = CheckTypes::validate($type, $form['input']);
+        // Kontrolu kontejneru zakládá jen agent.
+        $valid = in_array($type, CheckTypes::MANUAL_TYPES, true)
+            ? CheckTypes::validate($type, $form['input'])
+            : ['common' => [], 'config' => [], 'errors' => ['type' => 'invalid_check_type']];
         if ($valid['errors'] !== []) {
-            return $this->form(null, $object, in_array($type, CheckTypes::TYPES, true) ? $type : 'http', $form['values'], $valid['errors']);
+            return $this->form(null, $object, in_array($type, CheckTypes::MANUAL_TYPES, true) ? $type : 'http', $form['values'], $valid['errors']);
         }
         $id = $this->checks->create((string) $object['id'], $type, $valid['common'], $valid['config']);
         $this->ctx->audit('check.create', ['id' => $id, 'object_id' => $object['id'], 'type' => $type]);

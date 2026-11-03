@@ -84,7 +84,14 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   // Worker vyhodnotí alerty.
   await runWorker();
   await page.goto('/alerts');
-  await expect(page.getByTestId('alerts').getByRole('row').filter({ hasText: 'e2e-gpu.example.com' })).toContainText('disk_failing');
+  // Alert serveru (disk_failing); kontejnery mají vlastní alerty, ve kterých je server uvedený jako příčina.
+  await expect(page.getByTestId('alerts').getByRole('row').filter({ hasText: 'e2e-gpu.example.com' }).filter({ hasText: 'disk_failing' })).toHaveCount(1);
+
+  // Kontejner má vlastní kontrolu od agenta.
+  await page.goto('/inventory?q=queue-worker');
+  await page.getByRole('link', { name: 'queue-worker' }).click();
+  await expect(page.getByTestId('checks')).toContainText('Kontejner (agent)');
+  await expect(page.getByTestId('checks')).toContainText('container_down');
 
   // Panel v topologii.
   await page.goto('/inventory?q=e2e-gpu');

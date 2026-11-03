@@ -372,11 +372,23 @@ Když je na serveru `docker` a agent k němu má přístup (běží jako root), 
 - Každý kontejner je v inventáři objekt typu **Kontejner**, který server **obsahuje**. Atributy se zdrojem `agent`: `image`, `docker_state`, `health` (výsledek healthchecku) a `compose_project`. V mapě leží na patře kontejnerů ve sloupci svého serveru.
 - Kontejner, který v hlášení chybí (smazaný), se archivuje. Když se se stejným jménem vrátí, archivace se zruší a objekt (dokumentace, vztahy, historie) zůstává stejný.
 - Karta serveru má tabulku **Kontejnery Dockeru** se stavem každého kontejneru.
-- Kontrola Agent hlásí problém `container_down` (omezeně), když se kontejner opakovaně restartuje, je ve stavu `dead`, skončil s nenulovým kódem nebo jeho healthcheck hlásí `unhealthy`. Kontejner ukončený s kódem 0 (jednorázová úloha) problém není.
+- Každý kontejner má vlastní kontrolu **Kontejner (agent)**, kterou založí a vyhodnocuje agent při každém hlášení (ručně ji založit nejde). Problém se hlásí po 2 hlášeních po sobě:
+
+  | Stav kontejneru | Stav kontroly | Kód důvodu |
+  |---|---|---|
+  | běží (healthcheck v pořádku, startuje nebo žádný) | funguje | - |
+  | běží, healthcheck hlásí `unhealthy` | nefunguje | `container_unhealthy` |
+  | opakovaně se restartuje, ve stavu `dead`, skončil s nenulovým kódem | nefunguje | `container_down` |
+  | skončil s kódem 0 (jednorázová úloha, migrace) | funguje | - |
+  | pozastavený (`docker pause`), vytvořený a nespuštěný | omezeně | `container_paused`, `container_down` |
+  | v hlášení chybí (smazaný) | neznámý | `container_missing` |
+  | server přestal hlásit (interval + tolerance 180 s) | neznámý | `agent_missing` |
+
+  Protože server kontejner obsahuje, při výpadku serveru se alerty kontejnerů potlačí a jako pravděpodobná příčina se ukáže server.
 - Když agent na docker nedosáhne (neběží jako root), karta serveru to napíše. Přidat agenta do skupiny `docker` funguje taky, ale skupina dává práva roota, takže rozdíl v bezpečnosti není.
 - Hlášení kontejnerů vypnete v konfiguraci: `NORDVARR_DOCKER=0`.
 
-Kontejnery hlásí agent od verze 1.1.0. Na serverech se starším agentem stáhněte skript znovu (první řádek v návodu k instalaci).
+Stav kontejnerů se do Nordvarru 0.9.0 hlásil jako problém kontroly Agent serveru, od 0.9.0 ho má každý kontejner sám. Kontejnery hlásí agent od verze 1.1.0. Na serverech se starším agentem stáhněte skript znovu (první řádek v návodu k instalaci).
 
 ### Prahy kontroly Agent
 
@@ -392,7 +404,6 @@ Nastavují se na detailu kontroly (Upravit). Problém se hlásí po 3 hlášení
 | opotřebení SSD/NVMe | `disk_wear` | omezeně (nefunguje při 100 %) | 80 % |
 | SMART hlásí selhání, atribut pod prahem výrobce, kritické varování NVMe | `disk_failing` | nefunguje | - |
 | přemapované, čekající nebo neopravitelné sektory, chyby média, chyby v logu disku | `disk_errors` | omezeně | - |
-| kontejner Dockeru se restartuje, je mrtvý, skončil s chybou nebo má neúspěšný healthcheck | `container_down` | omezeně | - |
 
 Kontrola posílá notifikace i při stavu omezeně (lze vypnout). Hodnoty se ukládají 48 h po minutách a 400 dní jako hodinové souhrny.
 
