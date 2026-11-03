@@ -81,6 +81,7 @@ final class Worker
             $result = match ($check['type']) {
                 'heartbeat' => $this->service->evaluateHeartbeat($check, $now),
                 'agent' => (new AgentService($this->pdo))->evaluateMissing($check, $now),
+                'container' => (new AgentService($this->pdo))->evaluateContainerMissing($check, $now),
                 default => null,
             };
             if ($result !== null) {

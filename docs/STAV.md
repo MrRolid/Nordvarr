@@ -4,6 +4,15 @@ Aktualizováno: 2026-11-03
 
 ## Hotové fáze
 
+### F13 Vlastní stav kontejneru (větev `faze-13-stav-kontejneru`)
+
+Kandidát z F12 (vlastník: "slouč a pokračuj").
+
+- Typ kontroly `container` (migrace `0007_kontrola_kontejneru.sql` přestaví tabulku `checks`, stejně jako 0005). Kontrolu zakládá agent u každého objektu kontejneru, ručně ji založit nejde (`CheckTypes::MANUAL_TYPES`), upravit jde toleranci, práh a notifikace.
+- `Agent\ContainerEvaluator`: stav kontejneru -> stav kontroly (tabulka v `docs/NAVOD.md`). Každé hlášení serveru zapíše výsledek všem jeho kontejnerům, zmizelý kontejner dostane jednou `container_missing`. Worker hlídá, jestli server hlásí (`agent_missing`, stav neznámý).
+- Kontrola Agent serveru už problémy kontejnerů nehlásí (přesunuto na kontejnery). Vztah "server obsahuje kontejner" dává potlačení alertů a pravděpodobnou příčinu.
+- Testy: `ContainerEvaluatorTest`, `AgentContainersTest` (stav každého kontejneru po dvou hlášeních, `container_missing` jednou, ruční založení odmítnuto, worker při výpadku serveru), `ContainerCheckMigrationTest` (migrace nad daty z 0001 až 0006), e2e `agent.spec.js` (kontrola na kartě kontejneru, alert serveru vedle alertů kontejnerů).
+
 ### F12 Kontejnery Dockeru z agenta (větev `faze-12-docker`)
 
 Další krok po návrhu 3D mapy (vlastník: "slouč a pokračuj" po F11, kandidát z F11).
@@ -296,12 +305,12 @@ Nic.
 - Maskování podle entropie je heuristika: krátké nebo slovníkové tajné hodnoty v textu bez klíče (např. "heslo je zahrada") nepozná. Atributy s citlivým klíčem a dvojice `klíč: hodnota` maskuje vždy.
 - Záznamy auditu (včetně neúspěšných přihlášení) se nemažou; při dlouhodobém zkoušení hesel tabulka `audit_log` roste. Tabulku pokusů o přihlášení worker čistí.
 - Agent: jen Linux s bash 4.4+. Bez root práv a bez `smartmontools` chybí stav disků (karta to napíše). Virtuální disky ve VM obvykle SMART nemají. Disky za RAID řadičem vyžadují pro `smartctl` zvláštní typ zařízení (`-d megaraid,N` apod.), který `smartctl --scan` někdy nenabídne.
-- Agent: objekty kontejnerů nemají vlastní kontrolu, jejich problém hlásí kontrola Agent jejich serveru (stav kontejneru je v atributech a v tabulce na kartě serveru). Archivované kontejnery se v okolí objektu v mapě dál zobrazují, stejně jako jiné archivované objekty se vztahy.
+- Agent: archivované kontejnery se v okolí objektu v mapě dál zobrazují (jako archivované mají stav pozastaveno, poslední výsledek kontroly je `container_missing`), stejně jako jiné archivované objekty se vztahy.
 - Agent: popisy problémů (např. "přemapované sektory: 1872") jsou uložené česky i pro anglické UI, stejně jako detaily ostatních kontrol.
 - 3D pohled: popisky se při mnoha objektech na jednom patře překrývají (pomůže přiblížení nebo Roztáhnout patra). Čáry mají v WebGL vždy šířku 1 px, cesta k příčině se proto liší jen barvou. Výkon je ověřený na ukázkových datech (40 objektů), ne na stovkách.
 - Cytoscape vkládá na stránku vlastní `<style>`, který CSP blokuje. Obchází se to prázdným prvkem s id, které knihovna hledá, a pravidlem v `app.css` (ROZHODNUTI F4 bod 7). Při aktualizaci knihovny je potřeba to ověřit (e2e test hlídá chyby v konzoli).
 
 ## Další krok
 
-- Release 0.8.0 (F8 až F12) vydat z `main` tagem `v0.8.0` přes web GitHubu, až bude F12 sloučená (tag musí ukazovat na commit s `VERSION` 0.8.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
-- Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: vlastní stav objektu kontejneru (dnes problém hlásí kontrola serveru), retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
+- Release 0.9.0 (F8 až F13) vydat z `main` tagem `v0.9.0` přes web GitHubu, až bude F13 sloučená (tag musí ukazovat na commit s `VERSION` 0.9.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

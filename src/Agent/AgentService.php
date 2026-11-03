@@ -20,7 +20,8 @@ use PDO;
 /**
  * Příjem hlášení hostového agenta: najde nebo založí objekt serveru, uloží metriky,
  * založí kontrolu typu "agent" a hned ji vyhodnotí. Worker pak hlídá, jestli hlášení chodí.
- * Kontejnery Dockeru z hlášení udržuje jako objekty typu kontejner pod serverem.
+ * Kontejnery Dockeru z hlášení udržuje jako objekty typu kontejner pod serverem, každý
+ * s vlastní kontrolou typu "container", kterou vyhodnotí každé hlášení.
  */
 final class AgentService
 {
@@ -49,16 +50,24 @@ final class AgentService
         $snapshot = $report['snapshot'];
         $at = $snapshot['collected_at'];
 
-        [$objectId, $created, $checkId] = $this->inventory->transaction(function () use ($report, $source, $snapshot, $at): array {
+        [$objectId, $created, $checkId, $containerResults] = $this->inventory->transaction(function () use ($report, $source, $snapshot, $at): array {
             [$objectId, $created] = $this->resolveObject($report, $source);
             $this->agents->saveReport($objectId, $snapshot, $report['smart'], $report['smart_error'], $at);
             $this->agents->insertSample($objectId, $at, Report::sample($snapshot));
-            if ($report['containers'] !== null) {
-                $this->syncContainers($objectId, $report['external_id'], $report['containers'], $source);
-            }
+            $containerResults = $report['containers'] !== null
+                ? $this->syncContainers($objectId, $report['external_id'], $report['containers'], $source) : [];
 
-            return [$objectId, $created, $this->ensureCheck($objectId)];
+            return [$objectId, $created, $this->ensureCheck($objectId, 'agent'), $containerResults];
         });
+
+        // Kontroly kontejnerů (zápis výsledku má vlastní transakci, proto až po synchronizaci).
+        foreach ($containerResults as [$containerCheckId, $r]) {
+            $containerCheck = $this->checks->checks->find($containerCheckId);
+            if ($containerCheck !== null && $containerCheck['enabled']) {
+                $this->checks->record($containerCheck, new CheckResult($r['status'], $r['reason'], $r['detail'], null, $at, $at));
+                $this->checks->checks->setNextRun($containerCheckId, Time::toDb($now->modify('+' . self::window($containerCheck) . ' seconds')));
+            }
+        }
 
         $check = (array) $this->checks->checks->find($checkId);
         $status = Status::UNKNOWN;
@@ -97,6 +106,33 @@ final class AgentService
         $detail = $host === null ? 'agent se zatím neozval' : 'poslední hlášení ' . $this->localTime($last);
 
         return new CheckResult(Status::UNHEALTHY, Reason::AGENT_MISSING, $detail, null, $at, $at);
+    }
+
+    /**
+     * Vyhodnocení kontroly kontejneru workerem: když server, který kontejner obsahuje, přestal hlásit,
+     * stav kontejneru není známý. Vrací null, když hlášení serveru chodí.
+     *
+     * @param array<string, mixed> $check
+     */
+    public function evaluateContainerMissing(array $check, DateTimeImmutable $now): ?CheckResult
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT h.last_report_at FROM relationships r JOIN agent_hosts h ON h.object_id = r.from_id
+             WHERE r.to_id = ? AND r.kind = 'contains' ORDER BY h.last_report_at DESC LIMIT 1"
+        );
+        $stmt->execute([(string) $check['object_id']]);
+        $last = $stmt->fetchColumn();
+        $last = $last === false ? (string) $check['created_at'] : (string) $last;
+        $deadline = Time::fromDb($last)->modify('+' . self::window($check) . ' seconds');
+        if ($now <= $deadline) {
+            $this->checks->checks->setNextRun((string) $check['id'], Time::toDb($deadline->modify('+1 second')));
+
+            return null;
+        }
+        $this->checks->checks->setNextRun((string) $check['id'], Time::toDb($now->modify('+' . (int) $check['interval_s'] . ' seconds')));
+        $at = Time::toDb($now);
+
+        return new CheckResult(Status::UNKNOWN, Reason::AGENT_MISSING, 'server s kontejnerem se neozval, poslední hlášení ' . $this->localTime($last), null, $at, $at);
     }
 
     /**
@@ -143,11 +179,14 @@ final class AgentService
      * Kontejnery z hlášení jako objekty typu kontejner: server je obsahuje, atributy (obraz, stav,
      * healthcheck, projekt compose) spravuje agent. Kontejner, který v hlášení chybí, se archivuje;
      * když se vrátí, archivace se zruší. Externí id: docker:<externí id serveru>/<jméno kontejneru>.
+     * Vrací výsledky kontrol kontejnerů k zápisu (id kontroly, vyhodnocení).
      *
      * @param list<array<string, mixed>> $containers
+     * @return list<array{0: string, 1: array{status: string, reason: ?string, detail: string}}>
      */
-    private function syncContainers(string $hostId, string $hostExternalId, array $containers, string $source): void
+    private function syncContainers(string $hostId, string $hostExternalId, array $containers, string $source): array
     {
+        $results = [];
         $inv = $this->inventory;
         $prefix = 'docker:' . $hostExternalId . '/';
         $known = $inv->externalIds->withPrefix($source, $prefix);
@@ -173,27 +212,30 @@ final class AgentService
                     $inv->attributes->set($id, $key, $value, false, self::SOURCE);
                 }
             }
+            $results[] = [$this->ensureCheck($id, 'container'), ContainerEvaluator::evaluate($ct)];
         }
         foreach ($known as $externalId => $id) {
-            if (!isset($seen[$externalId])) {
-                $inv->objects->update($id, ['lifecycle' => 'archived']);
+            if (!isset($seen[$externalId]) && in_array('lifecycle', $inv->objects->update($id, ['lifecycle' => 'archived']), true)) {
+                $results[] = [$this->ensureCheck($id, 'container'), ['status' => Status::UNKNOWN, 'reason' => Reason::CONTAINER_MISSING, 'detail' => 'kontejner v hlášení serveru chybí (smazaný)']];
             }
         }
+
+        return $results;
     }
 
     /**
-     * Kontrola typu "agent" u objektu; první hlášení ji založí s výchozími prahy.
+     * Kontrola typu "agent" (server) nebo "container" u objektu; první hlášení ji založí s výchozím nastavením.
      */
-    private function ensureCheck(string $objectId): string
+    private function ensureCheck(string $objectId, string $type): string
     {
         foreach ($this->checks->checks->forObject($objectId) as $check) {
-            if ($check['type'] === 'agent') {
+            if ($check['type'] === $type) {
                 return (string) $check['id'];
             }
         }
-        $valid = CheckTypes::validate('agent', []);
+        $valid = CheckTypes::validate($type, []);
 
-        return $this->checks->checks->create($objectId, 'agent', $valid['common'], $valid['config']);
+        return $this->checks->checks->create($objectId, $type, $valid['common'], $valid['config']);
     }
 
     private function localTime(string $utc): string
