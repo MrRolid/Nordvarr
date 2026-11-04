@@ -213,3 +213,8 @@ Kandidát z F12. `SPEC.md` se nemění.
 5. **Smazaný kontejner** dostane jednou výsledek `container_missing` (neznámý) při archivaci, pak už žádný. Když server přestane hlásit, worker dá kontrolám jeho kontejnerů stav neznámý (`agent_missing`), ne nefunguje: o kontejneru v tu chvíli nic nevíme a výpadek hlásí kontrola serveru.
 6. **Verze 0.9.0.**
 
+## 2026-11-04 (vydání ručním spuštěním CI)
+
+1. **Release jde vydat ručním spuštěním workflow CI na `main`** (workflow_dispatch). Tag se vezme ze souboru `VERSION` a vznikne spolu s vydáním na právě testovaném commitu, takže se nemůže opakovat chyba z vydání `v0.3.0` (tag na starém commitu). Důvod: z prostředí agenta nejde odeslat tag (proxy) a vlastník chtěl, aby vydání udělal agent. Vydání přes web GitHubu a odeslání tagu fungují dál.
+2. **Ochrana:** když tag s verzí už existuje a ukazuje na jiný commit, ruční spuštění skončí chybou (je potřeba zvýšit `VERSION` nebo tag smazat). Release vznikne až po úspěšných testech (`needs: [phpunit, e2e]`).
+
