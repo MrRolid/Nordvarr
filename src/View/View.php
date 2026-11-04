@@ -161,6 +161,25 @@ final class View
         return $this->ago($fromUtc, $end);
     }
 
+    /**
+     * Odkaz na webovou adresu (jen http a https) do nové karty, jinak jen escapovaný text.
+     * $label je text odkazu (výchozí je adresa).
+     */
+    public function webLink(string $url, ?string $label = null): string
+    {
+        $url = trim($url);
+        $label = self::escape($label ?? $url);
+        $parts = parse_url($url);
+        if (!is_array($parts) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || ($parts['host'] ?? '') === ''
+            || preg_match('/[\s"<>]/', $url) === 1) {
+            return $label;
+        }
+
+        return '<a href="' . self::escape($url) . '" target="_blank" rel="noopener noreferrer" class="web-link">' . $label
+            . '<svg class="web-link-icon" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false">'
+            . '<path d="M4 2h6v6M10 2 3 9"/></svg></a>';
+    }
+
     public function raw(string $html): string
     {
         return $html;

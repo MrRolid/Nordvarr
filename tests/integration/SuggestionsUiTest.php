@@ -59,6 +59,9 @@ final class SuggestionsUiTest extends TestCase
 
         // Zbývající návrh se nabízí dál, přidaná kontrola už ne.
         $page = $this->ui('GET', '/objects/' . $web)->body;
+        // Adresa webu je proklik do nové karty (pod názvem objektu i u kontroly).
+        self::assertStringContainsString('<p class="object-web" data-test="object-web"><a href="https://shop.example.com/" target="_blank" rel="noopener noreferrer"', $page);
+        self::assertStringContainsString('class="web-link">GET https://shop.example.com/<svg', $page);
         self::assertStringNotContainsString('value="http:GET', $page);
         self::assertStringContainsString('value="tls_expiry:shop.example.com:443"', $page);
 

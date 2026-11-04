@@ -4,6 +4,12 @@ Aktualizováno: 2026-11-03
 
 ## Hotové fáze
 
+### 0.9.2 Proklik na web (větev `odkazy-na-weby`)
+
+- Na přání vlastníka: adresa webu je odkaz do nové karty. Pod názvem objektu (adresa první kontroly HTTP, jinak atribut `url` nebo `adresa`), u cíle kontroly HTTP na kartě objektu i v detailu kontroly a u hodnot atributů, které jsou adresou http(s).
+- `View::webLink`: odkaz jen pro http a https s hostem, jiné hodnoty zůstanou textem (žádné `javascript:` ani jiná schémata), `rel="noopener noreferrer"`.
+- Testy: `WebLinkTest`, `SuggestionsUiTest` (odkaz na kartě objektu).
+
 ### Oprava 0.9.1 (větev `oprava-curl-starsi-libcurl`)
 
 - Na serveru s AlmaLinux 9 (PHP 8.5 z Remi, systémová libcurl 7.76) worker při každém běhu spadl na nedefinované konstantě `CURLOPT_PROTOCOLS_STR` (existuje až od libcurl 7.85). Kontroly tak nikdy nedostaly výsledek a zůstávaly ve stavu neznámý; cron měl výstup v `/dev/null`, takže chyba nebyla vidět.
@@ -319,5 +325,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.9.1 (oprava pro starší libcurl): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Release 0.9.2 (proklik na web): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

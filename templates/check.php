@@ -21,7 +21,7 @@ $id = (string) $check['id'];
     </p>
     <?php if ((string) $check['reason_detail'] !== ''): ?><p><?= $v->e($check['reason_detail']) ?></p><?php endif; ?>
     <dl class="facts">
-        <dt><?= $v->t('check.target') ?></dt><dd><code><?= $v->e(\Nordvarr\Checks\CheckTypes::target((string) $check['type'], $check['config']) ?: '-') ?></code></dd>
+        <dt><?= $v->t('check.target') ?></dt><dd><code><?= $check['type'] === 'http' ? $v->raw($v->webLink((string) $check['config']['url'], \Nordvarr\Checks\CheckTypes::target('http', $check['config']))) : $v->e(\Nordvarr\Checks\CheckTypes::target((string) $check['type'], $check['config']) ?: '-') ?></code></dd>
         <dt><?= $v->t('check.last_run') ?></dt><dd><?= $check['last_run_at'] !== null ? $v->time((string) $check['last_run_at']) : $v->t('settings.never') ?></dd>
         <dt><?= $v->t('check.next_run') ?></dt><dd><?= $check['enabled'] && $check['next_run_at'] !== null ? $v->time((string) $check['next_run_at']) : '-' ?></dd>
         <dt><?= $v->t('check.interval') ?></dt><dd><?= $v->e($check['interval_s']) ?> s</dd>
