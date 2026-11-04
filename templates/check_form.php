@@ -72,6 +72,7 @@ $field = static function (string $t, string $key, string $label, string $inputTy
             <?= $v->raw($field('domain_expiry', 'domain', 'check.domain', 'text', ' placeholder="example.com"')) ?>
             <?= $v->raw($field('domain_expiry', 'degraded_days', 'check.degraded_days', 'number', ' min="0"')) ?>
             <?= $v->raw($field('domain_expiry', 'unhealthy_days', 'check.unhealthy_days', 'number', ' min="0"')) ?>
+            <?= $v->raw($field('domain_expiry', 'expires_on', 'check.expires_on', 'date')) ?>
             <p class="help"><?= $v->t('check.domain_help') ?></p>
             <?php elseif ($t === 'agent'): ?>
             <?= $v->raw($field('agent', 'grace_s', 'check.agent_grace', 'number', ' min="0"')) ?>

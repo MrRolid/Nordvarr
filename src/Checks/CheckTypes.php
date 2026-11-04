@@ -56,7 +56,7 @@ final class CheckTypes
             'tcp' => ['host' => '', 'port' => ''],
             'ping' => ['host' => ''],
             'tls_expiry' => ['host' => '', 'port' => 443, 'degraded_days' => 21, 'unhealthy_days' => 7],
-            'domain_expiry' => ['domain' => '', 'degraded_days' => 30, 'unhealthy_days' => 7],
+            'domain_expiry' => ['domain' => '', 'degraded_days' => 30, 'unhealthy_days' => 7, 'expires_on' => ''],
             'heartbeat' => ['grace_s' => 300],
             'agent' => \Nordvarr\Agent\HostEvaluator::DEFAULTS,
             'container' => ['grace_s' => 180],
@@ -154,6 +154,16 @@ final class CheckTypes
                     $errors['domain'] = 'invalid_domain';
                 }
                 $config = ['domain' => $domain] + self::days($input, 30, 7, $errors);
+                // Ruční datum expirace pro registry, které ho nezveřejňují (např. .eu).
+                $expiresOn = trim((string) ($input['expires_on'] ?? ''));
+                if ($expiresOn !== '') {
+                    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $expiresOn, new \DateTimeZone('UTC'));
+                    if ($date === false || $date->format('Y-m-d') !== $expiresOn || $expiresOn < '2000-01-01' || $expiresOn > '2199-12-31') {
+                        $errors['expires_on'] = 'invalid_date';
+                    } else {
+                        $config['expires_on'] = $expiresOn;
+                    }
+                }
                 break;
 
             case 'agent':

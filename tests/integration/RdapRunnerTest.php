@@ -40,11 +40,12 @@ final class RdapRunnerTest extends TestCase
         );
     }
 
-    private function check(string $domain): CheckResult
+    private function check(string $domain, string $expiresOn = ''): CheckResult
     {
         $runner = new RdapRunner($this->http, new HttpCacheRepository($this->pdo), self::BOOTSTRAP);
+        $config = ['domain' => $domain, 'degraded_days' => 30, 'unhealthy_days' => 7] + ($expiresOn === '' ? [] : ['expires_on' => $expiresOn]);
 
-        return $runner->check(['id' => 'c', 'timeout_s' => 5, 'config' => ['domain' => $domain, 'degraded_days' => 30, 'unhealthy_days' => 7]]);
+        return $runner->check(['id' => 'c', 'timeout_s' => 5, 'config' => $config]);
     }
 
     private static function inDays(int $days): string
@@ -96,6 +97,37 @@ final class RdapRunnerTest extends TestCase
         $r = $this->check('example.org');
         self::assertSame('unknown', $r->status);
         self::assertStringContainsString('bootstrapu', $r->detail);
+    }
+
+    public function testManualExpiryWhenRegistryDoesNotPublishIt(): void
+    {
+        // TLD bez RDAP serveru (jako .eu): bez ručního data neznámý stav s návodem.
+        $r = $this->check('example.org');
+        self::assertSame(['unknown', 'rdap_no_expiry'], [$r->status, $r->reasonCode]);
+        self::assertStringContainsString('zadejte ho v kontrole ručně', $r->detail);
+
+        $inDays = static fn (int $days): string => gmdate('Y-m-d', time() + $days * 86400);
+        $r = $this->check('example.org', $inDays(200));
+        self::assertSame(['healthy', null], [$r->status, $r->reasonCode]);
+        self::assertStringEndsWith('(datum zadané ručně)', $r->detail);
+        self::assertSame($inDays(200) . 'T00:00:00Z', $r->expiresAt);
+        self::assertNull($r->latencyMs);
+        self::assertSame(['degraded', 'domain_expiring'], [$this->check('example.org', $inDays(20))->status, $this->check('example.org', $inDays(20))->reasonCode]);
+        self::assertSame(['unhealthy', 'domain_expired'], [$this->check('example.org', '2026-01-01')->status, $this->check('example.org', '2026-01-01')->reasonCode]);
+
+        // RDAP bez expirace nebo nedostupný: ruční datum s poznámkou o RDAP.
+        $this->http->set('https://rdap.example.net/test/domain/noexpiry.test', FixtureHttpClient::file('rdap-domain-no-expiry.json'));
+        $r = $this->check('noexpiry.test', $inDays(100));
+        self::assertSame('healthy', $r->status);
+        self::assertStringContainsString('datum zadané ručně, RDAP: RDAP nevrátil datum expirace', $r->detail);
+        self::assertSame('healthy', $this->check('nodata.test', $inDays(100))->status);
+
+        // Datum z RDAP má přednost před ručním.
+        $this->domain('renewed.test', self::inDays(300));
+        $r = $this->check('renewed.test', $inDays(5));
+        self::assertSame('healthy', $r->status);
+        self::assertStringNotContainsString('ručně', $r->detail);
+        self::assertNotNull($r->latencyMs);
     }
 
     public function testLongestSuffixAndHttpsPreferred(): void

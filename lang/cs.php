@@ -343,7 +343,8 @@ return [
     'check.degraded_days' => 'Stav omezeně, když zbývá méně dní než',
     'check.unhealthy_days' => 'Stav nefunguje, když zbývá méně dní než',
     'check.domain' => 'Doména',
-    'check.domain_help' => 'Kontroluje se jednou denně přes RDAP.',
+    'check.domain_help' => 'Kontroluje se jednou denně přes RDAP. Některé registry (např. .eu) datum expirace nezveřejňují: pak vyplňte datum expirace ručně podle účtu u registrátora a po prodloužení domény ho přepište. Datum z RDAP má přednost.',
+    'check.expires_on' => 'Datum expirace (ručně, nepovinné)',
     'check.grace' => 'Tolerance (s)',
     'check.heartbeat_help' => 'Interval je očekávaná perioda signálu. Když signál nepřijde do intervalu + tolerance, kontrola hlásí heartbeat_missed.',
     'check.heartbeat_url' => 'Adresa pro signál (GET nebo POST):',
@@ -389,6 +390,7 @@ return [
     'err.invalid_host' => 'Zadejte platný název hosta nebo IP adresu.',
     'err.invalid_port' => 'Port musí být 1 až 65535.',
     'err.invalid_days' => 'Neplatné počty dní (pro omezeně musí být aspoň tolik jako pro nefunguje).',
+    'err.invalid_date' => 'Neplatné datum.',
     'err.invalid_domain' => 'Zadejte platnou doménu, např. example.com.',
     'err.invalid_grace' => 'Tolerance musí být 0 až 86400 s.',
 

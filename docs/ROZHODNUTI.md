@@ -251,3 +251,10 @@ Kandidát z F12. `SPEC.md` se nemění.
 3. **Export inventáře zůstává ve verzi 1**: provozní dokumentace je dál v `docs`, ostatní kategorie v novém poli `docs_other` a revize mají pole `category` (chybí-li, je to provozní). Starší export jde naimportovat, starší verze Nordvarru nová pole ignoruje (ztratí jen ostatní kategorie).
 4. **Export pro LLM obsahuje všechny kategorie** pod nadpisy kategorií ve stejném limitu 4000 znaků; runbook a DR jsou při řešení incidentu užitečné.
 5. **Verze 0.12.0.**
+
+## 2026-11-05 (0.13.0 Ruční datum expirace domény)
+
+1. **Místo zálohy přes WHOIS ruční datum expirace.** Registr `.eu` (EURid) nemá RDAP a ve WHOIS datum expirace (ani vytvoření) nezveřejňuje, takže WHOIS by pro `.eu` nic nepřinesl. Totéž platí pro další registry, které datum skrývají. WHOIS by navíc potřeboval odchozí port 43, který hostingy často blokují, a parsování textu, který se liší registr od registru.
+2. **Datum z RDAP má přednost** před ručním: po prodloužení se v RDAP změní samo, ruční datum by mohlo být zastaralé. Ruční datum se použije i při nedostupném RDAP (s poznámkou v detailu), protože je to údaj vlastníka.
+3. **Ruční datum je půlnoc UTC daného dne.** Přesný čas registry neuvádějí a s rezervou 30 a 7 dní na tom nezáleží.
+4. **Verze 0.13.0.**
