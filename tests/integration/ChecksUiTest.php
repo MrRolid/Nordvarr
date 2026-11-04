@@ -132,6 +132,26 @@ final class ChecksUiTest extends TestCase
         self::assertSame(['tcp', 'ssh', 120, 3, '{"host":"127.0.0.1","port":2222}'], [$row['type'], $row['name'], (int) $row['interval_s'], (int) $row['failure_threshold'], $row['config']]);
     }
 
+    public function testDomainExpiryWithManualDate(): void
+    {
+        $cfg = ['domain' => 'example.eu', 'degraded_days' => '30', 'unhealthy_days' => '7'];
+        $bad = $this->createCheck('domain_expiry', $cfg + ['expires_on' => '2027-02-30']);
+        self::assertSame(422, $bad->status);
+        self::assertStringContainsString('Neplatné datum.', $bad->body);
+
+        $id = $this->checkId($this->createCheck('domain_expiry', $cfg + ['expires_on' => '2027-03-31']));
+        $config = json_decode((string) $this->pdo()->query('SELECT config FROM checks')->fetchColumn(), true);
+        self::assertSame('2027-03-31', $config['expires_on']);
+        $form = $this->ui('GET', '/checks/' . $id . '/edit')->body;
+        self::assertStringContainsString('name="cfg[domain_expiry][expires_on]" type="date" value="2027-03-31"', $form);
+
+        // Vymazání data ho z konfigurace odstraní.
+        $edit = ['name' => '', 'interval_s' => '86400', 'timeout_s' => '15', 'failure_threshold' => '1', 'enabled' => '1', 'notify_on_degraded' => '1'];
+        $this->post('/checks/' . $id . '/edit', $edit + ['cfg' => ['domain_expiry' => $cfg + ['expires_on' => '']]]);
+        $config = json_decode((string) $this->pdo()->query('SELECT config FROM checks')->fetchColumn(), true);
+        self::assertArrayNotHasKey('expires_on', $config);
+    }
+
     public function testHeartbeatUrlIsShownOnCheckPage(): void
     {
         $id = $this->checkId($this->createCheck('heartbeat', ['grace_s' => '600'], ['interval_s' => '3600']));

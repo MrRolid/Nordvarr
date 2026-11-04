@@ -4,6 +4,15 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### 0.13.0 Ruční datum expirace domény (větev `faze-17-whois`)
+
+Z problému vlastníka: expirace domény `.eu` je trvale "neznámý".
+
+- Registr `.eu` (EURid) nemá RDAP a datum expirace nezveřejňuje ani ve WHOIS, záloha přes WHOIS by tedy nepomohla (viz ROZHODNUTI).
+- Kontrola expirace domény má nepovinné pole `expires_on` (Datum expirace, ručně). Použije se, když RDAP datum nedá (TLD bez RDAP, odpověď bez expirace, RDAP nedostupný); datum z RDAP má přednost. Detail výsledku uvádí "datum zadané ručně".
+- Bez ručního data u TLD bez RDAP: stav neznámý, důvod `rdap_no_expiry` s návodem vyplnit datum.
+- Testy: `RdapRunnerTest` (ruční datum, přednost RDAP, poznámka o RDAP), `CheckTypesTest` (validace data), `ChecksUiTest` (formulář, vymazání data).
+
 ### F16 Dokumentace v kategoriích (větev `faze-16-dokumentace`)
 
 Z požadavku vlastníka ("u dokumentace chci mít možnost víc souborů rozdělených podle provozní, DR, incidenty, runbook atd.").
@@ -355,6 +364,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.12.0 (F14 poskytovatelé, F15 služby a logy z agenta, F16 dokumentace v kategoriích): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Na serverech s agentem stáhnout agenta znovu (verze 1.2.0).
-- Expirace domén `.eu` (registr nemá RDAP): záloha přes WHOIS.
+- Release 0.13.0 (F14 poskytovatelé, F15 služby a logy z agenta, F16 dokumentace v kategoriích, ruční datum expirace domény): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Na serverech s agentem stáhnout agenta znovu (verze 1.2.0).
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

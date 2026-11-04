@@ -38,6 +38,13 @@ final class CheckTypesTest extends TestCase
         self::assertSame('example.com', $domain['config']['domain']);
         self::assertSame(86400, $domain['common']['interval_s'], 'Doména se kontroluje jednou denně.');
         self::assertSame(30, $domain['config']['degraded_days']);
+        self::assertArrayNotHasKey('expires_on', $domain['config'], 'Prázdné ruční datum se neukládá.');
+
+        // Ruční datum expirace (registry bez zveřejněné expirace, např. .eu).
+        self::assertSame('2027-03-31', CheckTypes::validate('domain_expiry', ['domain' => 'example.eu', 'expires_on' => ' 2027-03-31 '])['config']['expires_on']);
+        foreach (['31.3.2027', '2027-02-30', '2027-3-31', '1999-12-31', 'zítra'] as $bad) {
+            self::assertSame('invalid_date', CheckTypes::validate('domain_expiry', ['domain' => 'example.eu', 'expires_on' => $bad])['errors']['expires_on'] ?? null, $bad);
+        }
 
         self::assertSame(['grace_s' => 300], CheckTypes::validate('heartbeat', [])['config']);
         self::assertFalse(CheckTypes::validate('ping', ['host' => '192.0.2.1', 'enabled' => '0'])['common']['enabled']);

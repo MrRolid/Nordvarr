@@ -113,7 +113,7 @@ Postup:
 
 1. **Doporučené kontroly.** Na kartě objektu (část Kontroly) Nordvarr navrhne kontroly podle typu objektu a atributů a přidají se jedním tlačítkem. Návrhy:
    - web: HTTP na atribut `url`, jinak `https://<název>/`, u https i certifikát TLS a expirace domény webu (u `shop.example.com` doména `example.com`). Expirace se nezakládá na webu, ale na objektu typu **Doména**: když v inventáři ještě není, vznikne, dostane kontrolu expirace a web na ní "závisí". Další web se stejnou doménou použije stejný objekt. Pro existující weby ji doplníte hromadně tlačítkem v inventáři (viz bod 2),
-   - doména: expirace domény podle názvu,
+   - doména: expirace domény podle názvu. Registry, které datum expirace nezveřejňují (např. `.eu`), potřebují v kontrole vyplněné **Datum expirace (ručně)** z účtu u registrátora. Kontrola pak hlásí blížící se expiraci stejně jako u RDAP; po prodloužení domény datum přepište. Když RDAP datum vrátí, má přednost,
    - server, VM, síťové zařízení: ping na atribut `ip` (případně `ipv6`, `host`, `hostname`), jinak na název, pokud je to IP nebo jméno hosta,
    - služba, databáze, kontejner, cluster, poskytovatel, jiné: HTTP na atribut `url`, jinak TCP na `host` (nebo `ip`, `server`) a `port`,
    - externí služba: HTTP na atribut `url`, jinak ping na `ip`/`host` nebo na název.
@@ -295,7 +295,7 @@ Funguje GET i POST. Když signál nepřijde do intervalu plus tolerance, kontrol
 | Adresy vedou na `index.php?r=...` | `mod_rewrite` není zapnutý nebo `AllowOverride` nepovoluje `.htaccess`; aplikace tak funguje dál |
 | Kontroly zůstávají ve stavu neznámý, i když cron worker spouští | chyba workeru je v `nordvarr-data/logs/worker-error.log` (cron má výstup obvykle v `/dev/null`); ruční běh `php bin/nordvarr.php worker` ji vypíše |
 | Kontrola ping má `tool_missing` | chybí příkaz `ping` nebo nemá oprávnění (`setcap cap_net_raw+ep /usr/bin/ping`), případně nastavte `ping_binary` |
-| Expirace domény je "neznámý" | server se nedostane na RDAP (`data.iana.org` a server registru) nebo TLD nemá RDAP |
+| Expirace domény je "neznámý" | server se nedostane na RDAP (`data.iana.org` a server registru) nebo registr datum expirace nezveřejňuje (např. `.eu`, nemá RDAP a ani WHOIS datum neukazuje): v kontrole vyplňte **Datum expirace (ručně)** podle účtu u registrátora |
 | E-mail se neodesílá | "Odeslat test" u kanálu, historie pokusů v detailu kanálu, port 465 (SSL) nebo 587 (STARTTLS) |
 | Po aktualizaci API vrací 500 | přihlaste se jako admin nebo spusťte `php bin/nordvarr.php migrate` |
 | Zapomenuté heslo | `php bin/nordvarr.php reset-password <e-mail>` |

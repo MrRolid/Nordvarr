@@ -342,7 +342,8 @@ return [
     'check.degraded_days' => 'Degraded when fewer days remain than',
     'check.unhealthy_days' => 'Unhealthy when fewer days remain than',
     'check.domain' => 'Domain',
-    'check.domain_help' => 'Checked once a day via RDAP.',
+    'check.domain_help' => 'Checked once a day via RDAP. Some registries (e.g. .eu) do not publish the expiry date: enter it manually from your registrar account and update it after renewal. The RDAP date takes precedence.',
+    'check.expires_on' => 'Expiry date (manual, optional)',
     'check.grace' => 'Grace period (s)',
     'check.heartbeat_help' => 'The interval is the expected signal period. When no signal arrives within interval + grace, the check reports heartbeat_missed.',
     'check.heartbeat_url' => 'Signal address (GET or POST):',
@@ -388,6 +389,7 @@ return [
     'err.invalid_host' => 'Enter a valid host name or IP address.',
     'err.invalid_port' => 'The port must be 1 to 65535.',
     'err.invalid_days' => 'Invalid day counts (degraded must be at least the unhealthy value).',
+    'err.invalid_date' => 'Invalid date.',
     'err.invalid_domain' => 'Enter a valid domain, e.g. example.com.',
     'err.invalid_grace' => 'The grace period must be 0 to 86400 s.',
 

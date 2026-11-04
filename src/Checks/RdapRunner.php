@@ -10,7 +10,8 @@ use Nordvarr\Time;
 
 /**
  * Kontrola expirace domény přes RDAP. Server pro TLD se zjistí z bootstrapu IANA,
- * který se drží v cache 7 dní.
+ * který se drží v cache 7 dní. Když RDAP datum nedá (registr bez RDAP nebo bez
+ * zveřejněné expirace, např. .eu), použije se ruční datum z kontroly.
  */
 final class RdapRunner
 {
@@ -51,21 +52,40 @@ final class RdapRunner
             Status::UNKNOWN, $reason, $detail, null, $started, Time::toDb(Time::now())
         );
 
-        $base = $this->serverFor($domain, $timeout, $error);
+        $manual = (string) ($config['expires_on'] ?? '');
+        // Když RDAP datum nedá, použije se ruční datum z kontroly (pokud je zadané).
+        $fallback = function (string $reason, string $detail, bool $noServer = false) use ($manual, $config, $started, $unknown): CheckResult {
+            if ($manual === '') {
+                if ($noServer) {
+                    return $unknown(Reason::RDAP_NO_EXPIRY, $detail . '. Registr datum expirace nezveřejňuje (např. .eu), zadejte ho v kontrole ručně.');
+                }
+
+                return $unknown($reason, $detail);
+            }
+            $result = self::result((int) strtotime($manual . 'T00:00:00Z'), $config, null, $started);
+            $note = $noServer ? 'datum zadané ručně' : 'datum zadané ručně, RDAP: ' . $detail;
+
+            return new CheckResult(
+                $result->status, $result->reasonCode, $result->detail . ' (' . $note . ')',
+                $result->latencyMs, $result->startedAt, $result->finishedAt, $result->expiresAt
+            );
+        };
+
+        $base = $this->serverFor($domain, $timeout, $error, $noServer);
         if ($base === null) {
-            return $unknown(Reason::UNKNOWN_ERROR, $error);
+            return $fallback(Reason::UNKNOWN_ERROR, $error, $noServer);
         }
         $start = microtime(true);
         $response = $this->http->get(rtrim($base, '/') . '/domain/' . rawurlencode($domain), $timeout);
         $latency = (int) round((microtime(true) - $start) * 1000);
         if ($response->status === 0) {
-            return $unknown($response->dnsFailure ? Reason::DNS_FAILURE : Reason::UNKNOWN_ERROR, 'RDAP nedostupný: ' . $response->error);
+            return $fallback($response->dnsFailure ? Reason::DNS_FAILURE : Reason::UNKNOWN_ERROR, 'RDAP nedostupný: ' . $response->error);
         }
         if ($response->status === 404) {
-            return $unknown(Reason::UNKNOWN_ERROR, 'Doména v RDAP nenalezena');
+            return $fallback(Reason::UNKNOWN_ERROR, 'Doména v RDAP nenalezena');
         }
         if (!$response->ok()) {
-            return $unknown(Reason::UNKNOWN_ERROR, 'RDAP vrátil HTTP ' . $response->status);
+            return $fallback(Reason::UNKNOWN_ERROR, 'RDAP vrátil HTTP ' . $response->status);
         }
         $data = json_decode($response->body, true);
         $expiry = null;
@@ -76,9 +96,17 @@ final class RdapRunner
             }
         }
         if ($expiry === null) {
-            return $unknown(Reason::RDAP_NO_EXPIRY, 'RDAP nevrátil datum expirace');
+            return $fallback(Reason::RDAP_NO_EXPIRY, 'RDAP nevrátil datum expirace');
         }
 
+        return self::result($expiry, $config, $latency, $started);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private static function result(int $expiry, array $config, ?int $latency, string $started): CheckResult
+    {
         return CurlRunner::expiryResult(
             $expiry,
             (int) ($config['degraded_days'] ?? 30),
@@ -95,9 +123,10 @@ final class RdapRunner
     /**
      * Základní URL RDAP serveru pro TLD domény podle bootstrapu IANA.
      */
-    private function serverFor(string $domain, int $timeout, ?string &$error): ?string
+    private function serverFor(string $domain, int $timeout, ?string &$error, ?bool &$noServer = null): ?string
     {
         $error = '';
+        $noServer = false;
         $notBefore = Time::toDb(Time::now()->modify('-' . self::CACHE_DAYS . ' days'));
         $body = $this->cache->get($this->bootstrapUrl, $notBefore);
         if ($body === null) {
@@ -134,6 +163,7 @@ final class RdapRunner
             }
         }
         $error = 'Pro doménu není v bootstrapu IANA žádný RDAP server';
+        $noServer = true;
 
         return null;
     }
