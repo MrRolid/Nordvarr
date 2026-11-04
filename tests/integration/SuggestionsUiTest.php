@@ -59,11 +59,30 @@ final class SuggestionsUiTest extends TestCase
 
         // Zbývající návrh se nabízí dál, přidaná kontrola už ne.
         $page = $this->ui('GET', '/objects/' . $web)->body;
+        // Adresa webu je proklik do nové karty (pod názvem objektu i u kontroly).
+        self::assertStringContainsString('<p class="object-web" data-test="object-web"><a href="https://shop.example.com/" target="_blank" rel="noopener noreferrer"', $page);
+        self::assertStringContainsString('class="web-link">GET https://shop.example.com/<svg', $page);
         self::assertStringNotContainsString('value="http:GET', $page);
         self::assertStringContainsString('value="tls_expiry:shop.example.com:443"', $page);
 
-        $this->post('/objects/' . $web . '/checks/suggested', ['keys' => ['tls_expiry:shop.example.com:443']]);
+        self::assertStringContainsString('value="domain_expiry:example.com" checked', $page);
+        self::assertStringContainsString('založí objekt Doména', $page);
+
+        $this->post('/objects/' . $web . '/checks/suggested', ['keys' => ['tls_expiry:shop.example.com:443', 'domain_expiry:example.com']]);
         self::assertStringNotContainsString('data-test="suggestions"', $this->ui('GET', '/objects/' . $web)->body);
+
+        // Doména se založila jako objekt s kontrolou expirace a web na ní závisí.
+        $domain = $this->inventory->objects->findByTypeAndName('domain', 'example.com');
+        self::assertNotNull($domain);
+        self::assertSame(['domain_expiry example.com'], $this->checkTargets((string) $domain['id']));
+        self::assertNotNull($this->inventory->relationships->findEdge($web, (string) $domain['id'], 'depends_on'));
+
+        // Druhý web se stejnou doménou použije existující objekt domény.
+        $blog = $this->inventory->objects->create(['type' => 'website', 'name' => 'blog.example.com']);
+        $this->post('/objects/' . $blog . '/checks/suggested', ['keys' => ['domain_expiry:example.com']]);
+        self::assertSame(1, (int) $this->pdo()->query("SELECT COUNT(*) FROM objects WHERE type = 'domain'")->fetchColumn());
+        self::assertSame(['domain_expiry example.com'], $this->checkTargets((string) $domain['id']), 'Kontrola expirace se nezdvojí.');
+        self::assertNotNull($this->inventory->relationships->findEdge($blog, (string) $domain['id'], 'depends_on'));
     }
 
     public function testAgentHintOnServerWithoutAgent(): void
@@ -93,7 +112,7 @@ final class SuggestionsUiTest extends TestCase
         $response = $this->post('/inventory/checks', ['ids' => [$web, $domain, $server, $service], 'back' => 'status=none']);
         self::assertSame(303, $response->status);
         self::assertSame('/inventory?status=none', $response->headers['Location']);
-        self::assertSame(['suggest.bulk_done', ['checks' => 4, 'objects' => 3, 'without' => 1]], $this->session->get('flash'));
+        self::assertSame(['suggest.bulk_done', ['checks' => 5, 'objects' => 3, 'without' => 1]], $this->session->get('flash'));
         self::assertEqualsCanonicalizing(['http GET https://shop.example.com/', 'tls_expiry shop.example.com:443'], $this->checkTargets($web));
         self::assertSame(['domain_expiry example.net'], $this->checkTargets($domain));
         self::assertSame(['ping 198.51.100.7'], $this->checkTargets($server));

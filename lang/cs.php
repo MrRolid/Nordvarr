@@ -728,6 +728,7 @@ return [
     'agent.files' => 'Soubory',
     'agent.cron_alternative' => 'Místo systemd jde použít cron (root): * * * * * /usr/local/bin/nordvarr-agent.sh >/dev/null 2>&1',
 
+    'suggest.via_domain' => '(založí objekt Doména, web na ní závisí)',
     'suggest.title' => 'Doporučené kontroly:',
     'suggest.help' => 'Návrh podle typu, názvu a atributů objektu (url, ip, host, port). Nastavení jde potom upravit na detailu kontroly.',
     'suggest.add' => 'Přidat vybrané kontroly',

@@ -25,11 +25,27 @@ $id = (string) $object['id'];
 /** @var array<string, array<string, mixed>> $lastChangeObjects */
 /** @var int $alertCount90 */
 /** @var array<string, mixed>|null $host */
-/** @var list<array{key: string, type: string, input: array<string, string>, target: string}> $suggestions */
+/** @var list<array{key: string, type: string, input: array<string, string>, target: string, via: string}> $suggestions */
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
     <h1 data-test="object-name"><?= $v->e($object['name']) ?></h1>
+    <?php
+    // Proklik na web: adresa první kontroly HTTP, jinak platný atribut url/adresa.
+    $webUrl = '';
+    foreach ($checks as $c) {
+        if ($c['type'] === 'http') {
+            $webUrl = (string) $c['config']['url'];
+            break;
+        }
+    }
+    foreach ($attributes as $group) {
+        if ($webUrl === '' && in_array(strtolower((string) $group['key']), ['url', 'adresa'], true) && $group['valid'] !== null) {
+            $webUrl = (string) $group['valid'];
+        }
+    }
+    ?>
+    <?php if ($webUrl !== '' && $v->webLink($webUrl) !== $v->e($webUrl)): ?><p class="object-web" data-test="object-web"><?= $v->raw($v->webLink($webUrl)) ?></p><?php endif; ?>
     <div data-refresh-url="<?= $v->url('/objects/' . $id . '/diagnosis') ?>" id="diagnosis">
         <?= $v->raw($v->render('partials/diagnosis', compact('diagObject', 'objectStatus', 'openAlerts', 'inMaintenance', 'dependencies', 'lastChange', 'lastChangeObjects', 'alertCount90'))) ?>
     </div>
@@ -84,7 +100,7 @@ $id = (string) $object['id'];
         <ul class="plain">
             <?php foreach ($suggestions as $i => $s): ?>
             <li><label class="check-label"><input type="checkbox" name="keys[]" value="<?= $v->e($s['key']) ?>" checked>
-                <?= $v->t('checktype.' . $s['type']) ?> <code><?= $v->e($s['target']) ?></code></label></li>
+                <?= $v->t('checktype.' . $s['type']) ?> <code><?= $v->e($s['target']) ?></code><?php if ($s['via'] === 'domain'): ?> <span class="muted small-text"><?= $v->t('suggest.via_domain') ?></span><?php endif; ?></label></li>
             <?php endforeach; ?>
         </ul>
         <button type="submit" class="primary" data-test="add-suggested"><?= $v->t('suggest.add') ?></button>
@@ -105,7 +121,7 @@ $id = (string) $object['id'];
         <tr>
             <td><?= $v->raw($v->render('partials/status', ['status' => $cs])) ?></td>
             <td><a href="<?= $v->url('/checks/' . $c['id']) ?>"><?= $v->t('checktype.' . $c['type']) ?><?= (string) $c['name'] !== '' ? ': ' . $v->e($c['name']) : '' ?></a></td>
-            <td class="value"><code><?= $v->e(\Nordvarr\Checks\CheckTypes::target((string) $c['type'], $c['config'])) ?></code></td>
+            <td class="value"><code><?= $c['type'] === 'http' ? $v->raw($v->webLink((string) $c['config']['url'], \Nordvarr\Checks\CheckTypes::target('http', $c['config']))) : $v->e(\Nordvarr\Checks\CheckTypes::target((string) $c['type'], $c['config'])) ?></code></td>
             <td><?php if (!in_array($cs, ['healthy', 'paused'], true) && $c['reason_code'] !== null): ?><code><?= $v->e($c['reason_code']) ?></code>, <?= $v->ago((string) $c['since']) ?><?php endif; ?></td>
             <td class="nowrap"><?= $c['last_run_at'] !== null ? $v->ago((string) $c['last_run_at']) : '-' ?></td>
         </tr>
@@ -133,7 +149,7 @@ $id = (string) $object['id'];
                 <th scope="row" rowspan="<?= $v->e(count($group['values'])) ?>"><?= $v->e($group['key']) ?>
                     <?php if ($group['conflict']): ?><span class="badge warn" data-test="conflict"><?= $v->t('object.conflict') ?></span><?php endif; ?></th>
                 <?php endif; ?>
-                <td class="value"><?= $v->e($attr['value']) ?><?php if ($isValid): ?> <span class="badge ok"><?= $v->t('object.valid_value') ?></span><?php endif; ?></td>
+                <td class="value"><?= $v->raw($v->webLink((string) $attr['value'])) ?><?php if ($isValid): ?> <span class="badge ok"><?= $v->t('object.valid_value') ?></span><?php endif; ?></td>
                 <td><?= $v->e($attr['source']) ?></td>
                 <td>
                     <?php if ($attr['source'] === 'manual'): ?>

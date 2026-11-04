@@ -648,3 +648,7 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .suggestions p { margin: 0 0 .4rem; }
 .suggestions ul { margin: 0 0 .6rem; display: flex; flex-direction: column; gap: .25rem; }
 .bulk button + button { margin-left: .5rem; }
+
+/* Odkaz na web (adresa kontroly HTTP, atribut s URL), otevírá se v nové kartě. */
+.web-link { white-space: nowrap; }
+.web-link-icon { margin-left: .25em; vertical-align: baseline; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }

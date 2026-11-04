@@ -111,7 +111,7 @@ Nordvarr hlídá dvěma způsoby:
 Postup:
 
 1. **Doporučené kontroly.** Na kartě objektu (část Kontroly) Nordvarr navrhne kontroly podle typu objektu a atributů a přidají se jedním tlačítkem. Návrhy:
-   - web: HTTP na atribut `url`, jinak `https://<název>/`, u https i certifikát TLS,
+   - web: HTTP na atribut `url`, jinak `https://<název>/`, u https i certifikát TLS a expirace domény webu (u `shop.example.com` doména `example.com`). Expirace se nezakládá na webu, ale na objektu typu **Doména**: když v inventáři ještě není, vznikne, dostane kontrolu expirace a web na ní "závisí". Další web se stejnou doménou použije stejný objekt. Pro existující weby ji doplníte hromadně tlačítkem v inventáři (viz bod 2),
    - doména: expirace domény podle názvu,
    - server, VM, síťové zařízení: ping na atribut `ip` (případně `ipv6`, `host`, `hostname`), jinak na název, pokud je to IP nebo jméno hosta,
    - služba, databáze, jiné: HTTP na atribut `url`, jinak TCP na `host` (nebo `ip`, `server`) a `port`.

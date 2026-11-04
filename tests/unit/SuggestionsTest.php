@@ -31,10 +31,14 @@ final class SuggestionsTest extends TestCase
 
     public function testWebsite(): void
     {
-        self::assertSame(['http:GET https://shop.example.com/', 'tls_expiry:shop.example.com:443'], self::keys('website', 'shop.example.com'));
-        self::assertSame(['http:GET https://www.example.com/obchod', 'tls_expiry:www.example.com:443'],
+        self::assertSame(['http:GET https://shop.example.com/', 'tls_expiry:shop.example.com:443', 'domain_expiry:example.com'], self::keys('website', 'shop.example.com'));
+        self::assertSame(['http:GET https://www.example.com/obchod', 'tls_expiry:www.example.com:443', 'domain_expiry:example.com'],
             self::keys('website', 'E-shop', ['url' => 'https://www.example.com/obchod']), 'Atribut url má přednost před názvem.');
-        self::assertSame(['http:GET http://intranet.example.net/'], self::keys('website', 'intranet', ['URL' => 'http://intranet.example.net/']), 'Bez https není kontrola certifikátu.');
+        self::assertSame(['http:GET http://intranet.example.net/', 'domain_expiry:example.net'], self::keys('website', 'intranet', ['URL' => 'http://intranet.example.net/']), 'Bez https není kontrola certifikátu.');
+        $web = Suggestions::forObject(['type' => 'website', 'name' => 'shop.example.com'], [], []);
+        self::assertSame('domain', $web[2]['via'], 'Expirace domény se zakládá na objektu domény.');
+        self::assertSame(['http:GET https://shop.example.com/', 'tls_expiry:shop.example.com:443'],
+            array_column(Suggestions::forObject(['type' => 'website', 'name' => 'shop.example.com'], [], [], ['example.com']), 'key'), 'Doména už je pokrytá.');
         self::assertSame([], self::keys('website', 'Hlavní web'), 'Název není adresa a url chybí.');
         self::assertSame([], self::keys('website', '192.0.2.10'), 'IP adresa není web s certifikátem.');
     }
@@ -68,10 +72,22 @@ final class SuggestionsTest extends TestCase
     public function testExistingChecksAreNotSuggestedAgain(): void
     {
         $existing = [self::check('http', ['url' => 'https://shop.example.com/'])];
-        self::assertSame(['tls_expiry:shop.example.com:443'], self::keys('website', 'shop.example.com', [], $existing));
+        self::assertSame(['tls_expiry:shop.example.com:443', 'domain_expiry:example.com'], self::keys('website', 'shop.example.com', [], $existing));
         $existing[] = self::check('tls_expiry', ['host' => 'shop.example.com']);
-        self::assertSame([], self::keys('website', 'shop.example.com', [], $existing));
+        self::assertSame(['domain_expiry:example.com'], self::keys('website', 'shop.example.com', [], $existing));
+        $existing[] = self::check('domain_expiry', ['domain' => 'example.com']);
+        self::assertSame([], self::keys('website', 'shop.example.com', [], $existing), 'Expirace přímo na webu taky stačí.');
         self::assertSame(['ping:192.0.2.10'], self::keys('server', '192.0.2.10', [], [self::check('tcp', ['host' => '192.0.2.10', 'port' => '22'])]));
+    }
+
+    public function testRegistrableDomain(): void
+    {
+        self::assertSame('example.com', Suggestions::registrableDomain('shop.example.com'));
+        self::assertSame('example.com', Suggestions::registrableDomain('Example.COM.'));
+        self::assertSame('example.co.uk', Suggestions::registrableDomain('www.example.co.uk'));
+        self::assertNull(Suggestions::registrableDomain('co.uk'));
+        self::assertNull(Suggestions::registrableDomain('192.0.2.10'));
+        self::assertNull(Suggestions::registrableDomain('localhost'));
     }
 
     public function testInvalidTargetsAreDropped(): void
