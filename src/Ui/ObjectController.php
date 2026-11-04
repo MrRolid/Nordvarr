@@ -16,6 +16,7 @@ use Nordvarr\Inventory\ValidationException;
 use Nordvarr\Inventory\Vocabulary;
 use Nordvarr\Repository\AlertRepository;
 use Nordvarr\Repository\CheckRepository;
+use Nordvarr\Repository\DocRepository;
 use Nordvarr\Repository\SettingsRepository;
 use Nordvarr\Time;
 use Nordvarr\View\Markdown;
@@ -168,7 +169,17 @@ final class ObjectController
     {
         $id = (string) $object['id'];
         $inv = $this->inventory;
-        $docs = $inv->docs->current($id);
+        $revisionCounts = $inv->docs->revisionCounts($id);
+        $docs = [];
+        foreach ($inv->docs->all($id) as $category => $row) {
+            $docs[$category] = [
+                // Pod nadpisem kategorie (h3): # je h3, ## je h4 (stejně jako v panelu topologie).
+                'html' => (new Markdown(2))->render((string) $row['markdown']),
+                'updated_at' => (string) $row['updated_at'],
+                'updated_by' => (string) $row['updated_by'],
+                'revisions' => $revisionCounts[$category] ?? 0,
+            ];
+        }
         $timeline = $inv->timeline($id, 50);
         $relatedIds = [];
         foreach ($timeline as $event) {
@@ -191,9 +202,7 @@ final class ObjectController
             'externalIds' => $inv->externalIds->forObject($id),
             'attributes' => $inv->attributes->grouped($id),
             'relationships' => $inv->relationships->forObject($id),
-            'docsHtml' => $docs === null ? null : (new Markdown())->render((string) $docs['markdown']),
             'docs' => $docs,
-            'revisionCount' => count($inv->docs->revisions($id)),
             'timeline' => $timeline,
             'timelineObjects' => $inv->objects->findMany(array_values(array_unique($relatedIds))),
             'objectNames' => array_diff_key($inv->objects->names(), [$id => true]),
@@ -308,17 +317,23 @@ final class ObjectController
     /**
      * @param array<string, mixed> $object
      */
-    private function docsForm(array $object, ?string $markdown = null, ?string $error = null): Response
+    private function docsForm(array $object, ?string $category = null, ?string $markdown = null, ?string $error = null): Response
     {
         $id = (string) $object['id'];
-        $current = $this->inventory->docs->current($id);
+        $category ??= $this->ctx->request->queryString('cat', DocRepository::MAIN);
+        if (!DocRepository::isCategory($category)) {
+            return $this->ctx->notFound();
+        }
+        $current = $this->inventory->docs->current($id, $category);
 
         return $this->ctx->page('object_docs', [
             'title' => 'docs.edit',
             'object' => $object,
+            'category' => $category,
+            'filled' => array_keys($this->inventory->docs->all($id)),
             'markdown' => $markdown ?? (string) ($current['markdown'] ?? ''),
             'error' => $error,
-            'revisions' => $this->inventory->docs->revisions($id),
+            'revisions' => $this->inventory->docs->revisions($id, $category),
         ], $error === null ? 200 : 422);
     }
 
@@ -327,16 +342,20 @@ final class ObjectController
      */
     private function saveDocs(array $object): Response
     {
+        $category = $this->ctx->request->input('category', DocRepository::MAIN);
+        if (!DocRepository::isCategory($category)) {
+            return $this->ctx->notFound();
+        }
         $markdown = str_replace("\r\n", "\n", $this->ctx->request->input('markdown'));
         if (mb_strlen($markdown) > Inventory::MAX_DOC) {
-            return $this->docsForm($object, $markdown, 'err.invalid_docs');
+            return $this->docsForm($object, $category, $markdown, 'err.invalid_docs');
         }
-        $saved = $this->inventory->docs->save((string) $object['id'], $markdown, $this->ctx->userEmail());
+        $saved = $this->inventory->docs->save((string) $object['id'], $markdown, $this->ctx->userEmail(), $category);
         if ($saved) {
             $this->inventory->objects->touch((string) $object['id']);
         }
 
-        return $this->back($object, $saved ? 'docs.saved' : 'docs.unchanged', '#docs');
+        return $this->back($object, $saved ? 'docs.saved' : 'docs.unchanged', '#docs-' . $category);
     }
 
     /**
