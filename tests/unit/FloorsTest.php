@@ -29,6 +29,9 @@ final class FloorsTest extends TestCase
         self::assertSame('virtual', Floors::floorOf('vm'));
         self::assertSame('containers', Floors::floorOf('container'));
         self::assertSame('containers', Floors::floorOf('cluster'));
+        self::assertSame('providers', Floors::floorOf('provider'));
+        self::assertSame('external', Floors::floorOf('external'));
+        self::assertSame('providers', Floors::floorOf('server', '0'), 'Číslo 0 jsou poskytovatelé.');
         self::assertSame('services', Floors::floorOf('database'));
         self::assertSame('web', Floors::floorOf('website'));
         self::assertSame('domains', Floors::floorOf('domain'));

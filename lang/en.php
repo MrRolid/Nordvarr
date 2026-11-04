@@ -95,6 +95,8 @@ return [
     'type.other' => 'Other',
     'type.cluster' => 'Cluster',
     'type.container' => 'Container',
+    'type.provider' => 'Provider',
+    'type.external' => 'External service',
 
     'lifecycle.active' => 'Active',
     'lifecycle.archived' => 'Archived',
@@ -551,6 +553,7 @@ return [
     'topology.spread' => 'Spread floors',
     'topology.map3d' => '3D floor map: drag to rotate, scroll to zoom, click to select an object',
     'topology.webgl_missing' => 'The browser does not support WebGL, the 3D view cannot be shown. The map uses floors.',
+    'floor.providers' => 'Providers (hosting, data centres)',
     'floor.hardware' => 'Hardware and network',
     'floor.virtual' => 'Virtual machines and VPS',
     'floor.containers' => 'Containers (Docker, Kubernetes)',

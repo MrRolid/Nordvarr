@@ -80,6 +80,14 @@ final class SuggestionsTest extends TestCase
         self::assertSame(['ping:192.0.2.10'], self::keys('server', '192.0.2.10', [], [self::check('tcp', ['host' => '192.0.2.10', 'port' => '22'])]));
     }
 
+    public function testProvidersAndExternalServices(): void
+    {
+        self::assertSame(['http:GET https://status.example.net/', 'tls_expiry:status.example.net:443'], self::keys('provider', 'Hosting', ['url' => 'https://status.example.net/']));
+        self::assertSame([], self::keys('provider', 'Hosting bez adresy'));
+        self::assertSame(['ping:192.0.2.53'], self::keys('external', 'Veřejné DNS', ['ip' => '192.0.2.53']));
+        self::assertSame(['ping:resolver.example.net'], self::keys('external', 'resolver.example.net'));
+    }
+
     public function testRegistrableDomain(): void
     {
         self::assertSame('example.com', Suggestions::registrableDomain('shop.example.com'));

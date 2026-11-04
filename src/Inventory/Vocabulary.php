@@ -10,7 +10,7 @@ namespace Nordvarr\Inventory;
  */
 final class Vocabulary
 {
-    public const OBJECT_TYPES = ['server', 'vm', 'cluster', 'container', 'service', 'website', 'database', 'domain', 'network_device', 'other'];
+    public const OBJECT_TYPES = ['server', 'vm', 'cluster', 'container', 'service', 'website', 'database', 'domain', 'network_device', 'provider', 'external', 'other'];
     public const RELATIONSHIP_KINDS = ['depends_on', 'contains'];
     public const EVENT_TYPES = ['deploy', 'config', 'maintenance', 'restart', 'incident', 'note', 'other'];
     public const LIFECYCLES = ['active', 'archived'];

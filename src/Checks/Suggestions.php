@@ -19,7 +19,8 @@ use PDO;
  *   založí (nebo najde podle názvu) a web na něm "závisí",
  * - doména: expirace domény podle názvu,
  * - server, VM, síťové zařízení: ping na atribut ip, jinak na název (IP nebo jméno hosta),
- * - služba, databáze, kontejner a cluster: HTTP na atribut url, TCP na host/ip + port.
+ * - služba, databáze, kontejner, cluster, poskytovatel: HTTP na atribut url, TCP na host/ip + port,
+ * - externí služba: HTTP na atribut url, jinak ping na ip/host nebo název.
  * Návrh, který už existující kontrola pokrývá (stejný typ a cíl), se vynechá.
  */
 final class Suggestions
@@ -179,10 +180,19 @@ final class Suggestions
                     $suggestions[] = self::make('ping', ['host' => strtolower($target)]);
                 }
                 break;
+            case 'external':
+                // Externí služba (CDN, veřejné DNS, peering): HTTP na url, jinak ping na IP nebo jméno.
+                self::addHttp($suggestions, $url);
+                $target = $host !== '' ? $host : $hostFromName;
+                if ($url === '' && $target !== '' && CheckTypes::isValidHost(strtolower($target))) {
+                    $suggestions[] = self::make('ping', ['host' => strtolower($target)]);
+                }
+                break;
             case 'service':
             case 'database':
             case 'container':
             case 'cluster':
+            case 'provider':
             case 'other':
                 self::addHttp($suggestions, $url);
                 $port = $attr('port');
