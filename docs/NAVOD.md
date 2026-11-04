@@ -99,7 +99,8 @@ php bin/nordvarr.php reset-password <e-mail>  # nové heslo pro zapomenutý úč
    - **Hledat v mapě** (nad seznamem objektů): filtruje seznam podle názvu, typu nebo důvodu, bez ohledu na diakritiku. Enter vybere první shodu a ukáže ji v mapě (ve 3D k ní natočí kameru), Esc hledání zruší.
    - **Patra v mapě:** zaškrtávátky skryjete celá patra, platí v každém rozvržení.
    - **K příčině:** tlačítko se ukáže, když má některý objekt v mapě pravděpodobnou příčinu výpadku. Zvýrazní cestu od objektu k příčině (vybraný objekt, jinak ten nejhorší v seznamu), ostatní ztlumí a vybere příčinu. Ve 3D natočí kameru k příčině. Druhé kliknutí nebo výběr jiného objektu režim ukončí.
-7. U incidentu: karta objektu ukazuje stav a důvod, pravděpodobnou příčinu, poslední změnu v okolí a stav závislostí. Tlačítko **"Zkopírovat pro LLM"** připraví kontext k vložení do libovolného LLM (tajné údaje jsou maskované, Nordvarr sám žádné LLM nevolá).
+7. **Dokumentace** na kartě objektu je rozdělená do kategorií: **Provozní dokumentace** (co objekt dělá, kde běží, kdo se stará), **Runbook** (postupy krok za krokem: restart, nasazení, výměna certifikátu), **Obnova po havárii (DR)** (zálohy, pořadí obnovy, RTO a RPO), **Incidenty** (záznamy o minulých výpadcích a poučení) a **Ostatní**. Na kartě se zobrazují vyplněné kategorie, prázdné přidáte odkazem pod nimi ("Přidat dokument"). Každá kategorie má vlastní historii revizí. Text je v Markdownu. Export pro LLM obsahuje všechny kategorie, API (`docs_markdown`) a panel v topologii pracují s provozní dokumentací.
+8. U incidentu: karta objektu ukazuje stav a důvod, pravděpodobnou příčinu, poslední změnu v okolí a stav závislostí. Tlačítko **"Zkopírovat pro LLM"** připraví kontext k vložení do libovolného LLM (tajné údaje jsou maskované, Nordvarr sám žádné LLM nevolá).
 
 ### Jak zapnout hlídání
 
@@ -205,6 +206,8 @@ Odpověď (`201` nový objekt, `200` existující):
 ```
 
 Typy objektů: `server`, `vm`, `cluster`, `container`, `service`, `website`, `database`, `domain`, `network_device`, `provider`, `external`, `other`. Vztahy: `depends_on`, `contains`. Odkaz na neexistující objekt vrátí `422` se seznamem `missing_external_ids`, chybný vstup `422` s položkou `fields`.
+
+Pole `docs_markdown` zapisuje provozní dokumentaci objektu, ostatní kategorie (runbook, DR, incidenty) se upravují na kartě objektu.
 
 Tajné údaje (hesla, tokeny, privátní klíče, DSN s heslem) do atributů ani dokumentace nepatří.
 

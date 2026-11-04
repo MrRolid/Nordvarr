@@ -656,3 +656,13 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 /* Logy služeb na kartě serveru. */
 .host-log { margin: .3rem 0; }
 .host-log pre { max-height: 24rem; overflow: auto; font-size: .78rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Dokumentace v kategoriích (F16) */
+.doc-cat + .doc-cat { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .5rem; }
+.doc-cat-head { display: flex; align-items: baseline; gap: .75rem; }
+.doc-cat-head h3 { margin: .25rem 0; }
+.doc-add { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .25rem .75rem; color: var(--muted); }
+.doc-tabs { display: flex; flex-wrap: wrap; gap: .25rem; margin: 0 0 1rem; }
+.doc-tabs a { padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 4px; text-decoration: none; }
+.doc-tabs a.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.doc-tabs a.active .muted { color: inherit; }

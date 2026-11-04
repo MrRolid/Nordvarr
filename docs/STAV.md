@@ -1,8 +1,18 @@
 # Stav práce
 
-Aktualizováno: 2026-11-03
+Aktualizováno: 2026-11-05
 
 ## Hotové fáze
+
+### F16 Dokumentace v kategoriích (větev `faze-16-dokumentace`)
+
+Z požadavku vlastníka ("u dokumentace chci mít možnost víc souborů rozdělených podle provozní, DR, incidenty, runbook atd.").
+
+- Kategorie dokumentace: provozní, runbook, obnova po havárii (DR), incidenty, ostatní. Migrace `0010_kategorie_dokumentace.sql` přestaví `object_docs` (klíč objekt + kategorie) a přidá kategorii k revizím; dosavadní dokumentace je provozní.
+- Karta objektu: vyplněné kategorie pod sebou s vlastním odkazem na úpravu, prázdné jako odkazy "Přidat dokument". Formulář má přepínač kategorií a revize jen dané kategorie, revize ukazuje svou kategorii.
+- Export pro LLM obsahuje všechny kategorie s nadpisy (jen provozní dokumentace zůstává bez nadpisu jako dřív). Export a import inventáře přenáší kategorie (`docs_other`, `category` u revizí); starší export bez kategorií jde dál naimportovat.
+- API `docs_markdown` a panel v topologii dál pracují s provozní dokumentací.
+- Testy: `DocCategoriesTest` (repozitář, karta a formulář, neznámá kategorie, export pro LLM, migrace), `TransferTest` (přenos kategorií, starší formát, neplatná kategorie), e2e `inventory.spec.js` (runbook).
 
 ### F15 Služby a logy z agenta (větev `faze-15-sluzby-logy`)
 
@@ -345,5 +355,6 @@ Nic.
 
 ## Další krok
 
-- Release 0.11.0 (F14 poskytovatelé, F15 služby a logy z agenta): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Release 0.12.0 (F14 poskytovatelé, F15 služby a logy z agenta, F16 dokumentace v kategoriích): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Na serverech s agentem stáhnout agenta znovu (verze 1.2.0).
+- Expirace domén `.eu` (registr nemá RDAP): záloha přes WHOIS.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

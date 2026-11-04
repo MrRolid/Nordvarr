@@ -96,6 +96,15 @@ test('ruční úpravy: atribut s rozporem, dokumentace s revizí, tag', async ({
   await expect(page.getByTestId('docs').locator('ol li')).toHaveCount(2);
   await expect(page.getByTestId('docs')).toContainText('<script>alert(1)</script>');
 
+  // Další kategorie dokumentace: runbook.
+  await page.getByTestId('docs-add').getByRole('link', { name: 'Runbook' }).click();
+  await expect(page.getByRole('heading', { name: 'Upravit dokumentaci: Runbook' })).toBeVisible();
+  await page.getByLabel('Text (Markdown)').fill('## Restart\n\n1. systemctl restart app');
+  await page.getByRole('button', { name: 'Uložit' }).click();
+  await expect(page.getByTestId('docs-runbook')).toContainText('systemctl restart app');
+  await expect(page.getByTestId('docs-provoz')).toContainText('první krok');
+  await expect(page.getByTestId('docs-add')).not.toContainText('Runbook');
+
   await page.getByPlaceholder('nový tag').fill('aplikace');
   await page.getByRole('button', { name: 'Přidat tag' }).click();
   await expect(page.getByTestId('object-tags')).toContainText('aplikace');

@@ -34,6 +34,8 @@ final class TransferTest extends TestCase
         ], 'test');
         $id = (string) $inventory->externalIds->objectId('test', 'svc:tajne');
         $inventory->docs->save($id, "Druhá revize\n\nbez tajemství", 'admin@example.com');
+        $inventory->docs->save($id, "## Restart\n\n1. systemctl restart", 'admin@example.com', 'runbook');
+        $inventory->docs->save($id, 'Obnova ze zálohy', 'admin@example.com', 'dr');
         $inventory->addManualEvent($id, 'note', 'ruční poznámka', 'podrobnosti', '2026-10-20T10:00:00Z');
 
         $checks = new CheckRepository($inventory->pdo);
@@ -82,6 +84,40 @@ final class TransferTest extends TestCase
         // Import přes existující data nahradí celý inventář, nic se nezdvojí.
         (new Transfer($target))->import($first);
         self::assertSame($this->withoutTimestamp($first), $this->withoutTimestamp((new Transfer($target))->export()));
+    }
+
+    public function testDocCategoriesSurviveImport(): void
+    {
+        $export = json_decode(json_encode((new Transfer($this->filled()))->export(), JSON_THROW_ON_ERROR), true);
+        $target = new Inventory(TestDb::memory());
+        (new Transfer($target))->import($export);
+        $id = (string) $target->externalIds->objectId('test', 'svc:tajne');
+        self::assertSame(['provoz', 'runbook', 'dr'], array_keys($target->docs->all($id)));
+        self::assertSame("## Restart\n\n1. systemctl restart", $target->docs->current($id, 'runbook')['markdown'] ?? null);
+        self::assertSame(['dr' => 1, 'provoz' => 2, 'runbook' => 1], $target->docs->revisionCounts($id));
+
+        // Starší export bez kategorií: vše je provozní dokumentace.
+        foreach ($export['objects'] as &$o) {
+            unset($o['docs_other']);
+            $o['doc_revisions'] = array_map(static function (array $r): array {
+                unset($r['category']);
+
+                return $r;
+            }, array_values(array_filter($o['doc_revisions'], static fn (array $r): bool => $r['category'] === 'provoz')));
+        }
+        unset($o);
+        (new Transfer($target))->import($export);
+        self::assertSame(['provoz'], array_keys($target->docs->all($id)));
+        self::assertSame(['provoz' => 2], $target->docs->revisionCounts($id));
+
+        $export['objects'][0]['docs_other'] = [['category' => 'sklep', 'markdown' => 'x', 'updated_at' => 'x', 'updated_by' => 'x']];
+        try {
+            (new Transfer($target))->import($export);
+            self::fail('Neznámá kategorie dokumentace se nenaimportuje.');
+        } catch (ValidationException $e) {
+            self::assertSame(['file' => 'invalid_content'], $e->errors);
+        }
+        self::assertSame(['provoz'], array_keys($target->docs->all($id)), 'Neplatný import nic nezměnil.');
     }
 
     public function testExportContainsNoCanarySecrets(): void

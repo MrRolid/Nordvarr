@@ -5,9 +5,7 @@
 /** @var list<array{source: string, external_id: string}> $externalIds */
 /** @var list<array{key: string, values: list<array<string, mixed>>, conflict: bool, valid: ?string}> $attributes */
 /** @var array{outgoing: list<array<string, mixed>>, incoming: list<array<string, mixed>>} $relationships */
-/** @var string|null $docsHtml */
-/** @var array<string, mixed>|null $docs */
-/** @var int $revisionCount */
+/** @var array<string, array{html: string, updated_at: string, updated_by: string, revisions: int}> $docs */
 /** @var list<array<string, mixed>> $timeline */
 /** @var array<string, array<string, mixed>> $timelineObjects */
 /** @var array<string, string> $objectNames */
@@ -229,11 +227,26 @@ $id = (string) $object['id'];
         <h2><?= $v->t('object.docs') ?></h2>
         <a class="button" href="<?= $v->url('/objects/' . $id . '/docs') ?>" data-test="edit-docs"><?= $v->t('docs.edit') ?></a>
     </div>
-    <?php if ($docsHtml === null): ?>
+    <?php if ($docs === []): ?>
     <p class="muted"><?= $v->t('object.no_docs') ?></p>
-    <?php else: ?>
-    <div class="markdown" data-test="docs"><?= $v->raw($docsHtml) ?></div>
-    <p class="muted small-text"><?= $v->t('docs.meta', ['author' => (string) $docs['updated_by'], 'count' => $revisionCount]) ?> <?= $v->time((string) $docs['updated_at']) ?></p>
+    <?php endif; ?>
+    <?php foreach ($docs as $cat => $doc): ?>
+    <div class="doc-cat" id="docs-<?= $v->e($cat) ?>" data-test="docs-<?= $v->e($cat) ?>">
+        <div class="doc-cat-head">
+            <h3><?= $v->t('docs.cat.' . $cat) ?></h3>
+            <a href="<?= $v->url('/objects/' . $id . '/docs', ['cat' => $cat]) ?>"><?= $v->t('object.edit') ?></a>
+        </div>
+        <div class="markdown"<?= $cat === \Nordvarr\Repository\DocRepository::MAIN ? ' data-test="docs"' : '' ?>><?= $v->raw($doc['html']) ?></div>
+        <p class="muted small-text"><?= $v->t('docs.meta', ['author' => $doc['updated_by'], 'count' => $doc['revisions']]) ?> <?= $v->time($doc['updated_at']) ?></p>
+    </div>
+    <?php endforeach; ?>
+    <?php $missing = array_diff(\Nordvarr\Repository\DocRepository::CATEGORIES, array_keys($docs)); ?>
+    <?php if ($missing !== []): ?>
+    <p class="doc-add" data-test="docs-add"><?= $v->t('docs.add') ?>
+        <?php foreach ($missing as $cat): ?>
+        <a href="<?= $v->url('/objects/' . $id . '/docs', ['cat' => $cat]) ?>"><?= $v->t('docs.cat.' . $cat) ?></a>
+        <?php endforeach; ?>
+    </p>
     <?php endif; ?>
 </section>
 

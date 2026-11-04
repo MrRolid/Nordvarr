@@ -16,6 +16,7 @@ use Nordvarr\Inventory\Inventory;
 use Nordvarr\Repository\AlertRepository;
 use Nordvarr\Repository\CheckRepository;
 use Nordvarr\Repository\CheckResultRepository;
+use Nordvarr\Repository\DocRepository;
 use Nordvarr\Security\SecretMasker;
 use Nordvarr\Time;
 use PDO;
@@ -330,11 +331,20 @@ final class LlmContext
      */
     private function docs(string $objectId): ?array
     {
-        $doc = $this->inventory->docs->current($objectId);
-        if ($doc === null || trim((string) $doc['markdown']) === '') {
+        $parts = [];
+        $docs = array_filter($this->inventory->docs->all($objectId), static fn (array $d): bool => trim((string) $d['markdown']) !== '');
+        foreach ($docs as $category => $doc) {
+            // Jen provozní dokumentace jde bez nadpisu, ostatní kategorie dostanou nadpis s názvem.
+            $text = trim((string) $doc['markdown']);
+            if ($category !== DocRepository::MAIN || count($docs) > 1) {
+                $text = '# ' . $this->i18n->t('docs.cat.' . $category) . "\n\n" . preg_replace('/^(#{1,5})(?=\s)/m', '#$1', $text);
+            }
+            $parts[] = $text;
+        }
+        if ($parts === []) {
             return null;
         }
-        $markdown = self::mask((string) $doc['markdown']);
+        $markdown = self::mask(implode("\n\n", $parts));
         $truncated = mb_strlen($markdown) > self::MAX_DOC_CHARS;
 
         return ['markdown' => $truncated ? mb_substr($markdown, 0, self::MAX_DOC_CHARS) : $markdown, 'truncated' => $truncated];

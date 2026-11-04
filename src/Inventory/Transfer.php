@@ -6,6 +6,7 @@ namespace Nordvarr\Inventory;
 
 use Nordvarr\Checks\CheckTypes;
 use Nordvarr\Repository\CheckRepository;
+use Nordvarr\Repository\DocRepository;
 use Nordvarr\Security\SecretMasker;
 use Throwable;
 
@@ -56,8 +57,16 @@ final class Transfer
                     'updated_at' => $doc['updated_at'],
                     'updated_by' => $doc['updated_by'],
                 ],
+                // Ostatní kategorie dokumentace (provozní je v "docs" kvůli zpětné kompatibilitě).
+                'docs_other' => array_values(array_map(static fn (array $d): array => [
+                    'category' => $d['category'],
+                    'markdown' => SecretMasker::maskText((string) $d['markdown']),
+                    'updated_at' => $d['updated_at'],
+                    'updated_by' => $d['updated_by'],
+                ], array_diff_key($inv->docs->all($id), [DocRepository::MAIN => true]))),
                 'doc_revisions' => array_map(static fn (array $r): array => [
                     'id' => $r['id'],
+                    'category' => $r['category'],
                     'author' => $r['author'],
                     'created_at' => $r['created_at'],
                     'markdown' => SecretMasker::maskText((string) $r['markdown']),
@@ -169,8 +178,11 @@ final class Transfer
                     if (is_array($o['docs'] ?? null)) {
                         $inv->docs->restoreCurrent($id, (string) $o['docs']['markdown'], (string) $o['docs']['updated_at'], (string) $o['docs']['updated_by']);
                     }
+                    foreach ($o['docs_other'] ?? [] as $d) {
+                        $inv->docs->restoreCurrent($id, (string) $d['markdown'], (string) $d['updated_at'], (string) $d['updated_by'], self::docCategory($d['category'] ?? null));
+                    }
                     foreach ($o['doc_revisions'] ?? [] as $r) {
-                        $inv->docs->addRevision($id, (string) $r['author'], (string) $r['created_at'], (string) $r['markdown'], (string) $r['id']);
+                        $inv->docs->addRevision($id, (string) $r['author'], (string) $r['created_at'], (string) $r['markdown'], (string) $r['id'], self::docCategory($r['category'] ?? DocRepository::MAIN));
                     }
                 }
 
@@ -221,5 +233,14 @@ final class Transfer
             // Chybějící pole, porušená omezení databáze apod.: soubor není platný export.
             throw new ValidationException(['file' => 'invalid_content']);
         }
+    }
+
+    private static function docCategory(mixed $category): string
+    {
+        if (!is_string($category) || !DocRepository::isCategory($category)) {
+            throw new ValidationException(['file' => 'invalid_content']);
+        }
+
+        return $category;
     }
 }

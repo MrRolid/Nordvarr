@@ -244,3 +244,10 @@ Kandidát z F12. `SPEC.md` se nemění.
 4. **Logy do exportu pro LLM nejdou** (mohou obsahovat osobní údaje návštěvníků).
 5. **Verze 0.11.0, agent 1.2.0.**
 
+## 2026-11-05 (F16 Dokumentace v kategoriích)
+
+1. **Pevný seznam kategorií** (provozní, runbook, DR, incidenty, ostatní) místo libovolných souborů s názvem: odpovídá tomu, co vlastník vyjmenoval, nevyžaduje správu názvů a pořadí a na kartě je vždy ve stejném pořadí (runbook hned za provozní dokumentací, protože se při výpadku hledá nejdřív). Kategorie "Ostatní" pokryje zbytek.
+2. **Dosavadní dokumentace je provozní** a API (`docs_markdown`) i panel v topologii dál pracují jen s ní, aby se nezměnilo chování existujících integrací.
+3. **Export inventáře zůstává ve verzi 1**: provozní dokumentace je dál v `docs`, ostatní kategorie v novém poli `docs_other` a revize mají pole `category` (chybí-li, je to provozní). Starší export jde naimportovat, starší verze Nordvarru nová pole ignoruje (ztratí jen ostatní kategorie).
+4. **Export pro LLM obsahuje všechny kategorie** pod nadpisy kategorií ve stejném limitu 4000 znaků; runbook a DR jsou při řešení incidentu užitečné.
+5. **Verze 0.12.0.**
