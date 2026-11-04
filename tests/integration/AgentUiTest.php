@@ -94,6 +94,10 @@ final class AgentUiTest extends TestCase
         $graph = (new Topology($this->pdo(), new I18n($this->app . '/lang', 'cs')))->neighborhood($id, 1);
         self::assertSame("CPU 38 %\nRAM 63 %\nGPU 92 %", $graph['nodes'][0]['data']['subtitle']);
         self::assertTrue($graph['nodes'][0]['data']['host']);
+        // Pruhy prostředků v mapě: disk /data je nad prahem pro omezeně (85 %).
+        $resources = $graph['nodes'][0]['data']['resources'];
+        self::assertFalse($resources['stale']);
+        self::assertSame(['cpu' => 'ok', 'mem' => 'ok', 'disk' => 'warn', 'gpu' => 'none'], array_column($resources['items'], 'level', 'key'));
 
         $html = json_decode($this->ui('GET', '/topology/node/' . $id)->body, true)['html'];
         self::assertStringContainsString('data-test="node-host"', $html);

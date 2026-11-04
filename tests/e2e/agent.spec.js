@@ -104,11 +104,26 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   await page.getByTestId('show-topology').click();
   await expect(page.getByTestId('node-panel').getByTestId('node-host')).toContainText('GPU 0');
 
+  // Ve 2D má uzel serveru pruhy prostředků (obrázek SVG) a v popisku jen název.
+  const node2d = await page.evaluate(() => {
+    const n = document.getElementById('cy').cy.nodes().filter((x) => x.data('name') === 'e2e-gpu.example.com')[0];
+    return { hasRes: n.data('hasRes'), label: n.data('label'), img: n.data('resImg') ?? '', bg: n.style('background-image') };
+  });
+  expect(node2d.hasRes).toBe(true);
+  expect(node2d.label).toBe('e2e-gpu.example.com');
+  expect(node2d.img).toMatch(/^data:image\/svg\+xml/);
+  expect(decodeURIComponent(node2d.img)).toContain('>Disk</text>');
+  expect(node2d.bg).toContain('data:image/svg+xml');
+
   // Ve 3D má server pod názvem vytížení z posledního hlášení.
   await page.getByTestId('layout-switch').getByRole('button', { name: '3D' }).click();
   await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
   const label = page.locator('.map3d-label').filter({ hasText: 'e2e-gpu.example.com' });
-  await expect(label.locator('.map3d-metrics')).toHaveText(/^CPU \d+ %, RAM \d+ %, GPU \d+ %$/);
+  await expect(label.locator('.map3d-metrics')).toHaveText(/^CPU \d+ %, RAM \d+ %, Disk \d+ %, GPU \d+ %$/);
+  // Disk se zálohami má zaplněné inody (99 %), proto je červeně.
+  await expect(label.locator('[data-res="disk"]')).toHaveClass(/res-crit/);
+  await expect(label.locator('[data-res="disk"]')).toHaveAttribute('title', '/mnt/zalohy disk (inody)');
+  await expect(label.locator('[data-res="gpu"]')).toHaveClass(/res-none/);
 });
 
 test('skript agenta jde stáhnout bez přihlášení', async ({ request }) => {

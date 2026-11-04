@@ -512,6 +512,9 @@ input[type="radio"] { margin: 0; }
 .map3d-label { color: var(--map-text); font-weight: 600; padding: 0 .25rem; border-radius: 4px; background: color-mix(in srgb, var(--map-bg) 70%, transparent); pointer-events: auto; cursor: pointer; }
 .map3d-label.st-unhealthy { color: var(--st-unhealthy); }
 .map3d-metrics { display: block; font-weight: 400; font-size: .68rem; color: var(--map-muted); text-align: center; font-variant-numeric: tabular-nums; }
+.map3d-metrics .res-warn { color: var(--st-degraded); font-weight: 700; }
+.map3d-metrics .res-crit { color: var(--st-unhealthy); font-weight: 700; }
+.map3d-metrics.stale .res { color: var(--st-unknown); font-weight: 400; }
 .map3d-label.st-degraded { color: var(--st-degraded); }
 .map3d-label.active { outline: 2px solid var(--map-center); }
 .map3d-label.dim { opacity: .3; }

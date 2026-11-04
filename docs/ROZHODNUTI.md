@@ -258,3 +258,11 @@ Kandidát z F12. `SPEC.md` se nemění.
 2. **Datum z RDAP má přednost** před ručním: po prodloužení se v RDAP změní samo, ruční datum by mohlo být zastaralé. Ruční datum se použije i při nedostupném RDAP (s poznámkou v detailu), protože je to údaj vlastníka.
 3. **Ruční datum je půlnoc UTC daného dne.** Přesný čas registry neuvádějí a s rezervou 30 a 7 dní na tom nezáleží.
 4. **Verze 0.13.0.**
+
+## 2026-11-05 (0.14.0 Stav prostředků v topologii)
+
+1. **Barvy podle prahů kontroly agenta**, aby mapa a stav kontroly říkaly totéž: červená je tam, kde kontrola hlásí problém. Oranžová "blíží se" u CPU a RAM začíná 15 bodů pod prahem (kontrola sama má pro CPU a RAM jen jeden práh), u disku je to práh pro omezeně.
+2. **Jen nejplnější disk** (včetně inodů), ne všechny: v uzlu je místo na tři pruhy. Ostatní disky jsou na kartě serveru a v panelu.
+3. **Ve 2D obrázek SVG v uzlu** (Cytoscape neumí vícebarevný popisek). CSP obrázky `data:` povoluje, text v obrázku je escapovaný.
+4. **GPU bez barvy**: plné vytížení GPU je u výpočetních serverů běžný stav, ne problém.
+5. **Verze 0.14.0.**
