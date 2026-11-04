@@ -15,8 +15,8 @@ namespace Nordvarr\Topology;
  */
 final class Floors
 {
-    /** Patra zdola nahoru. */
-    public const FLOORS = ['hardware', 'virtual', 'containers', 'services', 'web', 'domains', 'external'];
+    /** Patra zdola nahoru. Poskytovatelé mají číslo 0, ostatní patra si čísla 1 až 7 nechávají. */
+    public const FLOORS = ['providers', 'hardware', 'virtual', 'containers', 'services', 'web', 'domains', 'external'];
 
     /** Klíče atributu, který přepíše patro odvozené z typu. */
     public const ATTRIBUTE_KEYS = ['vrstva', 'patro', 'layer'];
@@ -34,13 +34,16 @@ final class Floors
         'database' => 'services',
         'website' => 'web',
         'domain' => 'domains',
+        'provider' => 'providers',
+        'external' => 'external',
         'other' => 'external',
     ];
 
     private const SWEEPS = 6;
 
     /**
-     * Patro objektu. Přepis přijímá klíč patra nebo jeho číslo 1 až 7 (zdola); jiná hodnota se ignoruje.
+     * Patro objektu. Přepis přijímá klíč patra nebo jeho číslo 0 až 7 (0 = poskytovatelé, 1 = hardware);
+     * jiná hodnota se ignoruje.
      */
     public static function floorOf(string $type, ?string $override = null): string
     {
@@ -48,8 +51,8 @@ final class Floors
         if (in_array($override, self::FLOORS, true)) {
             return $override;
         }
-        if (preg_match('/^[1-7]$/', $override) === 1) {
-            return self::FLOORS[(int) $override - 1];
+        if (preg_match('/^[0-7]$/', $override) === 1) {
+            return self::FLOORS[(int) $override];
         }
 
         return self::BY_TYPE[$type] ?? 'external';

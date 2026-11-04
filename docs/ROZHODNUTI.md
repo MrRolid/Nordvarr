@@ -229,3 +229,10 @@ Kandidát z F12. `SPEC.md` se nemění.
 2. **Expirace domény webu na objektu typu doména**, ne na webu: doména je samostatná věc (může mít víc webů, e-mail, DNS) a v patrech mapy leží na patře domén. Web na ní "závisí", takže výpadek domény se ukáže jako pravděpodobná příčina u webu. Objekt domény se hledá podle názvu bez ohledu na velikost písmen, aby se nezakládal dvakrát.
 3. **Registrovaná doména bez úplného seznamu veřejných přípon** (Public Suffix List by byl velký soubor navíc): poslední dvě úrovně, u známých dvouúrovňových přípon (`co.uk`, `com.au` a podobné) tři. U neobvyklých přípon může návrh vyjít špatně; návrh se dá odškrtnout.
 
+## 2026-11-04 (F14 Poskytovatelé a externí služby)
+
+1. **Dva nové typy objektů** místo jednoho obecného: poskytovatel je "pod" infrastrukturou (obsahuje servery a VPS), externí služba je "nad" ní (weby a servery na ní závisí). Rozlišení dává vztahům a patrům smysl a výpadek poskytovatele se ukáže jako pravděpodobná příčina u jeho serverů.
+2. **Patro Poskytovatelé má číslo 0**, aby se nezměnil význam čísel 1 až 7 u atributu `vrstva` z F8.
+3. **Externí služby sdílí patro s typem `other`** (Internet a externí služby). Typ `other` zůstává pro věci, které jinam nepatří.
+4. **Verze 0.10.0.**
+

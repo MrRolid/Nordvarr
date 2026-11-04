@@ -96,6 +96,8 @@ return [
     'type.other' => 'Ostatní',
     'type.cluster' => 'Cluster',
     'type.container' => 'Kontejner',
+    'type.provider' => 'Poskytovatel',
+    'type.external' => 'Externí služba',
 
     'lifecycle.active' => 'Aktivní',
     'lifecycle.archived' => 'Archivované',
@@ -552,6 +554,7 @@ return [
     'topology.spread' => 'Roztáhnout patra',
     'topology.map3d' => '3D mapa pater: tažením otočíte, kolečkem přiblížíte, kliknutím vyberete objekt',
     'topology.webgl_missing' => 'Prohlížeč nepodporuje WebGL, 3D pohled nejde zobrazit. Mapa je v patrech.',
+    'floor.providers' => 'Poskytovatelé (hosting, datacentra)',
     'floor.hardware' => 'Hardware a síť',
     'floor.virtual' => 'Virtuální stroje a VPS',
     'floor.containers' => 'Kontejnery (Docker, Kubernetes)',

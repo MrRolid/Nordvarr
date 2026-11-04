@@ -94,7 +94,7 @@ php bin/nordvarr.php reset-password <e-mail>  # nové heslo pro zapomenutý úč
 5. **Kontroly** na detailu objektu: HTTP, TCP, ping, certifikát TLS, expirace domény, heartbeat. Rychlejší cesta je popsaná níže v části "Jak zapnout hlídání".
 6. **Topologie:** graf okolí objektu nebo objektů podle filtru. Přepínač nad mapou volí rozvržení:
    - **Automaticky:** rozvržení podle vztahů.
-   - **Patra:** objekty ve vodorovných pásech podle vrstvy infrastruktury, zdola: hardware a síť, virtuální stroje a VPS, kontejnery, služby a databáze, weby a API, domény, internet a externí služby. Objekty spojené vztahem leží nad sebou ve sloupci (VM nad svým serverem, web nad službou). Patro určuje typ objektu: kontejnery a clustery (Kubernetes, Docker Swarm) mají vlastní typy `container` a `cluster` a leží v patře kontejnerů. Cluster obsahuje své kontejnery (vztah "obsahuje") a sám může ležet ve VM nebo na serveru. Jiné patro nastavíte atributem `vrstva` s hodnotou `hardware`, `virtual`, `containers`, `services`, `web`, `domains`, `external` nebo číslem 1 až 7 (zdola). Volba rozvržení zůstává v adrese stránky.
+   - **Patra:** objekty ve vodorovných pásech podle vrstvy infrastruktury, zdola: poskytovatelé (hosting, datacentra), hardware a síť, virtuální stroje a VPS, kontejnery, služby a databáze, weby a API, domény, internet a externí služby. Objekty spojené vztahem leží nad sebou ve sloupci (VM nad svým serverem, web nad službou). Patro určuje typ objektu: kontejnery a clustery (Kubernetes, Docker Swarm) mají vlastní typy `container` a `cluster` a leží v patře kontejnerů. Cluster obsahuje své kontejnery (vztah "obsahuje") a sám může ležet ve VM nebo na serveru. **Poskytovatel** (typ `provider`, třeba firma, od které máte VPS nebo pronajatý server) leží v nejspodnějším patře a své servery a VPS "obsahuje". **Externí služba** (typ `external`: Cloudflare, veřejné DNS servery, peering jako NIX.CZ, Google) leží v nejvyšším patře: věci mimo vaši správu, na kterých vaše weby a servery "závisí". Jiné patro nastavíte atributem `vrstva` s hodnotou `providers`, `hardware`, `virtual`, `containers`, `services`, `web`, `domains`, `external` nebo číslem 0 až 7 (0 = poskytovatelé, 1 = hardware). Volba rozvržení zůstává v adrese stránky.
    - **3D:** patra jako disky nad sebou (hardware dole), objekty na obvodu disku. Objekty spojené vztahem leží ve stejném směru nad sebou. Tažením myší nebo prstem otočíte, kolečkem nebo dvěma prsty přiblížíte, kliknutím vyberete objekt (karta vpravo), dvojklikem otevřete jeho kartu. Klik v seznamu vlevo natočí mapu k objektu. Tlačítka: "Pohled shora", "Roztáhnout patra" a "Celý graf" (výchozí pohled). Najetí myší na objekt ztlumí vše mimo jeho sousedy. Server s agentem má pod názvem vytížení CPU, RAM (a GPU) z posledního hlášení. U víc než 60 objektů se popisky ukazují jen u objektů s problémem, u vybraného a jeho sousedů. 3D potřebuje WebGL. Bez něj zůstane mapa v patrech s upozorněním.
    - **Hledat v mapě** (nad seznamem objektů): filtruje seznam podle názvu, typu nebo důvodu, bez ohledu na diakritiku. Enter vybere první shodu a ukáže ji v mapě (ve 3D k ní natočí kameru), Esc hledání zruší.
    - **Patra v mapě:** zaškrtávátky skryjete celá patra, platí v každém rozvržení.
@@ -114,7 +114,8 @@ Postup:
    - web: HTTP na atribut `url`, jinak `https://<název>/`, u https i certifikát TLS a expirace domény webu (u `shop.example.com` doména `example.com`). Expirace se nezakládá na webu, ale na objektu typu **Doména**: když v inventáři ještě není, vznikne, dostane kontrolu expirace a web na ní "závisí". Další web se stejnou doménou použije stejný objekt. Pro existující weby ji doplníte hromadně tlačítkem v inventáři (viz bod 2),
    - doména: expirace domény podle názvu,
    - server, VM, síťové zařízení: ping na atribut `ip` (případně `ipv6`, `host`, `hostname`), jinak na název, pokud je to IP nebo jméno hosta,
-   - služba, databáze, jiné: HTTP na atribut `url`, jinak TCP na `host` (nebo `ip`, `server`) a `port`.
+   - služba, databáze, kontejner, cluster, poskytovatel, jiné: HTTP na atribut `url`, jinak TCP na `host` (nebo `ip`, `server`) a `port`,
+   - externí služba: HTTP na atribut `url`, jinak ping na `ip`/`host` nebo na název.
 
    Návrh, který už existující kontrola pokrývá, se nenabízí. Pokud se nic nenavrhne, doplňte objektu atribut (např. `url` nebo `ip`) nebo přidejte kontrolu ručně tlačítkem "Přidat kontrolu".
 2. **Hromadně z inventáře.** V inventáři vyberte objekty a použijte "Přidat doporučené kontroly". Přehled ukazuje počet objektů bez kontrol s odkazem na jejich seznam.
@@ -203,7 +204,7 @@ Odpověď (`201` nový objekt, `200` existující):
 {"id":"01a1...","created":true,"changed":true,"changes":{"object":["created"],"attributes":{"added":["document_root"],"updated":[],"removed":[]},"tags":{"added":["eshop"]},"relationships":{"added":["depends_on:vm:app1"],"removed":[]},"docs":true}}
 ```
 
-Typy objektů: `server`, `vm`, `cluster`, `container`, `service`, `website`, `database`, `domain`, `network_device`, `other`. Vztahy: `depends_on`, `contains`. Odkaz na neexistující objekt vrátí `422` se seznamem `missing_external_ids`, chybný vstup `422` s položkou `fields`.
+Typy objektů: `server`, `vm`, `cluster`, `container`, `service`, `website`, `database`, `domain`, `network_device`, `provider`, `external`, `other`. Vztahy: `depends_on`, `contains`. Odkaz na neexistující objekt vrátí `422` se seznamem `missing_external_ids`, chybný vstup `422` s položkou `fields`.
 
 Tajné údaje (hesla, tokeny, privátní klíče, DSN s heslem) do atributů ani dokumentace nepatří.
 
