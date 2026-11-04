@@ -4,11 +4,12 @@ Aktualizováno: 2026-11-03
 
 ## Hotové fáze
 
-### 0.9.2 Proklik na web (větev `odkazy-na-weby`)
+### 0.9.2 Proklik na web a doména webu (větev `odkazy-na-weby`)
 
 - Na přání vlastníka: adresa webu je odkaz do nové karty. Pod názvem objektu (adresa první kontroly HTTP, jinak atribut `url` nebo `adresa`), u cíle kontroly HTTP na kartě objektu i v detailu kontroly a u hodnot atributů, které jsou adresou http(s).
 - `View::webLink`: odkaz jen pro http a https s hostem, jiné hodnoty zůstanou textem (žádné `javascript:` ani jiná schémata), `rel="noopener noreferrer"`.
-- Testy: `WebLinkTest`, `SuggestionsUiTest` (odkaz na kartě objektu).
+- Doporučené kontroly webu nově obsahují expiraci registrované domény (`Suggestions::registrableDomain`, např. `shop.example.com` -> `example.com`, se seznamem dvouúrovňových přípon jako `co.uk`). Kontrola se zakládá na objektu typu doména, který se najde podle názvu nebo založí, a web na něm dostane vztah "závisí na". Návrh odpadá, když web na doméně s kontrolou expirace už závisí nebo má expiraci sám.
+- Testy: `WebLinkTest`, `SuggestionsTest` (registrovaná doména, pokrytá doména), `SuggestionsUiTest` (odkaz na kartě, založení objektu domény, sdílení mezi weby, hromadné přidání).
 
 ### Oprava 0.9.1 (větev `oprava-curl-starsi-libcurl`)
 

@@ -727,6 +727,7 @@ return [
     'agent.files' => 'Files',
     'agent.cron_alternative' => 'Instead of systemd you can use cron (root): * * * * * /usr/local/bin/nordvarr-agent.sh >/dev/null 2>&1',
 
+    'suggest.via_domain' => '(creates a Domain object, the website depends on it)',
     'suggest.title' => 'Suggested checks:',
     'suggest.help' => 'Suggested from the object type, name and attributes (url, ip, host, port). Settings can be changed later on the check page.',
     'suggest.add' => 'Add selected checks',

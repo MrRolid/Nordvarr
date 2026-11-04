@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nordvarr\Checks;
 
 use Nordvarr\Inventory\Inventory;
+use Nordvarr\Inventory\Vocabulary;
 use Nordvarr\Repository\CheckRepository;
 use PDO;
 
@@ -13,7 +14,9 @@ use PDO;
  * návrhy se ukážou na kartě objektu (nebo se přidají hromadně z inventáře).
  *
  * Pravidla:
- * - web: HTTP na atribut url, jinak https://<název>/; u https certifikát TLS,
+ * - web: HTTP na atribut url, jinak https://<název>/; u https certifikát TLS; expirace registrované
+ *   domény webu (example.com u shop.example.com) na objektu typu doména, který se při přidání
+ *   založí (nebo najde podle názvu) a web na něm "závisí",
  * - doména: expirace domény podle názvu,
  * - server, VM, síťové zařízení: ping na atribut ip, jinak na název (IP nebo jméno hosta),
  * - služba, databáze, kontejner a cluster: HTTP na atribut url, TCP na host/ip + port.
@@ -21,10 +24,13 @@ use PDO;
  */
 final class Suggestions
 {
+    /** Veřejné přípony o dvou úrovních, u kterých je registrovaná doména o úroveň delší. */
+    private const TWO_LEVEL_SUFFIXES = ['co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'me.uk', 'com.au', 'net.au', 'org.au', 'co.nz', 'com.br', 'co.jp', 'com.pl', 'com.cn', 'co.za', 'com.tr', 'com.mx'];
+
     /**
      * Návrhy pro objekt podle id (načte atributy a kontroly z databáze).
      *
-     * @return list<array{key: string, type: string, input: array<string, string>, target: string}>
+     * @return list<array{key: string, type: string, input: array<string, string>, target: string, via: string}>
      */
     public static function load(PDO $pdo, string $objectId): array
     {
@@ -37,8 +43,26 @@ final class Suggestions
         return self::forObject(
             $object,
             self::attributeValues($inventory->attributes->grouped($objectId)),
-            (new CheckRepository($pdo))->forObject($objectId)
+            (new CheckRepository($pdo))->forObject($objectId),
+            self::coveredDomains($pdo, $objectId)
         );
+    }
+
+    /**
+     * Domény, na kterých objekt už závisí a které mají kontrolu expirace (návrh pro ně odpadá).
+     *
+     * @return list<string>
+     */
+    private static function coveredDomains(PDO $pdo, string $objectId): array
+    {
+        $stmt = $pdo->prepare(
+            "SELECT lower(o.name) FROM relationships r JOIN objects o ON o.id = r.to_id
+             WHERE r.from_id = ? AND r.kind = 'depends_on' AND o.type = 'domain'
+             AND EXISTS (SELECT 1 FROM checks c WHERE c.object_id = o.id AND c.type = 'domain_expiry')"
+        );
+        $stmt->execute([$objectId]);
+
+        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
     /**
@@ -56,6 +80,13 @@ final class Suggestions
                 continue;
             }
             $valid = CheckTypes::validate($s['type'], $s['input']);
+            if ($s['via'] === 'domain') {
+                $id = self::applyDomain($pdo, $objectId, $s['target'], $valid);
+                if ($id !== null) {
+                    $created[] = ['id' => $id, 'type' => $s['type'], 'target' => $s['target']];
+                }
+                continue;
+            }
             $created[] = ['id' => $checks->create($objectId, $s['type'], $valid['common'], $valid['config']), 'type' => $s['type'], 'target' => $s['target']];
         }
 
@@ -63,12 +94,58 @@ final class Suggestions
     }
 
     /**
+     * Doména webu: najde nebo založí objekt typu doména, doplní mu kontrolu expirace a vztah
+     * "web závisí na doméně". Vrací id nově založené kontroly (null, když už existovala).
+     *
+     * @param array{common: array<string, mixed>, config: array<string, mixed>, errors: array<string, string>} $valid
+     */
+    private static function applyDomain(PDO $pdo, string $objectId, string $domain, array $valid): ?string
+    {
+        $inventory = new Inventory($pdo);
+        $checks = new CheckRepository($pdo);
+        $domainObject = $inventory->objects->findByTypeAndName('domain', $domain);
+        $domainId = $domainObject !== null ? (string) $domainObject['id'] : $inventory->objects->create(['type' => 'domain', 'name' => $domain, 'description' => '']);
+        $checkId = null;
+        $hasCheck = false;
+        foreach ($checks->forObject($domainId) as $check) {
+            $hasCheck = $hasCheck || ($check['type'] === 'domain_expiry' && CheckTypes::target('domain_expiry', $check['config']) === $domain);
+        }
+        if (!$hasCheck) {
+            $checkId = $checks->create($domainId, 'domain_expiry', $valid['common'], $valid['config']);
+        }
+        if ($inventory->relationships->findEdge($objectId, $domainId, 'depends_on') === null) {
+            $inventory->relate($objectId, $domainId, 'depends_on', '', Vocabulary::MANUAL_SOURCE);
+        }
+
+        return $checkId;
+    }
+
+    /**
+     * Registrovaná doména k jménu hosta (shop.example.com -> example.com, www.example.co.uk -> example.co.uk).
+     */
+    public static function registrableDomain(string $host): ?string
+    {
+        $host = rtrim(strtolower(trim($host)), '.');
+        if ($host === '' || filter_var($host, FILTER_VALIDATE_IP) !== false || !CheckTypes::isValidHost($host)) {
+            return null;
+        }
+        $labels = explode('.', $host);
+        if (count($labels) < 2) {
+            return null;
+        }
+        $take = in_array(implode('.', array_slice($labels, -2)), self::TWO_LEVEL_SUFFIXES, true) ? 3 : 2;
+
+        return count($labels) >= $take ? implode('.', array_slice($labels, -$take)) : null;
+    }
+
+    /**
      * @param array<string, mixed> $object
      * @param array<string, string> $attributes platné hodnoty atributů (klíč => hodnota)
      * @param list<array<string, mixed>> $checks existující kontroly objektu
-     * @return list<array{key: string, type: string, input: array<string, string>, target: string}>
+     * @param list<string> $coveredDomains domény, na kterých objekt už závisí a mají kontrolu expirace
+     * @return list<array{key: string, type: string, input: array<string, string>, target: string, via: string}>
      */
-    public static function forObject(array $object, array $attributes, array $checks): array
+    public static function forObject(array $object, array $attributes, array $checks, array $coveredDomains = []): array
     {
         $name = strtolower(trim((string) $object['name']));
         $attr = static fn (string ...$keys): string => self::firstAttribute($attributes, $keys);
@@ -82,6 +159,12 @@ final class Suggestions
             case 'website':
                 $url = $url !== '' ? $url : ($hostFromName !== '' && filter_var($hostFromName, FILTER_VALIDATE_IP) === false ? 'https://' . $hostFromName . '/' : '');
                 self::addHttp($suggestions, $url);
+                $host = parse_url($url, PHP_URL_HOST);
+                $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+                $domain = is_string($host) && in_array($scheme, ['http', 'https'], true) ? self::registrableDomain($host) : null;
+                if ($domain !== null && !in_array($domain, $coveredDomains, true)) {
+                    $suggestions[] = self::make('domain_expiry', ['domain' => $domain]) + ['via' => 'domain'];
+                }
                 break;
             case 'domain':
                 if ($hostFromName !== '' && filter_var($hostFromName, FILTER_VALIDATE_IP) === false) {
@@ -125,7 +208,7 @@ final class Suggestions
             if (isset($existing[$s['type'] . '|' . $target])) {
                 continue;
             }
-            $result[] = ['key' => $s['type'] . ':' . $target, 'type' => $s['type'], 'input' => $s['input'], 'target' => $target];
+            $result[] = ['key' => $s['type'] . ':' . $target, 'type' => $s['type'], 'input' => $s['input'], 'target' => $target, 'via' => $s['via'] ?? ''];
         }
 
         return $result;

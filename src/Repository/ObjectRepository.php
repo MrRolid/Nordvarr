@@ -30,6 +30,20 @@ final class ObjectRepository
     /**
      * @return array<string, mixed>|null
      */
+    /**
+     * Objekt daného typu podle názvu (bez ohledu na velikost písmen), nejstarší první.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByTypeAndName(string $type, string $name): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT id FROM objects WHERE type = ? AND lower(name) = lower(?) ORDER BY created_at, id LIMIT 1');
+        $stmt->execute([$type, $name]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : $this->find((string) $id);
+    }
+
     public function findByExternalId(string $source, string $externalId): ?array
     {
         $stmt = $this->pdo->prepare(

@@ -223,3 +223,9 @@ Kandidát z F12. `SPEC.md` se nemění.
 1. **Podpora libcurl starší než 7.85** (AlmaLinux/RHEL 9 má 7.76): místo `CURLOPT_PROTOCOLS_STR` se tam použije `CURLOPT_PROTOCOLS` se stejným omezením na http a https. Novější systémy dál používají textovou variantu (číselná je v libcurl označená jako zastaralá).
 2. **Chyba workeru do logu v datovém adresáři** (`logs/worker-error.log`): řádek pro cron posílá výstup do `/dev/null`, takže pád workeru nebyl nikde vidět. Log se nečistí automaticky, zapisuje se jen při chybě.
 
+## 2026-11-04 (0.9.2 Proklik na web a doména webu)
+
+1. **Proklik jen pro http a https** a vždy do nové karty s `rel="noopener noreferrer"`. Jiné hodnoty (třeba `javascript:`) zůstanou textem.
+2. **Expirace domény webu na objektu typu doména**, ne na webu: doména je samostatná věc (může mít víc webů, e-mail, DNS) a v patrech mapy leží na patře domén. Web na ní "závisí", takže výpadek domény se ukáže jako pravděpodobná příčina u webu. Objekt domény se hledá podle názvu bez ohledu na velikost písmen, aby se nezakládal dvakrát.
+3. **Registrovaná doména bez úplného seznamu veřejných přípon** (Public Suffix List by byl velký soubor navíc): poslední dvě úrovně, u známých dvouúrovňových přípon (`co.uk`, `com.au` a podobné) tři. U neobvyklých přípon může návrh vyjít špatně; návrh se dá odškrtnout.
+

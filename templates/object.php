@@ -25,7 +25,7 @@ $id = (string) $object['id'];
 /** @var array<string, array<string, mixed>> $lastChangeObjects */
 /** @var int $alertCount90 */
 /** @var array<string, mixed>|null $host */
-/** @var list<array{key: string, type: string, input: array<string, string>, target: string}> $suggestions */
+/** @var list<array{key: string, type: string, input: array<string, string>, target: string, via: string}> $suggestions */
 ?>
 <header class="object-head card" data-test="object-head">
     <p class="muted"><?= $v->t('type.' . $object['type']) ?><?php if ($object['lifecycle'] === 'archived'): ?> <span class="badge"><?= $v->t('lifecycle.archived') ?></span><?php endif; ?></p>
@@ -100,7 +100,7 @@ $id = (string) $object['id'];
         <ul class="plain">
             <?php foreach ($suggestions as $i => $s): ?>
             <li><label class="check-label"><input type="checkbox" name="keys[]" value="<?= $v->e($s['key']) ?>" checked>
-                <?= $v->t('checktype.' . $s['type']) ?> <code><?= $v->e($s['target']) ?></code></label></li>
+                <?= $v->t('checktype.' . $s['type']) ?> <code><?= $v->e($s['target']) ?></code><?php if ($s['via'] === 'domain'): ?> <span class="muted small-text"><?= $v->t('suggest.via_domain') ?></span><?php endif; ?></label></li>
             <?php endforeach; ?>
         </ul>
         <button type="submit" class="primary" data-test="add-suggested"><?= $v->t('suggest.add') ?></button>
