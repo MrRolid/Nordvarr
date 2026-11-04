@@ -4,6 +4,16 @@ Aktualizováno: 2026-11-03
 
 ## Hotové fáze
 
+### F15 Služby a logy z agenta (větev `faze-15-sluzby-logy`)
+
+Z požadavku vlastníka ("kontrolovat, že běží LAMP služby, PostgreSQL" a "výpis posledních 50 řádků z error a access logu jednou za 10 minut").
+
+- Agent 1.2.0: služby přes `systemctl` (známé služby zapnuté nebo běžící, nebo seznam z `NORDVARR_SERVICES`), konce logů (`tail -n 50`, nejvýš 20 kB, nejvýš 20 souborů) jednou za `NORDVARR_LOG_INTERVAL` (600 s), známé cesty logů nebo `NORDVARR_LOGS`.
+- Server: `Report` ověří jména a stavy služeb, logy jen s absolutní cestou, text bez řídicích znaků a s maskováním tajných údajů (`SecretMasker::maskStrict`). Logy se ukládají zvlášť (`agent_hosts.logs`, migrace `0009_logy_agenta.sql`), aby je nepřepsalo každé hlášení bez logů.
+- `HostEvaluator`: `service_down` (nefunguje) pro spadlou nebo zapnutou neběžící službu.
+- Karta serveru: tabulka služeb, rozbalovací logy.
+- Testy: `AgentScriptTest` (falešné systemctl a logy, výslovný seznam, vypnutí, interval, maskování), `AgentServicesTest` (problém kontroly, uložení logů, logy zůstanou bez nového hlášení, escapování na kartě), e2e `agent.spec.js`.
+
 ### F14 Poskytovatelé a externí služby (větev `faze-14-poskytovatele`)
 
 Z požadavků vlastníka po nasazení ("vrstva poskytovatelů, kteří dělají patro mé infrastruktury", "dostupnost věcí mimo můj scope a možnost ovlivnění").
@@ -335,5 +345,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.10.0 (F14 poskytovatelé a externí služby): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Release 0.11.0 (F14 poskytovatelé, F15 služby a logy z agenta): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

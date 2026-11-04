@@ -54,6 +54,9 @@ final class AgentService
             [$objectId, $created] = $this->resolveObject($report, $source);
             $this->agents->saveReport($objectId, $snapshot, $report['smart'], $report['smart_error'], $at);
             $this->agents->insertSample($objectId, $at, Report::sample($snapshot));
+            if ($report['logs'] !== null) {
+                $this->agents->saveLogs($objectId, $report['logs'], $at);
+            }
             $containerResults = $report['containers'] !== null
                 ? $this->syncContainers($objectId, $report['external_id'], $report['containers'], $source) : [];
 

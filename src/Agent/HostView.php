@@ -123,6 +123,14 @@ final class HostView
             ], $s['containers'] ?? []),
             'containers_reported' => ($s['containers'] ?? null) !== null,
             'containers_error' => (string) ($s['containers_error'] ?? ''),
+            // Služby systemd: null = agent je nehlásí.
+            'services' => array_map(static fn (array $svc): array => $svc + [
+                'level' => $svc['active'] === 'failed' || ($svc['active'] === 'inactive' && $svc['enabled'] === 'enabled') ? 'bad'
+                    : ($svc['active'] === 'active' ? 'ok' : 'none'),
+            ], $s['services'] ?? []),
+            'services_reported' => ($s['services'] ?? null) !== null,
+            'logs' => $host['logs'] ?? [],
+            'logs_at' => $host['logs_at'] ?? null,
             'problems' => HostEvaluator::problems($s, $host['smart'], $config),
             'chart' => $samples === [] ? null : self::chart($samples, $now, $chartLabel),
             'has_gpu_series' => $s['gpus'] !== [],

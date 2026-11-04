@@ -19,12 +19,17 @@ final class Report
     public const MAX_INTERFACES = 32;
     public const MAX_SMART = 32;
     public const MAX_CONTAINERS = 200;
+    public const MAX_SERVICES = 50;
+    public const MAX_LOGS = 20;
+    public const MAX_LOG_BYTES = 20000;
+    /** Stavy služby podle systemd; jiná hodnota je unknown. */
+    public const SERVICE_STATES = ['active', 'inactive', 'failed', 'activating', 'deactivating', 'reloading'];
     /** Stavy kontejneru podle dockeru; jiná hodnota je unknown. */
     public const CONTAINER_STATES = ['running', 'restarting', 'paused', 'exited', 'created', 'dead', 'removing'];
 
     /**
      * @param array<string, mixed> $input
-     * @return array{snapshot: array<string, mixed>, smart: list<array<string, mixed>>|null, smart_error: string, containers: list<array<string, mixed>>|null, external_id: string, object_id: ?string}
+     * @return array{snapshot: array<string, mixed>, smart: list<array<string, mixed>>|null, smart_error: string, containers: list<array<string, mixed>>|null, logs: list<array{path: string, lines: string}>|null, external_id: string, object_id: ?string}
      */
     public static function normalize(array $input, string $nowDb): array
     {
@@ -127,11 +132,33 @@ final class Report
             $containers = array_values(array_column($containers, null, 'name'));
         }
         $snapshot['containers'] = $containers;
+
+        // Služby systemd (null = agent je neposlal).
+        $snapshot['services'] = is_array($input['services'] ?? null) && array_is_list($input['services'])
+            ? array_values(array_column(self::list($input['services'], self::MAX_SERVICES, static fn (array $s): ?array => ($name = self::str($s['name'] ?? null, 100)) === ''
+                || preg_match('/^[A-Za-z0-9@_.\-]+$/', $name) !== 1 ? null : [
+                    'name' => $name,
+                    'active' => in_array($a = strtolower(self::str($s['active'] ?? null, 20)), self::SERVICE_STATES, true) ? $a : 'unknown',
+                    'sub' => self::str($s['sub'] ?? null, 30),
+                    'enabled' => self::str($s['enabled'] ?? null, 30),
+                    'restarts' => self::int($s['restarts'] ?? null, 0, 1000000),
+                ]), null, 'name'))
+            : null;
+
+        // Konce logů (jen občas, null = beze změny). Tajné údaje se maskují hned při příjmu.
+        $logs = null;
+        if (is_array($input['logs'] ?? null) && array_is_list($input['logs'])) {
+            $logs = self::list($input['logs'], self::MAX_LOGS, static fn (array $l): ?array => ($path = self::str($l['path'] ?? null, 300)) === '' || !str_starts_with($path, '/') ? null : [
+                'path' => $path,
+                'lines' => \Nordvarr\Security\SecretMasker::maskStrict(self::text($l['lines'] ?? null, self::MAX_LOG_BYTES)),
+            ]);
+        }
         $snapshot['containers_error'] = self::str($input['containers_error'] ?? null, 60);
 
         return [
             'snapshot' => $snapshot,
             'containers' => $containers,
+            'logs' => $logs,
             'smart' => $smart,
             'smart_error' => self::str($input['smart_error'] ?? null, 60),
             'external_id' => $externalId,
@@ -216,6 +243,23 @@ final class Report
     public static function pct(?int $total, ?int $used): ?float
     {
         return $total === null || $used === null || $total <= 0 ? null : round(100 * max(0, $used) / $total, 1);
+    }
+
+    /**
+     * Víceřádkový text (logy): bez řídicích znaků kromě konce řádku a tabulátoru, nejvýš $max bajtů z konce.
+     */
+    private static function text(mixed $value, int $max): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+        $value = mb_scrub(str_replace("\r", '', $value), 'UTF-8');
+        $value = preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $value) ?? '';
+        if (strlen($value) > $max) {
+            $value = mb_strcut($value, strlen($value) - $max, $max, 'UTF-8');
+        }
+
+        return $value;
     }
 
     private static function str(mixed $value, int $max): string

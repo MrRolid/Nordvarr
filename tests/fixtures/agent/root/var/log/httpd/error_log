@@ -1,0 +1,2 @@
+[Wed Nov 04 10:00:00.000000 2026] [core:error] [pid 1234] [client 192.0.2.50:5000] AH00128: File does not exist: /var/www/html/favicon.ico
+[Wed Nov 04 10:01:00.000000 2026] [php:error] [pid 1235] PHP Fatal error: Uncaught Error in /var/www/shop/index.php:12

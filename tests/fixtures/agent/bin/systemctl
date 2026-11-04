@@ -1,0 +1,18 @@
+#!/bin/sh
+# Falešné systemctl: seznam služeb a jejich stav.
+case "$1" in
+    list-unit-files)
+        printf 'httpd.service enabled disabled\nmariadb.service enabled disabled\npostgresql.service disabled disabled\nphp-fpm.service enabled disabled\nsshd.service enabled enabled\ntuned.service enabled enabled\n'
+        ;;
+    show)
+        case "$2" in
+            httpd.service) printf 'ActiveState=active\nSubState=running\nUnitFileState=enabled\nNRestarts=0\n' ;;
+            mariadb.service) printf 'ActiveState=failed\nSubState=failed\nUnitFileState=enabled\nNRestarts=3\n' ;;
+            postgresql.service) printf 'ActiveState=inactive\nSubState=dead\nUnitFileState=disabled\nNRestarts=0\n' ;;
+            php-fpm.service) printf 'ActiveState=active\nSubState=running\nUnitFileState=enabled\nNRestarts=0\n' ;;
+            sshd.service) printf 'ActiveState=active\nSubState=running\nUnitFileState=enabled\nNRestarts=0\n' ;;
+            *) printf 'ActiveState=inactive\nSubState=dead\nUnitFileState=\nNRestarts=0\n' ;;
+        esac
+        ;;
+    *) exit 1 ;;
+esac

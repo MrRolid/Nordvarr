@@ -47,6 +47,7 @@ final class AgentScriptTest extends TestCase
             'NORDVARR_SMARTCTL' => $this->fixtures . '/bin/smartctl',
             'NORDVARR_NVIDIA_SMI' => $this->fixtures . '/bin/nvidia-smi',
             'NORDVARR_DOCKER' => $this->fixtures . '/bin/docker',
+            'NORDVARR_SYSTEMCTL' => $this->fixtures . '/bin/systemctl',
             'LC_ALL' => 'C',
         ];
         $process = proc_open(['bash', $this->script, ...($arg === '' ? [] : [$arg])], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
@@ -74,7 +75,7 @@ final class AgentScriptTest extends TestCase
     {
         exec('bash -n ' . escapeshellarg($this->script) . ' 2>&1', $out, $code);
         self::assertSame(0, $code, implode("\n", $out));
-        self::assertSame([0, "nordvarr-agent 1.1.0\n"], array_slice($this->agent('--version'), 0, 2));
+        self::assertSame([0, "nordvarr-agent 1.2.0\n"], array_slice($this->agent('--version'), 0, 2));
     }
 
     public function testCollectsMetricsAndRatesFromTwoRuns(): void
@@ -135,6 +136,29 @@ final class AgentScriptTest extends TestCase
         $none = $this->dryRun(['NORDVARR_DOCKER' => $this->tmp . '/nic/docker']);
         self::assertArrayNotHasKey('containers', $none);
         self::assertArrayNotHasKey('containers_error', $none);
+    }
+
+    public function testServicesAndLogs(): void
+    {
+        $data = $this->dryRun();
+        self::assertSame(['httpd', 'mariadb', 'php-fpm', 'sshd'], array_column($data['services'], 'name'), 'Vypnutá postgresql a neznámá služba se nehlásí.');
+        self::assertSame(['failed', 'failed', 3], [$data['services'][1]['active'], $data['services'][1]['sub'], $data['services'][1]['restarts']]);
+        self::assertSame(['/var/log/httpd/error_log', '/var/log/httpd/access_log'], array_column($data['logs'], 'path'));
+        self::assertCount(50, explode("\n", $data['logs'][1]['lines']), 'Posledních 50 řádků.');
+
+        // Server tajné hodnoty v logu zamaskuje a služby vyhodnotí.
+        $report = Report::normalize($data, $data['collected_at']);
+        self::assertStringNotContainsString('a8f3k2m9q7x1z5c4v6b8n0', $report['logs'][1]['lines']);
+        self::assertStringContainsString('PHP Fatal error', $report['logs'][0]['lines']);
+        self::assertSame(['active', 'failed'], array_column(array_slice($report['snapshot']['services'], 0, 2), 'active'));
+
+        // Výslovný seznam služeb, vypnuté služby a logy, interval logů.
+        $explicit = $this->dryRun(['NORDVARR_SERVICES' => 'postgresql httpd']);
+        self::assertSame(['postgresql', 'httpd'], array_column($explicit['services'], 'name'), 'Výslovně zadaná služba se hlásí i vypnutá.');
+        $off = $this->dryRun(['NORDVARR_SERVICES' => '0', 'NORDVARR_LOGS' => '0']);
+        self::assertArrayNotHasKey('services', $off);
+        self::assertArrayNotHasKey('logs', $off);
+        self::assertArrayNotHasKey('logs', $this->dryRun(['NORDVARR_LOG_INTERVAL' => '0']));
     }
 
     public function testMissingSmartctlAndSmartInterval(): void

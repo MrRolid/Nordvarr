@@ -129,6 +129,40 @@ $gauge = static function (string $label, ?float $pct, string $level, string $val
     </p>
     <?php endif; ?>
 
+    <?php if ($h['services_reported']): ?>
+    <h3><?= $v->t('host.services', ['count' => count($h['services'])]) ?></h3>
+    <?php if ($h['services'] === []): ?>
+    <p class="muted"><?= $v->t('host.services_none') ?></p>
+    <?php else: ?>
+    <div class="table-wrap">
+    <table class="list" data-test="host-services">
+        <thead><tr><th><?= $v->t('host.service') ?></th><th><?= $v->t('host.service_state') ?></th><th><?= $v->t('host.service_restarts') ?></th></tr></thead>
+        <tbody>
+        <?php foreach ($h['services'] as $svc): ?>
+        <tr>
+            <td><?= $v->e($svc['name']) ?><?php if ($svc['enabled'] !== '' && $svc['enabled'] !== 'enabled'): ?> <span class="muted small-text">(<?= $v->e($svc['enabled']) ?>)</span><?php endif; ?></td>
+            <td class="lvl-<?= $v->e($svc['level']) ?>"><?= $v->e($svc['active'] . ($svc['sub'] !== '' ? ' (' . $svc['sub'] . ')' : '')) ?></td>
+            <td><?= $svc['restarts'] === null ? '-' : $v->e($svc['restarts']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if ($h['logs'] !== []): ?>
+    <h3><?= $v->t('host.logs') ?> <span class="muted small-text"><?= $v->ago((string) $h['logs_at']) ?></span></h3>
+    <div data-test="host-logs">
+        <?php foreach ($h['logs'] as $log): ?>
+        <details class="host-log">
+            <summary><code><?= $v->e($log['path']) ?></code></summary>
+            <pre><?= $v->e($log['lines'] !== '' ? $log['lines'] : $v->t('host.log_empty')) ?></pre>
+        </details>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
     <?php if ($h['containers_reported'] || $h['containers_error'] !== ''): ?>
     <h3><?= $v->t('host.containers', ['count' => count($h['containers'])]) ?></h3>
     <?php if ($h['containers_error'] !== ''): ?>
