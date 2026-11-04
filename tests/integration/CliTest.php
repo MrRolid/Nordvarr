@@ -140,6 +140,18 @@ final class CliTest extends TestCase
         }
     }
 
+    public function testWorkerErrorIsLoggedToDataDir(): void
+    {
+        // Poškozená databáze: worker spadne uprostřed běhu (cron má výstup v /dev/null, chyba musí být v logu).
+        $pdo = new \PDO('sqlite:' . $this->tmp . '/nordvarr-data/nordvarr.sqlite');
+        $pdo->exec('DROP TABLE check_state');
+        [$code, $out] = $this->cli('worker');
+        self::assertSame(1, $code);
+        self::assertStringContainsString('Chyba workeru:', $out);
+        $log = (string) file_get_contents($this->tmp . '/nordvarr-data/logs/worker-error.log');
+        self::assertMatchesRegularExpression('/^\[\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ\] PDOException: .*check_state/', $log);
+    }
+
     public function testWorkerWaitsForPendingMigrations(): void
     {
         file_put_contents($this->app . '/migrations/9002_cekajici.sql', 'CREATE TABLE cekajici (id TEXT);');
