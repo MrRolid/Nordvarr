@@ -652,3 +652,7 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 /* Odkaz na web (adresa kontroly HTTP, atribut s URL), otevírá se v nové kartě. */
 .web-link { white-space: nowrap; }
 .web-link-icon { margin-left: .25em; vertical-align: baseline; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Logy služeb na kartě serveru. */
+.host-log { margin: .3rem 0; }
+.host-log pre { max-height: 24rem; overflow: auto; font-size: .78rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }

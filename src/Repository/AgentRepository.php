@@ -76,6 +76,17 @@ final class AgentRepository
     }
 
     /**
+     * Uloží konce logů služeb (posílají se jen občas, mezi tím zůstávají poslední).
+     *
+     * @param list<array{path: string, lines: string}> $logs
+     */
+    public function saveLogs(string $objectId, array $logs, string $at): void
+    {
+        $this->pdo->prepare('UPDATE agent_hosts SET logs = ?, logs_at = ? WHERE object_id = ?')
+            ->execute([json_encode($logs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), $at, $objectId]);
+    }
+
+    /**
      * @param array<string, float|null> $sample
      */
     public function insertSample(string $objectId, string $at, array $sample): void
@@ -150,6 +161,7 @@ final class AgentRepository
     {
         $row['snapshot'] = json_decode((string) $row['snapshot'], true) ?: [];
         $row['smart'] = json_decode((string) $row['smart'], true) ?: [];
+        $row['logs'] = json_decode((string) ($row['logs'] ?? '[]'), true) ?: [];
 
         return $row;
     }

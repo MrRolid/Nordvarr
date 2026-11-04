@@ -236,3 +236,11 @@ Kandidát z F12. `SPEC.md` se nemění.
 3. **Externí služby sdílí patro s typem `other`** (Internet a externí služby). Typ `other` zůstává pro věci, které jinam nepatří.
 4. **Verze 0.10.0.**
 
+## 2026-11-05 (F15 Služby a logy z agenta)
+
+1. **Služby jako problém kontroly serveru, ne jako objekty** (na rozdíl od kontejnerů v F12/F13): služby systemd jsou součást serveru a v inventáři už bývají ručně založené služby (např. "nginx na web1"), automatické objekty by vznikaly duplicitně. Stav je v tabulce na kartě serveru.
+2. **Spadlá nebo zapnutá a neběžící služba = nefunguje.** Vypnutá služba se bez výslovného seznamu nehlásí vůbec (je jen nainstalovaná).
+3. **Logy jednou za 10 minut, 50 řádků, nejvýš 20 kB na soubor a 20 souborů**, jak chtěl vlastník. Agent je posílá syrové, server je hned při příjmu maskuje (stejné maskování jako export pro LLM) a ukládá jen poslední stav (žádná historie logů, Nordvarr není sběr logů).
+4. **Logy do exportu pro LLM nejdou** (mohou obsahovat osobní údaje návštěvníků).
+5. **Verze 0.11.0, agent 1.2.0.**
+

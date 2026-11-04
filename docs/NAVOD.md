@@ -315,6 +315,8 @@ Agent je jeden skript pro bash (`agent/nordvarr-agent.sh`), který každou minut
 | Síťový provoz rozhraní (průměr za minutu) | `/proc/net/dev` |
 | Stav disků ze SMART: zdraví, opotřebení SSD a NVMe, teplota, provozní hodiny, přemapované a čekající sektory, chyby média a chyby v logu disku | `smartctl -j` jednou za 15 minut |
 | Kontejnery Dockeru: jméno, obraz, stav, healthcheck, návratový kód, projekt docker compose | `docker ps -a` (když je docker nainstalovaný) |
+| Služby: Apache/httpd, nginx, MariaDB/MySQL, PostgreSQL, PHP-FPM, Redis, Docker, SSH, cron, pošta a další známé služby (stav, počet restartů) | `systemctl` |
+| Posledních 50 řádků logů služeb (Apache, nginx, MariaDB/MySQL, PHP-FPM, Redis, PostgreSQL), jednou za 10 minut | `tail` |
 
 Výstup `smartctl` a `docker ps` posílá agent v původní podobě JSON, rozbor (ATA/SATA i NVMe, stav kontejneru) dělá server.
 
@@ -357,6 +359,9 @@ Bez `mod_rewrite` nastavte `NORDVARR_URL=https://nordvarr.example.com/index.php?
 | `NORDVARR_SMART_INTERVAL` | sekundy mezi čteními SMART (výchozí 900, 0 = nečíst) |
 | `NORDVARR_SMARTCTL`, `NORDVARR_NVIDIA_SMI` | jiná cesta k příkazům |
 | `NORDVARR_DOCKER` | jiná cesta k příkazu `docker`, `0` = kontejnery nehlásit |
+| `NORDVARR_SERVICES` | hlídané služby oddělené mezerou (např. `httpd mariadb php-fpm`); výchozí jsou všechny známé zapnuté nebo běžící služby, `0` = nehlásit |
+| `NORDVARR_LOGS` | logy ke čtení oddělené mezerou (cesty); výchozí jsou známé logy služeb, `0` = neposílat |
+| `NORDVARR_LOG_INTERVAL` | sekundy mezi posíláním logů (výchozí 600) |
 
 Soubor se jen čte jako dvojice `KLÍČ=hodnota`, nic z něj se nespouští. Token se curl předává přes soubor s právy 600, takže není vidět v seznamu procesů. Poslední chyba odeslání je v `/var/lib/nordvarr-agent/last-error`.
 
@@ -366,6 +371,14 @@ Soubor se jen čte jako dvojice `KLÍČ=hodnota`, nic z něj se nespouští. Tok
 - Karta objektu ukáže sekci **Server (agent)**: ukazatele CPU, RAM, swapu, nejplnějšího disku, nejvyšší teploty a každé GPU, graf za 24 h, zaplnění disků, stav disků ze SMART a všechna teplotní čidla.
 - V topologii má uzel serveru v popisku CPU, RAM a GPU a panel uzlu ukazuje pruhy hodnot.
 - Export pro LLM obsahuje sekci se stavem serveru.
+
+### Služby a logy
+
+Agent od verze 1.2.0 hlídá služby systemd a posílá konce jejich logů:
+
+- Karta serveru má tabulku **Služby** se stavem a počtem restartů. Spadlá služba (`failed`) nebo služba, která je zapnutá, ale neběží, je problém kontroly Agent serveru (`service_down`, nefunguje).
+- Bez nastavení agent hlídá známé služby, které jsou zapnuté nebo běží. Vlastní seznam nastavíte v `NORDVARR_SERVICES`.
+- Jednou za 10 minut agent pošle posledních 50 řádků (nejvýš 20 kB) z logů služeb. Na kartě serveru jsou v části **Logy služeb**, každý log se rozbalí kliknutím. Hesla, tokeny a podobné hodnoty server při příjmu maskuje, i tak ale logy berte jako citlivé: vidí je každý přihlášený do Nordvarru.
 
 ### Kontejnery Dockeru
 
@@ -406,6 +419,7 @@ Nastavují se na detailu kontroly (Upravit). Problém se hlásí po 3 hlášení
 | opotřebení SSD/NVMe | `disk_wear` | omezeně (nefunguje při 100 %) | 80 % |
 | SMART hlásí selhání, atribut pod prahem výrobce, kritické varování NVMe | `disk_failing` | nefunguje | - |
 | přemapované, čekající nebo neopravitelné sektory, chyby média, chyby v logu disku | `disk_errors` | omezeně | - |
+| služba spadla (`failed`) nebo je zapnutá, ale neběží | `service_down` | nefunguje | - |
 
 Kontrola posílá notifikace i při stavu omezeně (lze vypnout). Hodnoty se ukládají 48 h po minutách a 400 dní jako hodinové souhrny.
 

@@ -3,7 +3,8 @@
 #
 # Každou minutu (cron nebo systemd timer) pošle do Nordvarru stav serveru:
 # CPU, load, RAM, swap, zaplnění disků, teploty, NVIDIA GPU, síťový provoz
-# a jednou za 15 minut stav disků ze SMART (smartctl, vyžaduje root), volitelně seznam kontejnerů Dockeru.
+# a jednou za 15 minut stav disků ze SMART (smartctl, vyžaduje root), volitelně seznam kontejnerů Dockeru,
+# stav služeb (systemd: web, databáze, PHP-FPM...) a jednou za 10 minut posledních 50 řádků logů služeb.
 # Závislosti: bash 4+, curl, coreutils (df, timeout), volitelně smartmontools, nvidia-smi a docker.
 #
 # Použití:
@@ -21,11 +22,15 @@
 #   NORDVARR_SMART_INTERVAL=900                    (sekundy mezi čteními SMART, 0 = nečíst)
 #   NORDVARR_SMARTCTL=smartctl, NORDVARR_NVIDIA_SMI=nvidia-smi   (nepovinné: jiná cesta k příkazům)
 #   NORDVARR_DOCKER=docker                         (nepovinné: cesta k příkazu docker, 0 = kontejnery nehlásit)
+#   NORDVARR_SERVICES="httpd mariadb"              (nepovinné: hlídané služby systemd; výchozí = známé služby, 0 = nehlásit)
+#   NORDVARR_LOGS="/var/log/httpd/error_log"       (nepovinné: logy ke čtení; výchozí = známé logy, 0 = neposílat)
+#   NORDVARR_LOG_INTERVAL=600                      (sekundy mezi posíláním logů)
+#   NORDVARR_SYSTEMCTL=systemctl                   (nepovinné: jiná cesta k systemctl)
 
 set -u
 umask 077
 
-AGENT_VERSION="1.1.0"
+AGENT_VERSION="1.2.0"
 MODE="send"
 case "${1:-}" in
     --dry-run) MODE="dry" ;;
@@ -43,7 +48,7 @@ if [ -r "$CONF" ]; then
         value="${value%$'\r'}"
         value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
         case "$key" in
-            NORDVARR_URL|NORDVARR_TOKEN|NORDVARR_EXTERNAL_ID|NORDVARR_OBJECT_ID|NORDVARR_HOSTNAME|NORDVARR_SMART_INTERVAL|NORDVARR_STATE_DIR|NORDVARR_SMARTCTL|NORDVARR_NVIDIA_SMI|NORDVARR_DOCKER)
+            NORDVARR_URL|NORDVARR_TOKEN|NORDVARR_EXTERNAL_ID|NORDVARR_OBJECT_ID|NORDVARR_HOSTNAME|NORDVARR_SMART_INTERVAL|NORDVARR_STATE_DIR|NORDVARR_SMARTCTL|NORDVARR_NVIDIA_SMI|NORDVARR_DOCKER|NORDVARR_SERVICES|NORDVARR_LOGS|NORDVARR_LOG_INTERVAL|NORDVARR_SYSTEMCTL)
                 [ -z "${!key:-}" ] && printf -v "$key" '%s' "$value" ;;
         esac
     done < "$CONF"
@@ -58,6 +63,8 @@ TOKEN="${NORDVARR_TOKEN:-}"
 SMARTCTL="${NORDVARR_SMARTCTL:-smartctl}"
 NVIDIA_SMI="${NORDVARR_NVIDIA_SMI:-nvidia-smi}"
 DOCKER="${NORDVARR_DOCKER:-docker}"
+SYSTEMCTL="${NORDVARR_SYSTEMCTL:-systemctl}"
+LOG_INTERVAL="${NORDVARR_LOG_INTERVAL:-600}"
 
 if [ "$MODE" != "dry" ] && { [ -z "$URL" ] || [ -z "$TOKEN" ]; }; then
     echo "Chybí NORDVARR_URL nebo NORDVARR_TOKEN (soubor $CONF)." >&2
@@ -248,6 +255,62 @@ if [ "$DOCKER" != "0" ] && command -v "$DOCKER" >/dev/null 2>&1; then
     fi
 fi
 
+# --- Služby systemd -------------------------------------------------------------
+
+# Známé služby (web, databáze, PHP, cache, pošta, SSH, cron); hlásí se jen zapnuté nebo běžící.
+KNOWN_SERVICES='^(httpd|apache2|nginx|lighttpd|caddy|mariadb|mysql|mysqld|postgresql(@[^.]*|-[0-9.]+)?|php[0-9.]*-fpm|php-fpm|redis(-server)?|memcached|docker|containerd|sshd|ssh|crond|cron|postfix|exim4|dovecot|named|bind9|haproxy|varnish|elasticsearch|mongod|rabbitmq-server|fail2ban)\.service$'
+SERVICES_JSON=""
+SERVICES_LIST="${NORDVARR_SERVICES:-}"
+if [ "$SERVICES_LIST" != "0" ] && command -v "$SYSTEMCTL" >/dev/null 2>&1; then
+    if [ -z "$SERVICES_LIST" ]; then
+        SERVICES_LIST="$(timeout 10 "$SYSTEMCTL" list-unit-files --type=service --no-legend --no-pager 2>/dev/null | awk '{print $1}' | grep -E "$KNOWN_SERVICES" | head -n 50 | tr '\n' ' ')"
+    fi
+    SVC_ITEMS=()
+    for unit in $SERVICES_LIST; do
+        case "$unit" in *.service) ;; *) unit="$unit.service" ;; esac
+        props="$(timeout 5 "$SYSTEMCTL" show "$unit" --property=ActiveState,SubState,UnitFileState,NRestarts 2>/dev/null)"
+        active="$(printf '%s\n' "$props" | sed -n 's/^ActiveState=//p')"
+        sub="$(printf '%s\n' "$props" | sed -n 's/^SubState=//p')"
+        enabled="$(printf '%s\n' "$props" | sed -n 's/^UnitFileState=//p')"
+        restarts="$(printf '%s\n' "$props" | sed -n 's/^NRestarts=//p')"
+        # Vypnutá a neběžící služba se nehlásí (je jen nainstalovaná), výslovně zadaná ano.
+        if [ -z "${NORDVARR_SERVICES:-}" ] && [ "$enabled" != "enabled" ] && [ "$active" != "active" ]; then
+            continue
+        fi
+        [ -n "$active" ] || continue
+        SVC_ITEMS+=("{\"name\":$(jstr "${unit%.service}"),\"active\":$(jstr "$active"),\"sub\":$(jstr "$sub"),\"enabled\":$(jstr "$enabled"),\"restarts\":$(jnum "$restarts")}")
+    done
+    SERVICES_JSON="[$(join_by_comma "${SVC_ITEMS[@]}")]"
+fi
+
+# --- Logy služeb (jednou za NORDVARR_LOG_INTERVAL sekund) --------------------------
+
+LOGS_JSON=""
+LOG_STAMP="$STATE_DIR/logs-at"
+LAST_LOGS="$(read_first "$LOG_STAMP")"
+if [ "${NORDVARR_LOGS:-}" != "0" ] && [ "$LOG_INTERVAL" -gt 0 ] && [ $(( NOW_EPOCH - ${LAST_LOGS:-0} )) -ge "$LOG_INTERVAL" ]; then
+    if [ -n "${NORDVARR_LOGS:-}" ]; then
+        LOG_FILES="$NORDVARR_LOGS"
+    else
+        LOG_FILES=""
+        for f in /var/log/httpd/error_log /var/log/httpd/access_log /var/log/apache2/error.log /var/log/apache2/access.log \
+                 /var/log/nginx/error.log /var/log/nginx/access.log /var/log/mariadb/mariadb.log /var/log/mysql/error.log \
+                 /var/log/php-fpm/error.log /var/log/php-fpm/www-error.log /var/log/redis/redis.log /var/log/postgresql/postgresql.log; do
+            [ -f "$ROOT$f" ] && LOG_FILES="$LOG_FILES $ROOT$f"
+        done
+    fi
+    LOG_ITEMS=()
+    for f in $LOG_FILES; do
+        [ -r "$f" ] || continue
+        # Posledních 50 řádků, nejvýš 20 kB; maskování tajných údajů dělá server.
+        lines="$(tail -n 50 "$f" 2>/dev/null | tail -c 20000)"
+        LOG_ITEMS+=("{\"path\":$(jstr "${f#"$ROOT"}"),\"lines\":$(jstr "$lines")}")
+        [ "${#LOG_ITEMS[@]}" -ge 20 ] && break
+    done
+    LOGS_JSON="[$(join_by_comma "${LOG_ITEMS[@]}")]"
+    [ "$MODE" = "dry" ] || echo "$NOW_EPOCH" > "$LOG_STAMP"
+fi
+
 # --- Hlášení ------------------------------------------------------------------
 
 PAYLOAD="$STATE_DIR/payload.json"
@@ -268,6 +331,8 @@ PAYLOAD="$STATE_DIR/payload.json"
     [ -n "$SMART_ERROR" ] && printf ',"smart_error":%s' "$(jstr "$SMART_ERROR")"
     [ -n "$CONTAINERS_JSON" ] && printf ',"containers":%s' "$CONTAINERS_JSON"
     [ -n "$CONTAINERS_ERROR" ] && printf ',"containers_error":%s' "$(jstr "$CONTAINERS_ERROR")"
+    [ -n "$SERVICES_JSON" ] && printf ',"services":%s' "$SERVICES_JSON"
+    [ -n "$LOGS_JSON" ] && printf ',"logs":%s' "$LOGS_JSON"
     printf '}\n'
 } > "$PAYLOAD"
 
@@ -289,7 +354,7 @@ if [ "$CODE" = "200" ]; then
     [ "$MODE" = "test" ] && { echo "OK: $(cat "$RESPONSE")"; }
     exit 0
 fi
-# Při chybě se SMART zkusí poslat znovu příště.
-rm -f "$SMART_STAMP"
+# Při chybě se SMART a logy zkusí poslat znovu příště.
+rm -f "$SMART_STAMP" "$LOG_STAMP"
 echo "Odeslání selhalo (HTTP ${CODE:-000}): $(cat "$RESPONSE" 2>/dev/null) $(cat "$STATE_DIR/last-error" 2>/dev/null)" | tee -a "$STATE_DIR/last-error" >&2
 exit 2

@@ -27,7 +27,7 @@ final class HostEvaluator
 
     /** Pořadí důležitosti kódů při stejné závažnosti. */
     private const PRIORITY = [
-        Reason::DISK_FAILING, Reason::TEMPERATURE_HIGH, Reason::DISK_FULL, Reason::DISK_WEAR, Reason::DISK_ERRORS,
+        Reason::SERVICE_DOWN, Reason::DISK_FAILING, Reason::TEMPERATURE_HIGH, Reason::DISK_FULL, Reason::DISK_WEAR, Reason::DISK_ERRORS,
         Reason::MEMORY_HIGH, Reason::CPU_HIGH,
     ];
 
@@ -100,6 +100,15 @@ final class HostEvaluator
             if ($disk['wear_pct'] !== null && $disk['wear_pct'] >= (float) $c['wear_degraded_pct']) {
                 $add($disk['wear_pct'] >= 100 ? Status::UNHEALTHY : Status::DEGRADED, Reason::DISK_WEAR,
                     sprintf('%s: opotřebení %s %%', $label, self::n($disk['wear_pct'])));
+            }
+        }
+
+        // Služby: spadlá (failed) nebo zapnutá, ale neběžící služba je výpadek serveru.
+        foreach ($snapshot['services'] ?? [] as $svc) {
+            if ($svc['active'] === 'failed') {
+                $add(Status::UNHEALTHY, Reason::SERVICE_DOWN, sprintf('služba %s spadla (failed)', $svc['name']));
+            } elseif ($svc['active'] === 'inactive' && $svc['enabled'] === 'enabled') {
+                $add(Status::UNHEALTHY, Reason::SERVICE_DOWN, sprintf('služba %s neběží', $svc['name']));
             }
         }
 
