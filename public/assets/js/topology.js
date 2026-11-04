@@ -35,11 +35,48 @@ if (el && window.cytoscape) {
     const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const urlFor = (template, id) => template.replace('__ID__', encodeURIComponent(id));
 
+    // Pruhy prostředků serveru s agentem (CPU, RAM, nejplnější disk) jako obrázek SVG v uzlu.
+    // Barva podle úrovně ze serveru, zastaralé hlášení šedě. Varianta bez textu pro malé uzly.
+    const RES_KEYS = { cpu: 'CPU', mem: 'RAM', disk: 'Disk' };
+    const resourceImage = (resources, withText) => {
+        const items = (resources?.items ?? []).filter((i) => RES_KEYS[i.key]);
+        if (items.length === 0) return null;
+        const color = (level) => css(resources.stale ? '--st-unknown'
+            : { ok: '--st-healthy', warn: '--st-degraded', crit: '--st-unhealthy' }[level] ?? '--st-unknown');
+        const track = css('--map-node-ring');
+        const text = css('--map-text');
+        const esc = (v) => String(v).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+        const row = 18;
+        const [x0, w] = withText ? [34, 52] : [0, 120];
+        const parts = items.map((item, i) => {
+            const y = i * row;
+            const fill = Math.max(2, Math.round((w * Math.min(100, item.pct)) / 100));
+            let out = `<rect x="${x0}" y="${y + 5}" width="${w}" height="8" rx="3" fill="${esc(track)}"/>`
+                + `<rect x="${x0}" y="${y + 5}" width="${fill}" height="8" rx="3" fill="${esc(color(item.level))}"/>`;
+            if (withText) {
+                out += `<text x="0" y="${y + 13}" font-size="11" font-weight="600" fill="${esc(text)}">${RES_KEYS[item.key]}</text>`
+                    + `<text x="120" y="${y + 13}" font-size="11" font-weight="600" text-anchor="end" fill="${esc(text)}">${item.pct}%</text>`;
+            }
+            return out;
+        });
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="${items.length * row}" viewBox="0 0 120 ${items.length * row}" `
+            + `font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">${parts.join('')}</svg>`;
+        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    };
+
     // Data uzlu doplněná o popisek a podíly stavů kontrol pro prstenec.
     const prepare = (graph) => {
         const nodes = graph.nodes.map((n) => {
             const d = { ...n.data };
-            d.label = d.subtitle ? `${d.name}\n${d.subtitle}` : d.name;
+            d.resImg = resourceImage(d.resources, true);
+            d.resBars = resourceImage(d.resources, false);
+            d.hasRes = d.resImg !== null;
+            if (!d.hasRes) {
+                delete d.resImg;
+                delete d.resBars;
+            }
+            // U serveru s pruhy prostředků je v popisku jen název, hodnoty jsou v pruzích.
+            d.label = d.subtitle && !d.hasRes ? `${d.name}\n${d.subtitle}` : d.name;
             const total = STATUSES.reduce((sum, s) => sum + (d.ring?.[s] ?? 0), 0);
             for (const s of STATUSES) d[`p_${s}`] = total > 0 ? (100 * (d.ring?.[s] ?? 0)) / total : 0;
             d.hasChecks = total > 0;
@@ -99,6 +136,26 @@ if (el && window.cytoscape) {
                 },
             },
             { selector: 'node[?hasChecks]', style: { 'border-width': 0 } },
+            {
+                selector: 'node[?hasRes]',
+                style: compact ? {
+                    'background-image': 'data(resBars)',
+                    'background-fit': 'none',
+                    'background-width': '62%',
+                    'background-height': 'auto',
+                    'background-clip': 'node',
+                } : {
+                    // Pruhy ve spodní polovině uvnitř prstence, název nad nimi.
+                    'background-image': 'data(resImg)',
+                    'background-fit': 'none',
+                    'background-width': '62%',
+                    'background-height': 'auto',
+                    'background-position-y': '66%',
+                    'background-clip': 'node',
+                    'text-margin-y': -27,
+                    'text-max-width': 70,
+                },
+            },
             { selector: 'node[status = "unhealthy"]', style: { 'underlay-color': c['st-unhealthy'], 'underlay-opacity': 0.16, 'underlay-padding': 10, 'underlay-shape': 'ellipse' } },
             { selector: 'node[status = "degraded"]', style: { 'underlay-color': c['st-degraded'], 'underlay-opacity': 0.12, 'underlay-padding': 8, 'underlay-shape': 'ellipse' } },
             { selector: 'node[status = "paused"]', style: { 'border-style': 'dashed', 'border-width': 2, 'border-color': c['st-paused'] } },
@@ -518,7 +575,14 @@ if (el && window.cytoscape) {
     if (mode === '3d') enter3d();
 
     // Přepnutí světlého a tmavého režimu.
-    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => cy.style(style()));
+    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+        // Pruhy prostředků mají barvy zapečené v obrázku, proto se vytvoří znovu.
+        for (const e of prepare(lastGraph)) {
+            const node = cy.getElementById(e.data.id);
+            if (!node.empty()) node.data(e.data);
+        }
+        cy.style(style());
+    });
 
     // Obnovování dat grafu s ETag: aktivní karta 15 s, na pozadí 60 s, při chybě zpomalit.
     let etag = null;

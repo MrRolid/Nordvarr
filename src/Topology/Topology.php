@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nordvarr\Topology;
 
+use Nordvarr\Agent\HostResources;
 use Nordvarr\Agent\Report;
 use Nordvarr\Alerts\MaintenanceState;
 use Nordvarr\Checks\ObjectStatus;
@@ -183,6 +184,7 @@ final class Topology
                 'center' => $id === $centerId,
                 'subtitle' => isset($hosts[$id]) ? $this->hostSubtitle($hosts[$id]) : $this->subtitle($object, $status, $latency, count($checks)),
                 'host' => isset($hosts[$id]),
+                'resources' => isset($hosts[$id]) ? HostResources::evaluate($hosts[$id], self::agentConfig($checks)) : null,
                 'floor' => $floor,
             ]];
         }
@@ -224,6 +226,23 @@ final class Topology
         $floors = array_map(fn (array $b): array => $b + ['label' => $this->i18n->t('floor.' . $b['floor'])], $layout['bands']);
 
         return ['nodes' => $nodes, 'edges' => $edges, 'floors' => $floors];
+    }
+
+    /**
+     * Prahy z kontroly typu agent (první nalezená), jinak výchozí.
+     *
+     * @param list<array<string, mixed>> $checks
+     * @return array<string, mixed>
+     */
+    private static function agentConfig(array $checks): array
+    {
+        foreach ($checks as $check) {
+            if ($check['type'] === 'agent' && is_array($check['config'])) {
+                return $check['config'];
+            }
+        }
+
+        return [];
     }
 
     /**

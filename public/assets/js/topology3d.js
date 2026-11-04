@@ -59,14 +59,32 @@ export function createMap3d(container, graph, options = {}) {
 
     const statusColor = (status) => color(STATUS_VARS[status] ?? 'map-node-ring');
 
-    // Popisek uzlu: název, u serveru s agentem pod ním vytížení (CPU, RAM, GPU) z posledního hlášení.
+    // Popisek uzlu: název, u serveru s agentem pod ním vytížení (CPU, RAM, disk, GPU) z posledního hlášení.
     const fillLabel = (label, d) => {
         label.className = `map3d-label st-${d.status}`;
         const name = document.createElement('span');
         name.textContent = d.name;
         name.dataset.node = d.id;
         label.replaceChildren(name);
-        if (d.host && d.subtitle) {
+        const items = d.resources?.items ?? [];
+        if (d.host && items.length > 0) {
+            // Každá hodnota zvlášť s barvou podle úrovně (ok, blíží se prahu, překročen), zastaralé šedě.
+            const metrics = document.createElement('span');
+            metrics.className = `map3d-metrics${d.resources.stale ? ' stale' : ''}`;
+            metrics.dataset.node = d.id;
+            const names = { cpu: 'CPU', mem: 'RAM', disk: 'Disk', gpu: 'GPU' };
+            items.forEach((item, i) => {
+                if (i > 0) metrics.append(', ');
+                const part = document.createElement('span');
+                part.className = `res res-${item.level}`;
+                part.dataset.node = d.id;
+                part.dataset.res = item.key;
+                part.textContent = `${names[item.key] ?? item.key} ${item.pct} %`;
+                if (item.detail) part.title = item.detail;
+                metrics.append(part);
+            });
+            label.append(metrics);
+        } else if (d.host && d.subtitle) {
             const metrics = document.createElement('span');
             metrics.className = 'map3d-metrics';
             metrics.dataset.node = d.id;

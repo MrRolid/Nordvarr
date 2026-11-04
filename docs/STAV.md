@@ -4,6 +4,14 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### 0.14.0 Stav prostředků v topologii (větev `faze-18-prostredky-v-topologii`)
+
+Z požadavku vlastníka: "viditelný stav prostředků na objektech v topologii, aby se tam dalo vidět barevně, kde je přetížený CPU nebo dochází disk".
+
+- `Agent\HostResources`: z posledního hlášení CPU, RAM, nejplnější disk (místo i inody) a GPU s úrovní ok, warn, crit podle prahů kontroly agenta; příznak zastaralého hlášení.
+- Topologie: data uzlu mají `resources`. Ve 2D pruhy jako obrázek SVG uvnitř uzlu (barvy se přegenerují při změně světlého a tmavého režimu), ve 3D barevné hodnoty pod názvem s mountem disku v nápovědě.
+- Testy: `HostResourcesTest`, `AgentUiTest` (data uzlu), e2e `agent.spec.js` (obrázek ve 2D, barvy a nápověda ve 3D).
+
 ### 0.13.0 Ruční datum expirace domény (větev `faze-17-whois`)
 
 Z problému vlastníka: expirace domény `.eu` je trvale "neznámý".
@@ -364,5 +372,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.13.0 (F14 poskytovatelé, F15 služby a logy z agenta, F16 dokumentace v kategoriích, ruční datum expirace domény): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Na serverech s agentem stáhnout agenta znovu (verze 1.2.0).
+- Release 0.14.0 (stav prostředků v topologii): vydat ručním spuštěním workflow CI na `main`. Nainstalovat agenta na servery vlastníka.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
