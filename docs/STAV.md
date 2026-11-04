@@ -312,5 +312,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.9.0 (F8 až F13) vydat z `main` tagem `v0.9.0` přes web GitHubu, až bude F13 sloučená (tag musí ukazovat na commit s `VERSION` 0.9.0). Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Release 0.9.0 (F8 až F13): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
