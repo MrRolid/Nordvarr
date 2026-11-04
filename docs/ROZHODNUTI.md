@@ -218,3 +218,8 @@ Kandidát z F12. `SPEC.md` se nemění.
 1. **Release jde vydat ručním spuštěním workflow CI na `main`** (workflow_dispatch). Tag se vezme ze souboru `VERSION` a vznikne spolu s vydáním na právě testovaném commitu, takže se nemůže opakovat chyba z vydání `v0.3.0` (tag na starém commitu). Důvod: z prostředí agenta nejde odeslat tag (proxy) a vlastník chtěl, aby vydání udělal agent. Vydání přes web GitHubu a odeslání tagu fungují dál.
 2. **Ochrana:** když tag s verzí už existuje a ukazuje na jiný commit, ruční spuštění skončí chybou (je potřeba zvýšit `VERSION` nebo tag smazat). Release vznikne až po úspěšných testech (`needs: [phpunit, e2e]`).
 
+## 2026-11-04 (oprava 0.9.1, starší libcurl)
+
+1. **Podpora libcurl starší než 7.85** (AlmaLinux/RHEL 9 má 7.76): místo `CURLOPT_PROTOCOLS_STR` se tam použije `CURLOPT_PROTOCOLS` se stejným omezením na http a https. Novější systémy dál používají textovou variantu (číselná je v libcurl označená jako zastaralá).
+2. **Chyba workeru do logu v datovém adresáři** (`logs/worker-error.log`): řádek pro cron posílá výstup do `/dev/null`, takže pád workeru nebyl nikde vidět. Log se nečistí automaticky, zapisuje se jen při chybě.
+

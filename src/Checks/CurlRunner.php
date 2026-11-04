@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nordvarr\Checks;
 
 use CurlHandle;
+use Nordvarr\Http\Client\CurlProtocols;
 use Nordvarr\Time;
 
 /**
@@ -96,13 +97,11 @@ final class CurlRunner
             CURLOPT_PROXY => '',
             CURLOPT_NOPROXY => '*',
             CURLOPT_NOSIGNAL => true,
-            CURLOPT_PROTOCOLS_STR => 'http,https',
-        ];
+        ] + CurlProtocols::options();
         if ($type === 'http') {
             $options += [
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_MAXREDIRS => 5,
-                CURLOPT_REDIR_PROTOCOLS_STR => 'http,https',
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_SSL_VERIFYHOST => 2,
                 CURLOPT_USERAGENT => $this->userAgent,

@@ -4,6 +4,13 @@ Aktualizováno: 2026-11-03
 
 ## Hotové fáze
 
+### Oprava 0.9.1 (větev `oprava-curl-starsi-libcurl`)
+
+- Na serveru s AlmaLinux 9 (PHP 8.5 z Remi, systémová libcurl 7.76) worker při každém běhu spadl na nedefinované konstantě `CURLOPT_PROTOCOLS_STR` (existuje až od libcurl 7.85). Kontroly tak nikdy nedostaly výsledek a zůstávaly ve stavu neznámý; cron měl výstup v `/dev/null`, takže chyba nebyla vidět.
+- `Http\Client\CurlProtocols`: na starší libcurl se použije číselná varianta `CURLOPT_PROTOCOLS` (stejné omezení na http a https). Použito v `CurlRunner` i `CurlHttpClient` (RDAP, notifikace).
+- Chyba workeru se nově zapisuje do `nordvarr-data/logs/worker-error.log` a worker skončí kódem 1.
+- Testy: `CurlProtocolsTest` (obě varianty, libcurl je přijme), `CliTest` (chyba workeru v logu).
+
 ### F13 Vlastní stav kontejneru (větev `faze-13-stav-kontejneru`)
 
 Kandidát z F12 (vlastník: "slouč a pokračuj").
@@ -312,5 +319,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.9.0 (F8 až F13): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
+- Release 0.9.1 (oprava pro starší libcurl): vydat ručním spuštěním workflow CI na `main` (Actions -> CI -> Run workflow), tag vznikne podle `VERSION`. Vydání `v0.3.0` s tagem na starém commitu doporučuji smazat. Na serverech s agentem stáhnout agenta znovu (verze 1.1.0).
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

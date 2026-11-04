@@ -123,6 +123,13 @@ final class Cli
                 Notifier::fromConfig($pdo, $this->appRoot, $config),
             );
             $worker->run($start + Worker::MAX_RUNTIME);
+        } catch (Throwable $e) {
+            // Cron má výstup obvykle v /dev/null; chyba se proto zapíše i do logu v datovém adresáři.
+            $line = sprintf("[%s] %s: %s (%s:%d)\n", gmdate('Y-m-d\TH:i:s\Z'), $e::class, $e->getMessage(), $e->getFile(), $e->getLine());
+            @file_put_contents($config->dataDir() . '/logs/worker-error.log', $line, FILE_APPEND);
+            fwrite($err, 'Chyba workeru: ' . $line);
+
+            return 1;
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);

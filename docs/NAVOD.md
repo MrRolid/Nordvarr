@@ -289,6 +289,7 @@ Funguje GET i POST. Když signál nepřijde do intervalu plus tolerance, kontrol
 | Přehled hlásí, že worker neběží | řádek v cronu, uživatel cronu, `php -v` v cronu (stejná verze jako web), práva k datovému adresáři |
 | API vrací `401` i se správným tokenem | předání hlavičky `Authorization` do PHP (viz `public/.htaccess`, u PHP-FPM `CGIPassAuth On` nebo `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1`) |
 | Adresy vedou na `index.php?r=...` | `mod_rewrite` není zapnutý nebo `AllowOverride` nepovoluje `.htaccess`; aplikace tak funguje dál |
+| Kontroly zůstávají ve stavu neznámý, i když cron worker spouští | chyba workeru je v `nordvarr-data/logs/worker-error.log` (cron má výstup obvykle v `/dev/null`); ruční běh `php bin/nordvarr.php worker` ji vypíše |
 | Kontrola ping má `tool_missing` | chybí příkaz `ping` nebo nemá oprávnění (`setcap cap_net_raw+ep /usr/bin/ping`), případně nastavte `ping_binary` |
 | Expirace domény je "neznámý" | server se nedostane na RDAP (`data.iana.org` a server registru) nebo TLD nemá RDAP |
 | E-mail se neodesílá | "Odeslat test" u kanálu, historie pokusů v detailu kanálu, port 465 (SSL) nebo 587 (STARTTLS) |

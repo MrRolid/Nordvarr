@@ -44,9 +44,7 @@ final class CurlHttpClient implements HttpClient
     {
         $body = '';
         $handle = curl_init($url);
-        curl_setopt_array($handle, $options + [
-            CURLOPT_PROTOCOLS_STR => 'http,https',
-            CURLOPT_REDIR_PROTOCOLS_STR => 'http,https',
+        curl_setopt_array($handle, $options + CurlProtocols::options() + [
             CURLOPT_TIMEOUT => max(1, $timeoutS),
             CURLOPT_USERAGENT => $this->userAgent,
             CURLOPT_ENCODING => '',
