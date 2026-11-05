@@ -4,6 +4,11 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### Oprava 0.16.1 (větev `oprava-ukonceni-udrzby`)
+
+- "Ukončit teď" u údržbového okna, které začalo ve stejné sekundě (časy jsou na sekundy), nic neudělalo: ukončení vyžadovalo začátek striktně před "teď", stránka přitom okno ukazovala jako probíhající. Projevilo se jako občasné selhání e2e testu údržbového okna v CI.
+- `MaintenanceRepository::end` ukončí i takové okno a začátek posune o sekundu dřív (omezení konec > začátek). Test `MaintenanceEndTest`.
+
 ### 0.16.0 Logy webů (větev `faze-20-logy-webu`, agent 1.3.0)
 
 Z požadavku vlastníka: "výpis logů u webu" a "každý web může mít svůj log ve vlastním souboru, musí tam být možnost nastavovat cesty, odkud má agent data načítat".
