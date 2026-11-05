@@ -383,15 +383,18 @@ if [ "${NORDVARR_LOGS:-}" != "0" ] && [ "$LOG_INTERVAL" -gt 0 ] && [ $(( NOW_EPO
     fi
     # Logy webů a služeb zadané v Nordvarru (z poslední odpovědi serveru), jen z povolených adresářů.
     # Cesta se ověřuje po rozbalení odkazů, aby nešlo přes symbolický odkaz číst jiné soubory.
+    # Položka je "cesta" nebo "cesta|filtr" (jen řádky obsahující filtr, třeba název webu ze společného logu).
+    WEB_LOGS=()
     if [ -f "$STATE_DIR/log-paths" ]; then
-        while IFS= read -r p; do
-            [[ "$p" =~ ^/[A-Za-z0-9._@+/-]+$ ]] || continue
+        while IFS= read -r item; do
+            [[ "$item" =~ ^(/[A-Za-z0-9._@+/-]+)(\|([A-Za-z0-9._:@/-]{1,100}))?$ ]] || continue
+            p="${BASH_REMATCH[1]}"
             [[ "$p" =~ (^|/)\.\.?(/|$) ]] && continue
             real="$(realpath -e -- "$ROOT$p" 2>/dev/null)" || continue
             for allow in ${NORDVARR_LOG_ALLOW:-/var/log /var/www}; do
                 allow_real="$(realpath -e -- "$ROOT${allow%/}" 2>/dev/null)" || continue
                 if [[ "$real" == "$allow_real"/* ]]; then
-                    case " $LOG_FILES " in *" $ROOT$p "*) ;; *) LOG_FILES="$LOG_FILES $ROOT$p" ;; esac
+                    WEB_LOGS+=("$item")
                     break
                 fi
             done
@@ -404,6 +407,19 @@ if [ "${NORDVARR_LOGS:-}" != "0" ] && [ "$LOG_INTERVAL" -gt 0 ] && [ $(( NOW_EPO
         lines="$(tail -n 50 "$f" 2>/dev/null | tail -c 20000)"
         LOG_ITEMS+=("{\"path\":$(jstr "${f#"$ROOT"}"),\"lines\":$(jstr "$lines")}")
         [ "${#LOG_ITEMS[@]}" -ge 20 ] && break
+    done
+    for item in "${WEB_LOGS[@]}"; do
+        [ "${#LOG_ITEMS[@]}" -ge 20 ] && break
+        p="${item%%|*}"
+        case " $LOG_FILES " in *" $ROOT$item "*) continue ;; esac
+        [ -r "$ROOT$p" ] || continue
+        if [ "$item" = "$p" ]; then
+            lines="$(tail -n 50 "$ROOT$p" 2>/dev/null | tail -c 20000)"
+        else
+            # Filtr: posledních 50 odpovídajících řádků z konce souboru (nejvýš posledních 20 000 řádků).
+            lines="$(tail -n 20000 "$ROOT$p" 2>/dev/null | grep -F -- "${item#*|}" | tail -n 50 | tail -c 20000)"
+        fi
+        LOG_ITEMS+=("{\"path\":$(jstr "$item"),\"lines\":$(jstr "$lines")}")
     done
     LOGS_JSON="[$(join_by_comma "${LOG_ITEMS[@]}")]"
     [ "$MODE" = "dry" ] || echo "$NOW_EPOCH" > "$LOG_STAMP"
@@ -450,7 +466,7 @@ rm -f "$HEADERS"
 if [ "$CODE" = "200" ]; then
     rm -f "$STATE_DIR/last-error"
     # Cesty k logům webů z odpovědi; když se změnily, logy se pošlou hned při dalším běhu.
-    paths="$(sed -n 's/.*"log_paths":\[\([^]]*\)\].*/\1/p' "$RESPONSE" | tr ',' '\n' | tr -d '"' | grep -E '^/[A-Za-z0-9._@+/-]+$' | grep -vE '(^|/)\.\.?(/|$)' | head -n 20)"
+    paths="$(sed -n 's/.*"log_paths":\[\([^]]*\)\].*/\1/p' "$RESPONSE" | tr ',' '\n' | tr -d '"' | grep -E '^/[A-Za-z0-9._@+/-]+(\|[A-Za-z0-9._:@/-]{1,100})?$' | grep -vE '(^|/)\.\.?(/|$)' | head -n 20)"
     if [ "$paths" != "$(cat "$STATE_DIR/log-paths" 2>/dev/null)" ]; then
         if [ -n "$paths" ]; then printf '%s\n' "$paths" > "$STATE_DIR/log-paths"; else rm -f "$STATE_DIR/log-paths"; fi
         rm -f "$LOG_STAMP"

@@ -12,6 +12,7 @@ Z požadavků vlastníka: "na straně agenta přidávat nové domény s logy a d
 - Stránka **Události** (nová položka navigace): barvy podle důležitosti, počty, filtr období, nejnižší důležitosti a typu. Důležitost i v přehledu, na časové ose objektu, v ručním formuláři, v API `/api/v1/events`, v exportu inventáře a pro LLM.
 - API agenta: `/api/v1/agent/event` (událost k serveru, volitelně k webu, id jedinečné v rámci serveru) a `/api/v1/agent/site` (web na serveru: objekt, vztah, cesty k logům, volitelně doporučené kontroly). Agent 1.4.0: `nordvarr-agent.sh event` a `site`.
 - 3D: klik na stěnu kostky natočí kameru kolmo na stěnu a přiblíží.
+- Logy webů s filtrem `cesta | text` pro společný log (hromadný hosting s `VirtualDocumentRoot` loguje všechny weby do jednoho souboru): agent pošle jen řádky s textem. Zjištěno na serveru vlastníka, kde vlastní log webu zůstával prázdný, protože provoz z Cloudflare jde do výchozího vhostu na 443.
 - NAVOD kapitola 13 (agent, fail2ban, CrowdSec, aplikace přes API).
 - Testy: `AgentEventsTest`, `EventSeverityMigrationTest`, `AgentScriptTest` (podpříkazy), e2e `agent.spec.js` (události, natočení kostky), `mobile.spec.js` (šest položek navigace).
 

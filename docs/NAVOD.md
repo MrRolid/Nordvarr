@@ -396,6 +396,15 @@ Každý web může mít logy ve vlastním souboru (třeba `CustomLog /var/www/vh
 3. Server pošle agentovi cesty v odpovědi na hlášení. Při změně cest agent pošle logy hned při dalším běhu, potom jednou za 10 minut (posledních 50 řádků, nejvýš 20 kB).
 4. Logy jsou na kartě webu, u každého souboru je server a stáří. Soubor, který agent zatím neposlal, je označený "čeká na agenta".
 
+**Společný log pro víc webů** (typicky hromadný hosting s `VirtualDocumentRoot`, kde všechny weby logují do jednoho souboru): zadejte cestu a za svislou čáru text, podle kterého se řádky webu poznají, například `/var/log/httpd/weby_access_log | shop.example.com`. Agent pošle posledních 50 řádků, které text obsahují (hledá v posledních 20 000 řádcích souboru). Výchozí formát logu Apache název webu neobsahuje, přidejte ho do konfigurace (na serveru za Cloudflare i skutečnou adresu návštěvníka):
+
+```
+LogFormat "%V %{CF-Connecting-IP}i %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" weby
+CustomLog /var/log/httpd/weby_access_log weby
+```
+
+Filtr hledá text kdekoli v řádku, `example.com` tedy zachytí i `shop.example.com`; zadejte co nejpřesnější název.
+
 Agent čte jen soubory pod povolenými adresáři `NORDVARR_LOG_ALLOW` (výchozí `/var/log` a `/var/www`), cestu ověřuje po rozbalení symbolických odkazů. Bez toho by kdokoli s přístupem do Nordvarru mohl nechat agenta (běží jako root) poslat libovolný soubor serveru, třeba `/etc/shadow`. Logy jinde povolíte v `/etc/nordvarr-agent.conf`, například `NORDVARR_LOG_ALLOW=/var/log /var/www /srv/app/logs`.
 
 ### Kontejnery Dockeru

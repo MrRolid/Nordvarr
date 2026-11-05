@@ -154,7 +154,7 @@ test('logy webu: cesty na kartě webu, agent serveru je pošle, karta webu je uk
   const webUrl = await createObject(page, 'logy-shop.example.com', 'website');
 
   // Bez cest je formulář rozbalený.
-  await page.getByLabel('Cesty k souborům na serveru (jedna na řádek)').fill('/var/www/vhosts/shop_example_com/access.log');
+  await page.locator('#log-paths').fill('/var/www/vhosts/shop_example_com/access.log');
   await page.getByRole('button', { name: 'Uložit cesty' }).click();
   await expect(page.getByTestId('logs-no-agent')).toBeVisible();
 

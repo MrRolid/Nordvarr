@@ -289,5 +289,6 @@ Kandidát z F12. `SPEC.md` se nemění.
 3. **Agent posílá události vlastním endpointem** `/api/v1/agent/event` se svým tokenem (scope `agent:write`), událost se váže na jeho server; id události je jedinečné v rámci serveru. Aplikacím doporučujeme vlastní token `events:write` a obecné `/api/v1/events`, aby neměly token agenta.
 4. **Web ze serveru** (`nordvarr-agent.sh site`) se hledá podle názvu (stejně jako doména u doporučených kontrol), vztah a cesty k logům mají zdroj `agent`. Doporučené kontroly jen na výslovné `--checks`: web, který ještě není veřejný, by hned hlásil výpadek.
 5. **Notifikace kritických událostí do kanálů zatím nejsou**: události jsou přehled, alerty zůstávají u kontrol. Kandidát na další verzi.
-6. **Verze 0.17.0, agent 1.4.0.**
+6. **Filtr logu jako `cesta | text`** (pevný text, `grep -F`), ne regulární výraz: bezpečné předání agentovi (jen znaky bez mezer) a stačí na název webu ve společném logu. Hledá se v posledních 20 000 řádcích, aby čtení velkého logu nezatížilo server.
+7. **Verze 0.17.0, agent 1.4.0.**
 

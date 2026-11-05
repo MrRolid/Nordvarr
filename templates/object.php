@@ -235,7 +235,8 @@ $id = (string) $object['id'];
     <div data-test="object-logs">
         <?php foreach ($objectLogs['entries'] as $entry): ?>
         <details class="host-log"<?= $entry['lines'] !== null ? ' open' : '' ?>>
-            <summary><code><?= $v->e($entry['path']) ?></code>
+            <?php $item = \Nordvarr\Agent\ObjectLogs::split($entry['path']); ?>
+            <summary><code><?= $v->e($item['path']) ?></code><?php if ($item['filter'] !== ''): ?> <span class="muted small-text"><?= $v->t('logs.filter', ['filter' => $item['filter']]) ?></span><?php endif; ?>
                 <?php if ($entry['lines'] !== null): ?>
                 <span class="muted small-text"><?= $v->e($entry['host']) ?>, <?= $v->ago((string) $entry['logs_at']) ?></span>
                 <?php else: ?>
@@ -252,7 +253,7 @@ $id = (string) $object['id'];
         <form method="post" action="<?= $v->url('/objects/' . $id . '/logs') ?>" class="form" data-test="logs-form">
             <?= $v->csrfField() ?>
             <label for="log-paths"><?= $v->t('logs.paths') ?></label>
-            <textarea id="log-paths" name="paths" rows="3" class="mono" placeholder="/var/www/vhosts/example_com/access.log"><?= $v->e($objectLogs['value']) ?></textarea>
+            <textarea id="log-paths" name="paths" rows="3" class="mono" placeholder="/var/log/httpd/weby_access_log | shop.example.com"><?= $v->e($objectLogs['value']) ?></textarea>
             <p class="help"><?= $v->t('logs.help') ?></p>
             <button type="submit"><?= $v->t('logs.save') ?></button>
         </form>

@@ -255,6 +255,20 @@ final class AgentScriptTest extends TestCase
             self::assertStringContainsString('GET / HTTP/1.1', $logs['/var/www/vhosts/example_com/access.log']);
             self::assertStringNotContainsString('nesmi-odejit', json_encode($logs));
 
+            // Společný log s filtrem: jen řádky obsahující název webu.
+            is_dir($root . '/var/log/httpd') || mkdir($root . '/var/log/httpd', 0o777, true);
+            file_put_contents($root . '/var/log/httpd/weby_access_log', implode("\n", [
+                'shop.example.com 203.0.113.5 "GET /kosik HTTP/1.1" 200',
+                'jiny.example.org 203.0.113.6 "GET / HTTP/1.1" 200',
+                'shop.example.com 203.0.113.7 "POST /objednavka HTTP/1.1" 302',
+            ]) . "\n");
+            file_put_contents($this->tmp . '/state/log-paths', "/var/log/httpd/weby_access_log|shop.example.com\n/var/log/httpd/weby_access_log|nic; rm -rf /\n");
+            $logs = array_column($this->dryRun()['logs'], 'lines', 'path');
+            self::assertArrayHasKey('/var/log/httpd/weby_access_log|shop.example.com', $logs);
+            self::assertSame("shop.example.com 203.0.113.5 \"GET /kosik HTTP/1.1\" 200\nshop.example.com 203.0.113.7 \"POST /objednavka HTTP/1.1\" 302", $logs['/var/log/httpd/weby_access_log|shop.example.com']);
+            self::assertCount(3, $logs, 'Položka s neplatným filtrem se přeskočí.');
+            file_put_contents($this->tmp . '/state/log-paths', implode("\n", array_slice($paths, 0, 4)) . "\n");
+
             // Povolené adresáře jdou změnit v konfiguraci agenta.
             $allowed = array_column($this->dryRun(['NORDVARR_LOG_ALLOW' => '/etc'])['logs'], 'path');
             self::assertNotContains('/var/www/vhosts/example_com/access.log', $allowed);
