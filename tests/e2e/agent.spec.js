@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { execFile } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { loginOk, runWorker } from './helpers.js';
+import { createObject, loginOk, runWorker } from './helpers.js';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -138,6 +138,32 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   await expect(page.getByTestId('cubes-toggle')).toHaveAttribute('aria-pressed', 'true');
   await page.getByTestId('cubes-toggle').click();
   expect(await cubes()).toEqual([]);
+});
+
+test('logy webu: cesty na kartě webu, agent serveru je pošle, karta webu je ukáže', async ({ page, baseURL }) => {
+  await loginOk(page);
+  mkdirSync(join(work, 'root/var/www/vhosts/shop_example_com'), { recursive: true });
+  writeFileSync(join(work, 'root/var/www/vhosts/shop_example_com/access.log'), '203.0.113.9 - - "GET /kosik HTTP/1.1" 200\n');
+  const webUrl = await createObject(page, 'logy-shop.example.com', 'website');
+
+  // Bez cest je formulář rozbalený.
+  await page.getByLabel('Cesty k souborům na serveru (jedna na řádek)').fill('/var/www/vhosts/shop_example_com/access.log');
+  await page.getByRole('button', { name: 'Uložit cesty' }).click();
+  await expect(page.getByTestId('logs-no-agent')).toBeVisible();
+
+  // Web závisí na serveru s agentem.
+  await page.locator('#rel-type').selectOption('out:depends_on');
+  await page.locator('#rel-target').selectOption({ label: 'e2e-gpu.example.com' });
+  await page.getByRole('button', { name: 'Přidat vztah' }).click();
+  await expect(page.getByTestId('log-waiting')).toBeVisible();
+
+  // První hlášení přinese cesty, druhé pošle logy.
+  await agent(baseURL);
+  expect(readFileSync(join(work, 'state/log-paths'), 'utf8')).toBe('/var/www/vhosts/shop_example_com/access.log\n');
+  await agent(baseURL);
+  await page.goto(webUrl);
+  await expect(page.getByTestId('object-logs')).toContainText('GET /kosik HTTP/1.1');
+  await expect(page.getByTestId('object-logs')).toContainText('e2e-gpu.example.com');
 });
 
 test('skript agenta jde stáhnout bez přihlášení', async ({ request }) => {

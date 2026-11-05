@@ -4,6 +4,15 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### 0.16.0 Logy webů (větev `faze-20-logy-webu`, agent 1.3.0)
+
+Z požadavku vlastníka: "výpis logů u webu" a "každý web může mít svůj log ve vlastním souboru, musí tam být možnost nastavovat cesty, odkud má agent data načítat".
+
+- `Agent\ObjectLogs`: cesty v atributu `logy` (web, služba, databáze, kontejner), ověření cesty, cesty pro agenta serveru (objekty do vzdálenosti 2 ve vztazích), logy pro kartu objektu.
+- Odpověď na hlášení agenta má `log_paths`. Agent 1.3.0 si je uloží (`log-paths` ve stavovém adresáři), při změně pošle logy hned a čte je jen pod `NORDVARR_LOG_ALLOW` (výchozí `/var/log /var/www`) po rozbalení odkazů.
+- Karta webu: část **Logy** s formulářem cest a posledními řádky (server, stáří, "čeká na agenta", upozornění bez souvisejícího serveru s agentem).
+- Testy: `ObjectLogsTest` (ověření cest, vztahy, maskování a escapování, mazání), `AgentScriptTest` (povolené adresáře, symbolický odkaz ven, `..`, zapomenutí cest), e2e `agent.spec.js` (celá cesta se skutečným skriptem agenta).
+
 ### 0.15.0 Servery jako kostky ve 3D a čitelnější popisky (větev `faze-19-kostky-3d`)
 
 Z požadavků vlastníka: "režim, kdy se dá přepnout server na krychli, která má hodnoty na svých stranách" a "výchozí tabulka má málo čitelné texty, kontrast musí být velký a písmena taky velká".
@@ -386,5 +395,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.15.0 (kostky ve 3D). Další servery vlastníka s agentem, logy webů podle rozložení logů na serveru.
+- Release 0.16.0 (kostky ve 3D, logy webů, agent 1.3.0). Na serverech aktualizovat skript agenta. Další servery vlastníka s agentem.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

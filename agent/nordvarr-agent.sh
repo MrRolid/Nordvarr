@@ -25,12 +25,13 @@
 #   NORDVARR_SERVICES="httpd mariadb"              (nepovinné: hlídané služby systemd; výchozí = známé služby, 0 = nehlásit)
 #   NORDVARR_LOGS="/var/log/httpd/error_log"       (nepovinné: logy ke čtení; výchozí = známé logy, 0 = neposílat)
 #   NORDVARR_LOG_INTERVAL=600                      (sekundy mezi posíláním logů)
+#   NORDVARR_LOG_ALLOW="/var/log /var/www"         (adresáře, ze kterých smí agent číst logy webů zadané v Nordvarru)
 #   NORDVARR_SYSTEMCTL=systemctl                   (nepovinné: jiná cesta k systemctl)
 
 set -u
 umask 077
 
-AGENT_VERSION="1.2.0"
+AGENT_VERSION="1.3.0"
 MODE="send"
 case "${1:-}" in
     --dry-run) MODE="dry" ;;
@@ -48,7 +49,7 @@ if [ -r "$CONF" ]; then
         value="${value%$'\r'}"
         value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
         case "$key" in
-            NORDVARR_URL|NORDVARR_TOKEN|NORDVARR_EXTERNAL_ID|NORDVARR_OBJECT_ID|NORDVARR_HOSTNAME|NORDVARR_SMART_INTERVAL|NORDVARR_STATE_DIR|NORDVARR_SMARTCTL|NORDVARR_NVIDIA_SMI|NORDVARR_DOCKER|NORDVARR_SERVICES|NORDVARR_LOGS|NORDVARR_LOG_INTERVAL|NORDVARR_SYSTEMCTL)
+            NORDVARR_URL|NORDVARR_TOKEN|NORDVARR_EXTERNAL_ID|NORDVARR_OBJECT_ID|NORDVARR_HOSTNAME|NORDVARR_SMART_INTERVAL|NORDVARR_STATE_DIR|NORDVARR_SMARTCTL|NORDVARR_NVIDIA_SMI|NORDVARR_DOCKER|NORDVARR_SERVICES|NORDVARR_LOGS|NORDVARR_LOG_INTERVAL|NORDVARR_LOG_ALLOW|NORDVARR_SYSTEMCTL)
                 [ -z "${!key:-}" ] && printf -v "$key" '%s' "$value" ;;
         esac
     done < "$CONF"
@@ -299,6 +300,22 @@ if [ "${NORDVARR_LOGS:-}" != "0" ] && [ "$LOG_INTERVAL" -gt 0 ] && [ $(( NOW_EPO
             [ -f "$ROOT$f" ] && LOG_FILES="$LOG_FILES $ROOT$f"
         done
     fi
+    # Logy webů a služeb zadané v Nordvarru (z poslední odpovědi serveru), jen z povolených adresářů.
+    # Cesta se ověřuje po rozbalení odkazů, aby nešlo přes symbolický odkaz číst jiné soubory.
+    if [ -f "$STATE_DIR/log-paths" ]; then
+        while IFS= read -r p; do
+            [[ "$p" =~ ^/[A-Za-z0-9._@+/-]+$ ]] || continue
+            [[ "$p" =~ (^|/)\.\.?(/|$) ]] && continue
+            real="$(realpath -e -- "$ROOT$p" 2>/dev/null)" || continue
+            for allow in ${NORDVARR_LOG_ALLOW:-/var/log /var/www}; do
+                allow_real="$(realpath -e -- "$ROOT${allow%/}" 2>/dev/null)" || continue
+                if [[ "$real" == "$allow_real"/* ]]; then
+                    case " $LOG_FILES " in *" $ROOT$p "*) ;; *) LOG_FILES="$LOG_FILES $ROOT$p" ;; esac
+                    break
+                fi
+            done
+        done < "$STATE_DIR/log-paths"
+    fi
     LOG_ITEMS=()
     for f in $LOG_FILES; do
         [ -r "$f" ] || continue
@@ -351,6 +368,12 @@ rm -f "$HEADERS"
 
 if [ "$CODE" = "200" ]; then
     rm -f "$STATE_DIR/last-error"
+    # Cesty k logům webů z odpovědi; když se změnily, logy se pošlou hned při dalším běhu.
+    paths="$(sed -n 's/.*"log_paths":\[\([^]]*\)\].*/\1/p' "$RESPONSE" | tr ',' '\n' | tr -d '"' | grep -E '^/[A-Za-z0-9._@+/-]+$' | grep -vE '(^|/)\.\.?(/|$)' | head -n 20)"
+    if [ "$paths" != "$(cat "$STATE_DIR/log-paths" 2>/dev/null)" ]; then
+        if [ -n "$paths" ]; then printf '%s\n' "$paths" > "$STATE_DIR/log-paths"; else rm -f "$STATE_DIR/log-paths"; fi
+        rm -f "$LOG_STAMP"
+    fi
     [ "$MODE" = "test" ] && { echo "OK: $(cat "$RESPONSE")"; }
     exit 0
 fi

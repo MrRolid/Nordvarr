@@ -368,6 +368,7 @@ Bez `mod_rewrite` nastavte `NORDVARR_URL=https://nordvarr.example.com/index.php?
 | `NORDVARR_SERVICES` | hlídané služby oddělené mezerou (např. `httpd mariadb php-fpm`); výchozí jsou všechny známé zapnuté nebo běžící služby, `0` = nehlásit |
 | `NORDVARR_LOGS` | logy ke čtení oddělené mezerou (cesty); výchozí jsou známé logy služeb, `0` = neposílat |
 | `NORDVARR_LOG_INTERVAL` | sekundy mezi posíláním logů (výchozí 600) |
+| `NORDVARR_LOG_ALLOW` | adresáře oddělené mezerou, ze kterých smí agent číst logy webů zadané v Nordvarru (výchozí `/var/log /var/www`) |
 
 Soubor se jen čte jako dvojice `KLÍČ=hodnota`, nic z něj se nespouští. Token se curl předává přes soubor s právy 600, takže není vidět v seznamu procesů. Poslední chyba odeslání je v `/var/lib/nordvarr-agent/last-error`.
 
@@ -385,6 +386,17 @@ Agent od verze 1.2.0 hlídá služby systemd a posílá konce jejich logů:
 - Karta serveru má tabulku **Služby** se stavem a počtem restartů. Spadlá služba (`failed`) nebo služba, která je zapnutá, ale neběží, je problém kontroly Agent serveru (`service_down`, nefunguje).
 - Bez nastavení agent hlídá známé služby, které jsou zapnuté nebo běží. Vlastní seznam nastavíte v `NORDVARR_SERVICES`.
 - Jednou za 10 minut agent pošle posledních 50 řádků (nejvýš 20 kB) z logů služeb. Na kartě serveru jsou v části **Logy služeb**, každý log se rozbalí kliknutím. Hesla, tokeny a podobné hodnoty server při příjmu maskuje, i tak ale logy berte jako citlivé: vidí je každý přihlášený do Nordvarru.
+
+### Logy webů a služeb
+
+Každý web může mít logy ve vlastním souboru (třeba `CustomLog /var/www/vhosts/example_com/access.log combined` ve vhostu Apache). Cesty k nim se zadávají v Nordvarru, agent 1.3.0 a novější je čte:
+
+1. Na kartě webu (stejně u služby, databáze a kontejneru) v části **Logy** zadejte cesty k souborům na serveru, jednu na řádek, a uložte.
+2. Web musí souviset se serverem, na kterém běží agent: web "závisí na" serveru, server "obsahuje" web, nebo přes jeden objekt mezi nimi (web závisí na službě, server obsahuje službu). Jinak karta upozorní, že logy nikdo nepošle.
+3. Server pošle agentovi cesty v odpovědi na hlášení. Při změně cest agent pošle logy hned při dalším běhu, potom jednou za 10 minut (posledních 50 řádků, nejvýš 20 kB).
+4. Logy jsou na kartě webu, u každého souboru je server a stáří. Soubor, který agent zatím neposlal, je označený "čeká na agenta".
+
+Agent čte jen soubory pod povolenými adresáři `NORDVARR_LOG_ALLOW` (výchozí `/var/log` a `/var/www`), cestu ověřuje po rozbalení symbolických odkazů. Bez toho by kdokoli s přístupem do Nordvarru mohl nechat agenta (běží jako root) poslat libovolný soubor serveru, třeba `/etc/shadow`. Logy jinde povolíte v `/etc/nordvarr-agent.conf`, například `NORDVARR_LOG_ALLOW=/var/log /var/www /srv/app/logs`.
 
 ### Kontejnery Dockeru
 

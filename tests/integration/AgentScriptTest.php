@@ -75,7 +75,7 @@ final class AgentScriptTest extends TestCase
     {
         exec('bash -n ' . escapeshellarg($this->script) . ' 2>&1', $out, $code);
         self::assertSame(0, $code, implode("\n", $out));
-        self::assertSame([0, "nordvarr-agent 1.2.0\n"], array_slice($this->agent('--version'), 0, 2));
+        self::assertSame([0, "nordvarr-agent 1.3.0\n"], array_slice($this->agent('--version'), 0, 2));
     }
 
     public function testCollectsMetricsAndRatesFromTwoRuns(): void
@@ -213,6 +213,49 @@ final class AgentScriptTest extends TestCase
             self::assertStringContainsString('Odeslání selhalo', $err);
             self::assertFileExists($this->tmp . '/state/last-error');
             self::assertFileDoesNotExist($this->tmp . '/state/smart-at');
+        } finally {
+            $servers->stop();
+            TempDir::remove($mockDir);
+        }
+    }
+
+    public function testLogPathsFromServerOnlyFromAllowedDirectories(): void
+    {
+        $root = $this->tmp . '/root';
+        mkdir($root . '/var/www/vhosts/example_com', 0o777, true);
+        is_dir($root . '/etc') || mkdir($root . '/etc');
+        file_put_contents($root . '/var/www/vhosts/example_com/access.log', "203.0.113.5 - - \"GET / HTTP/1.1\" 200\n");
+        file_put_contents($root . '/etc/tajne', "nesmi-odejit\n");
+        symlink($root . '/etc/tajne', $root . '/var/www/vhosts/example_com/odkaz.log');
+
+        $servers = new FixtureServers();
+        $mockDir = TempDir::create('nordvarr-agent-mock-');
+        try {
+            $base = $servers->mockEndpoint($mockDir);
+            $paths = ['/var/www/vhosts/example_com/access.log', '/etc/tajne', '/var/www/vhosts/example_com/odkaz.log', '/var/www/neni.log', '/var/www/../etc/tajne'];
+            file_put_contents($mockDir . '/log-paths.json', json_encode($paths, JSON_UNESCAPED_SLASHES));
+            $env = ['NORDVARR_URL' => $base, 'NORDVARR_TOKEN' => 'nv_test'];
+            [$code, , $err] = $this->agent('--test', $env);
+            self::assertSame(0, $code, $err);
+            self::assertSame(array_slice($paths, 0, 4), file($this->tmp . '/state/log-paths', FILE_IGNORE_NEW_LINES), 'Cesta s .. se neuloží.');
+            self::assertFileDoesNotExist($this->tmp . '/state/logs-at', 'Nové cesty: logy se pošlou hned při dalším běhu.');
+
+            $logs = array_column($this->dryRun()['logs'], 'lines', 'path');
+            self::assertSame(['/var/log/httpd/error_log', '/var/log/httpd/access_log', '/var/www/vhosts/example_com/access.log'], array_keys($logs),
+                'Soubor mimo povolené adresáře, odkaz ven a chybějící soubor se nečtou.');
+            self::assertStringContainsString('GET / HTTP/1.1', $logs['/var/www/vhosts/example_com/access.log']);
+            self::assertStringNotContainsString('nesmi-odejit', json_encode($logs));
+
+            // Povolené adresáře jdou změnit v konfiguraci agenta.
+            $allowed = array_column($this->dryRun(['NORDVARR_LOG_ALLOW' => '/etc'])['logs'], 'path');
+            self::assertNotContains('/var/www/vhosts/example_com/access.log', $allowed);
+            self::assertContains('/etc/tajne', $allowed);
+
+            // Server cesty přestal posílat: agent je zapomene.
+            unlink($mockDir . '/log-paths.json');
+            [$code, , $err] = $this->agent('--test', $env);
+            self::assertSame(0, $code, $err);
+            self::assertFileDoesNotExist($this->tmp . '/state/log-paths');
         } finally {
             $servers->stop();
             TempDir::remove($mockDir);

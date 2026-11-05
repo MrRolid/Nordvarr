@@ -11,3 +11,5 @@ NORDVARR_TOKEN=
 # NORDVARR_OBJECT_ID=
 # NORDVARR_HOSTNAME=srv1.example.com
 # NORDVARR_SMART_INTERVAL=900
+# Logy webů zadané v Nordvarru se čtou jen z těchto adresářů (oddělené mezerou):
+# NORDVARR_LOG_ALLOW=/var/log /var/www
