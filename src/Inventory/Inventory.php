@@ -154,11 +154,14 @@ final class Inventory
      *
      * @return string id události
      */
-    public function addManualEvent(string $objectId, string $type, string $summary, string $details, string $occurredAt): string
+    public function addManualEvent(string $objectId, string $type, string $summary, string $details, string $occurredAt, string $severity = 'info'): string
     {
         $errors = [];
         if (!in_array($type, Vocabulary::EVENT_TYPES, true)) {
             $errors['type'] = 'invalid_type';
+        }
+        if (!in_array($severity, Vocabulary::EVENT_SEVERITIES, true)) {
+            $errors['severity'] = 'invalid_severity';
         }
         if (trim($summary) === '' || mb_strlen($summary) > 300) {
             $errors['summary'] = 'invalid_summary';
@@ -174,6 +177,7 @@ final class Inventory
             'source' => Vocabulary::MANUAL_SOURCE,
             'source_event_id' => \Nordvarr\Uuid::v7(),
             'type' => $type,
+            'severity' => $severity,
             'occurred_at' => $occurredAt,
             'summary' => trim($summary),
             'details' => $details,

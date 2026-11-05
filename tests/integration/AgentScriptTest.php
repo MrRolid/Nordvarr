@@ -38,7 +38,24 @@ final class AgentScriptTest extends TestCase
      */
     private function agent(string $arg, array $env = []): array
     {
-        $env += [
+        $env = $this->env($env);
+        $process = proc_open(['bash', $this->script, ...($arg === '' ? [] : [$arg])], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
+        self::assertIsResource($process);
+        $out = (string) stream_get_contents($pipes[1]);
+        $err = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return [proc_close($process), $out, $err];
+    }
+
+    /**
+     * @param array<string, string> $env
+     * @return array<string, string>
+     */
+    private function env(array $env = []): array
+    {
+        return $env + [
             'PATH' => $this->fixtures . '/bin:/usr/local/bin:/usr/bin:/bin',
             'NORDVARR_ROOT' => $this->tmp . '/root',
             'NORDVARR_STATE_DIR' => $this->tmp . '/state',
@@ -50,14 +67,6 @@ final class AgentScriptTest extends TestCase
             'NORDVARR_SYSTEMCTL' => $this->fixtures . '/bin/systemctl',
             'LC_ALL' => 'C',
         ];
-        $process = proc_open(['bash', $this->script, ...($arg === '' ? [] : [$arg])], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
-        self::assertIsResource($process);
-        $out = (string) stream_get_contents($pipes[1]);
-        $err = (string) stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        return [proc_close($process), $out, $err];
     }
 
     /**
@@ -75,7 +84,7 @@ final class AgentScriptTest extends TestCase
     {
         exec('bash -n ' . escapeshellarg($this->script) . ' 2>&1', $out, $code);
         self::assertSame(0, $code, implode("\n", $out));
-        self::assertSame([0, "nordvarr-agent 1.3.0\n"], array_slice($this->agent('--version'), 0, 2));
+        self::assertSame([0, "nordvarr-agent 1.4.0\n"], array_slice($this->agent('--version'), 0, 2));
     }
 
     public function testCollectsMetricsAndRatesFromTwoRuns(): void
@@ -256,6 +265,67 @@ final class AgentScriptTest extends TestCase
             [$code, , $err] = $this->agent('--test', $env);
             self::assertSame(0, $code, $err);
             self::assertFileDoesNotExist($this->tmp . '/state/log-paths');
+        } finally {
+            $servers->stop();
+            TempDir::remove($mockDir);
+        }
+    }
+
+    public function testEventAndSiteSubcommands(): void
+    {
+        $servers = new FixtureServers();
+        $mockDir = TempDir::create('nordvarr-agent-mock-');
+        try {
+            $base = $servers->mockEndpoint($mockDir);
+            $env = ['NORDVARR_URL' => $base, 'NORDVARR_TOKEN' => 'nv_test', 'NORDVARR_OBJECT_ID' => '01a1a905-dba6-7e32-a4a0-e522802ba3f8'];
+            [$code, , $err] = $this->agent('event', $env);
+            self::assertSame(1, $code, 'Bez shrnutí nápověda.');
+            self::assertStringContainsString('Použití', $err);
+
+            $requests = function () use ($mockDir): array {
+                $out = [];
+                foreach (glob($mockDir . '/*.json') ?: [] as $f) {
+                    $out[] = json_decode((string) file_get_contents($f), true);
+                    unlink($f);
+                }
+
+                return $out;
+            };
+            $process = proc_open(['bash', $this->script, 'event', '-s', 'warning', '-t', 'security', '-i', 'f2b-1', 'fail2ban zabanoval 203.0.113.7', "jail: sshd\n\"pokusy\": 12"],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $this->env($env));
+            $out = (string) stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertSame(0, proc_close($process));
+            self::assertStringStartsWith('OK: ', $out);
+            [$request] = $requests();
+            self::assertSame('/api/v1/agent/event', $request['path']);
+            self::assertSame('Bearer nv_test', $request['headers']['authorization']);
+            $body = json_decode($request['body'], true);
+            self::assertSame(['gpu1.example.com', '01a1a905-dba6-7e32-a4a0-e522802ba3f8', 'security', 'warning', 'fail2ban zabanoval 203.0.113.7', "jail: sshd\n\"pokusy\": 12", 'f2b-1'],
+                [$body['hostname'], $body['object_id'], $body['type'], $body['severity'], $body['summary'], $body['details'], $body['event_id']]);
+            self::assertArrayNotHasKey('site', $body);
+
+            $process = proc_open(['bash', $this->script, 'site', 'shop.example.com', '/var/www/shop/access.log', '/var/www/shop/error.log', '--checks'],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $this->env($env));
+            stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertSame(0, proc_close($process));
+            [$request] = $requests();
+            self::assertSame('/api/v1/agent/site', $request['path']);
+            $body = json_decode($request['body'], true);
+            self::assertSame(['shop.example.com', true, ['/var/www/shop/access.log', '/var/www/shop/error.log']], [$body['name'], $body['checks'], $body['logs']]);
+            self::assertSame([], glob($this->tmp . '/state/headers*') ?: [], 'Soubor s tokenem se smaže.');
+
+            // Nedostupný server: kód 2 a chybová hláška.
+            $process = proc_open(['bash', $this->script, 'event', 'zkouška'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null,
+                $this->env(['NORDVARR_URL' => 'http://127.0.0.1:' . FixtureServers::freePort(), 'NORDVARR_TOKEN' => 'x']));
+            fclose($pipes[1]);
+            $err = (string) stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+            self::assertSame(2, proc_close($process));
+            self::assertStringContainsString('Odeslání selhalo', $err);
         } finally {
             $servers->stop();
             TempDir::remove($mockDir);

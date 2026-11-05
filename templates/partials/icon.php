@@ -7,6 +7,7 @@ $paths = [
     'inventory' => 'M4 5h16M4 12h16M4 19h16',
     'topology' => 'M6 4a2 2 0 100 4 2 2 0 000-4zM18 4a2 2 0 100 4 2 2 0 000-4zM12 16a2 2 0 100 4 2 2 0 000-4zM7 8l4 8M17 8l-4 8',
     'alerts' => 'M12 3l9 17H3zM12 10v4M12 17h.01',
+    'events' => 'M5 4h14v12H9l-4 4zM9 9h6M9 12h4',
     'settings' => 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v3M12 19v3M2 12h3M19 12h3',
 ];
 $d = $paths[$name] ?? '';

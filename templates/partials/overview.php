@@ -62,8 +62,9 @@ $status = static fn (string $s): string => $v->render('partials/status', ['statu
     <?php else: ?>
     <ol class="timeline">
         <?php foreach ($events as $event): ?>
-        <li>
+        <li class="sev-row sev-row-<?= $v->e($event['severity']) ?>">
             <span class="nowrap muted"><?= $v->time((string) $event['occurred_at']) ?></span>
+            <?php if ($event['severity'] !== 'info'): ?><span class="sev sev-<?= $v->e($event['severity']) ?>"><?= $v->t('event.severity.' . $event['severity']) ?></span><?php endif; ?>
             <span class="badge"><?= $v->t('event.type.' . $event['type']) ?></span>
             <strong><?= $v->e($event['summary']) ?></strong>
             <?php foreach ($event['object_ids'] as $oid): ?>
@@ -73,6 +74,7 @@ $status = static fn (string $s): string => $v->render('partials/status', ['statu
         <?php endforeach; ?>
     </ol>
     <?php endif; ?>
+    <p><a href="<?= $v->url('/events') ?>" data-test="all-events"><?= $v->t('overview.all_events') ?></a></p>
 </section>
 
 <section class="card" data-test="expiring">

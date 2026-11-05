@@ -281,3 +281,13 @@ Kandidát z F12. `SPEC.md` se nemění.
 3. **Souvislost webu se serverem přes vztahy do vzdálenosti 2** (stejně jako okolí v topologii): web na serveru, web závislý na službě na serveru. Když web souvisí s víc servery, cesty dostanou všechny a chybějící soubor agent přeskočí.
 4. **Cesty v atributu `logy`**, ne v nové tabulce: jdou nastavit i přes API (upsert) a přenáší se exportem inventáře.
 5. **Verze 0.16.0, agent 1.3.0.**
+
+## 2026-11-05 (0.17.0 Události ze serverů)
+
+1. **Čtyři úrovně důležitosti** (`info`, `notice`, `warning`, `critical`) nezávislé na typu: objednávka i ban jsou různé typy, ale důležitost určuje odesílatel podle situace. Stávající incidenty dostaly `warning`, ostatní `info`.
+2. **Tři nové typy** místo obecného "jiné": `security` (fail2ban, CrowdSec), `business` (objednávky, formuláře), `message` (vzkaz, výchozí pro agenta). Typ je v CHECK omezení, tabulka se přestavěla.
+3. **Agent posílá události vlastním endpointem** `/api/v1/agent/event` se svým tokenem (scope `agent:write`), událost se váže na jeho server; id události je jedinečné v rámci serveru. Aplikacím doporučujeme vlastní token `events:write` a obecné `/api/v1/events`, aby neměly token agenta.
+4. **Web ze serveru** (`nordvarr-agent.sh site`) se hledá podle názvu (stejně jako doména u doporučených kontrol), vztah a cesty k logům mají zdroj `agent`. Doporučené kontroly jen na výslovné `--checks`: web, který ještě není veřejný, by hned hlásil výpadek.
+5. **Notifikace kritických událostí do kanálů zatím nejsou**: události jsou přehled, alerty zůstávají u kontrol. Kandidát na další verzi.
+6. **Verze 0.17.0, agent 1.4.0.**
+

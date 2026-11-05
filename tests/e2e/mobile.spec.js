@@ -14,15 +14,21 @@ test('na mobilu je hlavní navigace spodní lišta', async ({ page }) => {
   expect(Math.round(box.width)).toBe(viewport.width);
   expect(await nav.evaluate((el) => getComputedStyle(el).position)).toBe('fixed');
 
-  // Všech 5 položek je vidět a jde na ně kliknout.
+  // Všech 6 položek je vidět a jde na ně kliknout.
   const links = nav.getByRole('link');
-  await expect(links).toHaveCount(5);
+  await expect(links).toHaveCount(6);
   await nav.getByRole('link', { name: 'Alerty' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Alerty' })).toBeVisible();
 
   // Stránka nemá vodorovný posuvník.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+  for (const link of await links.all()) {
+    await expect(link).toBeInViewport();
+  }
+  await nav.getByRole('link', { name: 'Události' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Události' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
 test('inventář a detail objektu jsou na mobilu bez vodorovného posuvníku', async ({ page }) => {

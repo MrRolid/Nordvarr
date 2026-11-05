@@ -132,6 +132,13 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   await page.getByTestId('cubes-toggle').click();
   await expect(page.getByTestId('cubes-toggle')).toHaveAttribute('aria-pressed', 'true');
   expect(await cubes()).toEqual([serverId]);
+  // Klik na stěnu kostky natočí kameru kolmo na ni (boční stěna: vodorovný pohled) a přiblíží.
+  const pos = await page.evaluate((id) => document.getElementById('map3d').map3d.screenPosition(id), serverId);
+  const box = await page.getByTestId('map3d').boundingBox();
+  await page.mouse.click(box.x + pos.x, box.y + pos.y);
+  await expect.poll(() => page.evaluate(() => document.getElementById('map3d').map3d.stats().lastFace?.normal[1])).toBe(0);
+  await expect.poll(() => page.evaluate(() => Math.abs(document.getElementById('map3d').map3d.stats().view.polar - Math.PI / 2) < 0.01)).toBe(true);
+  expect(await page.evaluate(() => document.getElementById('map3d').map3d.stats().lastFace.id)).toBe(serverId);
   await page.reload();
   await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
   expect(await cubes()).toEqual([serverId]);
@@ -164,6 +171,42 @@ test('logy webu: cesty na kartě webu, agent serveru je pošle, karta webu je uk
   await page.goto(webUrl);
   await expect(page.getByTestId('object-logs')).toContainText('GET /kosik HTTP/1.1');
   await expect(page.getByTestId('object-logs')).toContainText('e2e-gpu.example.com');
+});
+
+test('události ze serveru: agent event a site, přehled Události s důležitostí', async ({ page, baseURL }) => {
+  await loginOk(page);
+  const env = {
+    PATH: `${join(fixtures, 'bin')}:/usr/local/bin:/usr/bin:/bin`,
+    NORDVARR_URL: baseURL,
+    NORDVARR_TOKEN: token,
+    NORDVARR_ROOT: join(work, 'root'),
+    NORDVARR_STATE_DIR: join(work, 'state'),
+    NORDVARR_HOSTNAME: 'e2e-gpu.example.com',
+    NORDVARR_CONF: join(work, 'neni.conf'),
+    LC_ALL: 'C',
+  };
+  const script = join(process.env.E2E_SITE, 'nordvarr/agent/nordvarr-agent.sh');
+  const run = async (...args) => (await promisify(execFile)('bash', [script, ...args], { env })).stdout;
+
+  expect(await run('site', 'udalosti-shop.example.com', '/var/www/vhosts/udalosti/access.log')).toContain('"created":true');
+  expect(await run('event', '-s', 'critical', '-t', 'security', 'CrowdSec zablokoval 25 adres')).toContain('OK:');
+  expect(await run('event', '-s', 'notice', '-t', 'business', '-w', 'udalosti-shop.example.com', 'Nová objednávka č. 7', 'zákazník: Example s.r.o.')).toContain('OK:');
+  expect(await run('event', 'AI agent: obnovil jsem certifikát')).toContain('OK:');
+
+  await page.getByRole('navigation', { name: 'Hlavní navigace' }).getByRole('link', { name: 'Události' }).click();
+  const feed = page.getByTestId('event-feed');
+  await expect(feed.locator('[data-severity="critical"]')).toContainText('CrowdSec zablokoval 25 adres');
+  await expect(feed.locator('[data-severity="notice"]')).toContainText('udalosti-shop.example.com');
+  await expect(feed.locator('[data-severity="info"]').filter({ hasText: 'AI agent' })).toContainText('vzkaz');
+  await page.getByLabel('Nejméně').selectOption('warning');
+  await page.getByRole('button', { name: 'Zobrazit' }).click();
+  await expect(feed.locator('li')).toHaveCount(1);
+
+  // Web ze serveru má cesty k logům a událost na kartě.
+  await page.goto('/inventory?q=udalosti-shop');
+  await page.getByRole('link', { name: 'udalosti-shop.example.com' }).click();
+  await expect(page.locator('#log-paths')).toHaveValue('/var/www/vhosts/udalosti/access.log');
+  await expect(page.getByTestId('timeline')).toContainText('Nová objednávka č. 7');
 });
 
 test('skript agenta jde stáhnout bez přihlášení', async ({ request }) => {

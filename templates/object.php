@@ -295,8 +295,9 @@ $id = (string) $object['id'];
     <?php else: ?>
     <ol class="timeline" data-test="timeline">
         <?php foreach ($timeline as $event): ?>
-        <li>
+        <li class="sev-row sev-row-<?= $v->e($event['severity']) ?>">
             <span class="nowrap muted"><?= $v->time((string) $event['occurred_at']) ?></span>
+            <?php if ($event['severity'] !== 'info'): ?><span class="sev sev-<?= $v->e($event['severity']) ?>"><?= $v->t('event.severity.' . $event['severity']) ?></span><?php endif; ?>
             <span class="badge type-<?= $v->e($event['type']) ?>"><?= $v->t('event.type.' . $event['type']) ?></span>
             <strong><?= $v->e($event['summary']) ?></strong>
             <span class="muted small-text"><?= $v->e($event['source']) ?></span>
@@ -320,6 +321,12 @@ $id = (string) $object['id'];
             <select id="ev-type" name="type">
                 <?php foreach (\Nordvarr\Inventory\Vocabulary::EVENT_TYPES as $type): ?>
                 <option value="<?= $v->e($type) ?>"<?= $type === 'note' ? ' selected' : '' ?>><?= $v->t('event.type.' . $type) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <label for="ev-severity"><?= $v->t('event.severity') ?></label>
+            <select id="ev-severity" name="severity">
+                <?php foreach (\Nordvarr\Inventory\Vocabulary::EVENT_SEVERITIES as $sev): ?>
+                <option value="<?= $v->e($sev) ?>"><?= $v->t('event.severity.' . $sev) ?></option>
                 <?php endforeach; ?>
             </select>
             <label for="ev-when"><?= $v->t('event.occurred_at') ?></label>

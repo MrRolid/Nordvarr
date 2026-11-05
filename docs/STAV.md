@@ -4,6 +4,17 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### 0.17.0 Události ze serverů a natočení kostky (větev `faze-21-udalosti`, agent 1.4.0)
+
+Z požadavků vlastníka: "na straně agenta přidávat nové domény s logy a další události (nový projekt, formulář podpory, objednávka, fail2ban/CrowdSec, vzkaz od AI agenta), vrstva událostí označených barvou důležitosti" a "kliknutí na stěnu kostky ji natočí, aby byla co nejlépe čitelná".
+
+- Migrace `0011_dulezitost_udalosti.sql`: důležitost (`info`, `notice`, `warning`, `critical`) a typy `security`, `business`, `message`; stávající incidenty mají `warning`.
+- Stránka **Události** (nová položka navigace): barvy podle důležitosti, počty, filtr období, nejnižší důležitosti a typu. Důležitost i v přehledu, na časové ose objektu, v ručním formuláři, v API `/api/v1/events`, v exportu inventáře a pro LLM.
+- API agenta: `/api/v1/agent/event` (událost k serveru, volitelně k webu, id jedinečné v rámci serveru) a `/api/v1/agent/site` (web na serveru: objekt, vztah, cesty k logům, volitelně doporučené kontroly). Agent 1.4.0: `nordvarr-agent.sh event` a `site`.
+- 3D: klik na stěnu kostky natočí kameru kolmo na stěnu a přiblíží.
+- NAVOD kapitola 13 (agent, fail2ban, CrowdSec, aplikace přes API).
+- Testy: `AgentEventsTest`, `EventSeverityMigrationTest`, `AgentScriptTest` (podpříkazy), e2e `agent.spec.js` (události, natočení kostky), `mobile.spec.js` (šest položek navigace).
+
 ### Oprava 0.16.1 (větev `oprava-ukonceni-udrzby`)
 
 - "Ukončit teď" u údržbového okna, které začalo ve stejné sekundě (časy jsou na sekundy), nic neudělalo: ukončení vyžadovalo začátek striktně před "teď", stránka přitom okno ukazovala jako probíhající. Projevilo se jako občasné selhání e2e testu údržbového okna v CI.
@@ -400,5 +411,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.16.0 (kostky ve 3D, logy webů, agent 1.3.0). Na serverech aktualizovat skript agenta. Další servery vlastníka s agentem.
+- Release 0.17.0 (události, agent 1.4.0). Další kandidáti: notifikace kritických událostí do kanálů, události v mapě topologie.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

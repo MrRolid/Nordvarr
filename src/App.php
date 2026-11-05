@@ -129,6 +129,7 @@ final class App
             (new Ui\ObjectController($ctx))->register($router);
             (new Ui\SettingsController($ctx, $this->appRoot))->register($router);
             (new Ui\AlertController($ctx))->register($router);
+            (new Ui\EventController($ctx))->register($router);
             (new Ui\ChannelController($ctx, $this->appRoot))->register($router);
             (new Ui\TopologyController($ctx, $this->appRoot))->register($router);
             (new Ui\LlmExportController($ctx, $this->appRoot))->register($router);

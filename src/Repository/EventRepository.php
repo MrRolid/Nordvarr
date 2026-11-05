@@ -27,21 +27,22 @@ final class EventRepository
     }
 
     /**
-     * @param array{source: string, source_event_id: string, type: string, occurred_at: string, summary: string, details: string} $event
+     * @param array{source: string, source_event_id: string, type: string, severity?: string, occurred_at: string, summary: string, details: string} $event
      * @param list<string> $objectIds
      */
     public function create(array $event, array $objectIds, ?string $id = null, ?string $createdAt = null): string
     {
         $id ??= Uuid::v7();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO events (id, source, source_event_id, type, occurred_at, summary, details, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO events (id, source, source_event_id, type, severity, occurred_at, summary, details, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
             $event['source'],
             $event['source_event_id'],
             $event['type'],
+            $event['severity'] ?? 'info',
             $event['occurred_at'],
             $event['summary'],
             $event['details'],
@@ -108,6 +109,56 @@ final class EventRepository
         }
 
         return $rows;
+    }
+
+    /**
+     * Přehled událostí s filtrem: od času, nejnižší důležitost, typ, objekt. Nejnovější první.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function feed(string $since, string $minSeverity = 'info', ?string $type = null, ?string $objectId = null, int $limit = 200): array
+    {
+        $levels = array_slice(\Nordvarr\Inventory\Vocabulary::EVENT_SEVERITIES, max(0, (int) array_search($minSeverity, \Nordvarr\Inventory\Vocabulary::EVENT_SEVERITIES, true)));
+        $where = ['e.occurred_at >= ?', 'e.severity IN (' . implode(', ', array_fill(0, count($levels), '?')) . ')'];
+        $params = [$since, ...$levels];
+        if ($type !== null) {
+            $where[] = 'e.type = ?';
+            $params[] = $type;
+        }
+        if ($objectId !== null) {
+            $where[] = 'EXISTS (SELECT 1 FROM event_objects x WHERE x.event_id = e.id AND x.object_id = ?)';
+            $params[] = $objectId;
+        }
+        $stmt = $this->pdo->prepare(
+            'SELECT e.*, group_concat(eo.object_id) AS object_ids FROM events e
+             LEFT JOIN event_objects eo ON eo.event_id = e.id
+             WHERE ' . implode(' AND ', $where) . '
+             GROUP BY e.id ORDER BY e.occurred_at DESC, e.id DESC LIMIT ' . max(1, min(1000, $limit))
+        );
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$row) {
+            $row['object_ids'] = $row['object_ids'] === null ? [] : explode(',', (string) $row['object_ids']);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Počet událostí podle důležitosti od daného času.
+     *
+     * @return array<string, int>
+     */
+    public function countsBySeverity(string $since): array
+    {
+        $stmt = $this->pdo->prepare('SELECT severity, COUNT(*) AS n FROM events WHERE occurred_at >= ? GROUP BY severity');
+        $stmt->execute([$since]);
+        $out = array_fill_keys(\Nordvarr\Inventory\Vocabulary::EVENT_SEVERITIES, 0);
+        foreach ($stmt->fetchAll() as $row) {
+            $out[(string) $row['severity']] = (int) $row['n'];
+        }
+
+        return $out;
     }
 
     /**

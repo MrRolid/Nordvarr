@@ -11,6 +11,7 @@ $navItems = [
     '/inventory' => ['nav.inventory', 'inventory'],
     '/topology' => ['nav.topology', 'topology'],
     '/alerts' => ['nav.alerts', 'alerts'],
+    '/events' => ['nav.events', 'events'],
     '/settings' => ['nav.settings', 'settings'],
 ];
 ?><!doctype html>

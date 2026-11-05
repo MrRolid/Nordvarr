@@ -28,6 +28,10 @@ final class EventIngest
         if (!in_array($type, Vocabulary::EVENT_TYPES, true)) {
             $errors['type'] = 'invalid_type';
         }
+        $severity = $input['severity'] ?? 'info';
+        if (!in_array($severity, Vocabulary::EVENT_SEVERITIES, true)) {
+            $errors['severity'] = 'invalid_severity';
+        }
         $occurredAt = is_string($input['occurred_at'] ?? null)
             ? \Nordvarr\Repository\EventRepository::normalizeTime($input['occurred_at'])
             : null;
@@ -56,7 +60,7 @@ final class EventIngest
             throw new ValidationException($errors);
         }
 
-        return $this->inventory->transaction(function () use ($source, $eventId, $type, $occurredAt, $summary, $details, $refs): array {
+        return $this->inventory->transaction(function () use ($source, $eventId, $type, $severity, $occurredAt, $summary, $details, $refs): array {
             $inv = $this->inventory;
             $existing = $inv->events->findBySourceId($source, $eventId);
             if ($existing !== null) {
@@ -81,6 +85,7 @@ final class EventIngest
                 'source' => $source,
                 'source_event_id' => $eventId,
                 'type' => $type,
+                'severity' => $severity,
                 'occurred_at' => $occurredAt,
                 'summary' => trim($summary),
                 'details' => $details,
