@@ -685,3 +685,25 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .sev-row-notice { border-left-color: var(--accent); }
 .sev-row-warning { border-left-color: var(--st-degraded); }
 .sev-row-critical { border-left-color: var(--st-unhealthy); background: color-mix(in srgb, var(--danger-bg) 45%, transparent); }
+
+/* Zvukové upozornění (F22) */
+.sound-menu { position: relative; }
+.sound-toggle { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: .85rem; }
+.sound-toggle::-webkit-details-marker { display: none; }
+.sound-toggle .icon { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sound-menu[data-muted="until"] .sound-toggle, .sound-menu[data-muted="forever"] .sound-toggle { color: var(--warn-text); background: var(--warn-bg); }
+.sound-panel { position: absolute; right: 0; top: calc(100% + .35rem); z-index: 30; width: min(22rem, calc(100vw - 2rem)); padding: .75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / .18); display: grid; gap: .6rem; }
+.sound-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.sound-actions button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.sound-level { display: grid; grid-template-columns: 1fr auto; gap: .25rem .4rem; align-items: center; border-left: 4px solid var(--border); padding-left: .5rem; }
+.sound-level label { grid-column: 1 / -1; font-weight: 600; font-size: .85rem; }
+.sound-level-info { border-left-color: var(--accent); }
+.sound-level-warning { border-left-color: var(--st-degraded); }
+.sound-level-critical { border-left-color: var(--st-unhealthy); }
+.sound-toast { position: fixed; right: 1rem; top: 4.5rem; z-index: 40; max-width: min(28rem, calc(100vw - 2rem)); padding: .6rem .9rem; border-radius: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 6px solid var(--accent); box-shadow: 0 6px 24px rgb(0 0 0 / .18); font-weight: 600; }
+.sound-toast-warning { border-left-color: var(--st-degraded); }
+.sound-toast-critical { border-left-color: var(--st-unhealthy); }
+@media (max-width: 720px) {
+    .sound-state { display: none; }
+    .sound-toast { top: .75rem; }
+}

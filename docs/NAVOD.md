@@ -23,7 +23,7 @@ Obsah:
 - Webový server, doporučený je Apache 2.4 s `mod_rewrite` (hezké adresy). Bez `mod_rewrite` aplikace funguje s adresami `index.php?r=...`.
 - Cron, který každou minutu spustí PHP z příkazové řádky.
 - Pro kontrolu `ping` příkaz `ping` (balíček `iputils-ping`). Bez něj má kontrola stav "neznámý" s důvodem `tool_missing`.
-- Odchozí spojení ze serveru na kontrolované cíle, na SMTP server, Telegram nebo webhooky a pro expiraci domén na RDAP (`data.iana.org` a servery registrů).
+- Odchozí spojení ze serveru na kontrolované cíle, na SMTP server, Telegram, Discord nebo webhooky a pro expiraci domén na RDAP (`data.iana.org` a servery registrů).
 
 ## 2. Instalace
 
@@ -89,10 +89,15 @@ php bin/nordvarr.php reset-password <e-mail>  # nové heslo pro zapomenutý úč
 
 1. **Nastavení -> Obecné:** časová zóna a řádek pro cron.
 2. **Nastavení -> Notifikace:** adresa aplikace pro odkazy v notifikacích (vyplní se sama při prvním přihlášení), jazyk notifikací a interval připomínek.
-3. **Nastavení -> Kanály:** e-mail (SMTP), Telegram nebo webhook. Po uložení použijte "Odeslat test".
+3. **Nastavení -> Kanály:** kam chodí alerty. Po uložení u kanálu použijte "Odeslat test".
+   - **E-mail:** odesílatel, příjemci, primární SMTP server a nepovinný **záložní SMTP server**, který se použije, když primární selže (historie pokusů je v detailu kanálu).
+   - **Telegram:** token bota od @BotFather a chat ID.
+   - **Discord:** v Discordu Nastavení serveru -> Integrace -> Webhooky -> Nový webhook -> Kopírovat URL webhooku a adresu vložte do kanálu. Zpráva má barevný pruh podle druhu (červená výpadek, zelená vyřešení). Adresa obsahuje token, ukládá se zašifrovaná.
+   - **Webhook:** obecný JSON podepsaný HMAC pro vlastní integrace.
+   - **Zvuk v prohlížeči:** tlačítko **Zvuk** v horní liště. Zvuk zazní při novém nebo vyřešeném alertu a při nové události, dokud je Nordvarr otevřený v některé kartě. Každá úroveň má svůj zvuk (informace, oranžová, červená) a zvuk jde vybrat (dvojtón, zvonek, dvojité pípnutí, gong, siréna, bez zvuku) a přehrát. "Ztlumit na 1 hodinu" se po hodině samo zruší, "Ztlumit" platí do zapnutí. Nastavení platí pro daný prohlížeč. Prohlížeč pustí zvuk až po prvním kliknutí na stránku. Upozornění se ukáže i jako text vpravo nahoře.
 4. **Inventář:** objekty ručně, importem JSON nebo přes API. Vztahy "závisí na" a "obsahuje" určují okolí v topologii a potlačení alertů.
 5. **Kontroly** na detailu objektu: HTTP, TCP, ping, certifikát TLS, expirace domény, heartbeat. Rychlejší cesta je popsaná níže v části "Jak zapnout hlídání".
-6. **Topologie:** graf okolí objektu nebo objektů podle filtru. Přepínač nad mapou volí rozvržení:
+6. **Topologie:** graf okolí objektu nebo objektů podle filtru. Z hlavní navigace se otevře 3D se všemi objekty. Přepínač nad mapou volí rozvržení:
    - **Automaticky:** rozvržení podle vztahů.
    - **Patra:** objekty ve vodorovných pásech podle vrstvy infrastruktury, zdola: poskytovatelé (hosting, datacentra), hardware a síť, virtuální stroje a VPS, kontejnery, služby a databáze, weby a API, domény, internet a externí služby. Objekty spojené vztahem leží nad sebou ve sloupci (VM nad svým serverem, web nad službou). Patro určuje typ objektu: kontejnery a clustery (Kubernetes, Docker Swarm) mají vlastní typy `container` a `cluster` a leží v patře kontejnerů. Cluster obsahuje své kontejnery (vztah "obsahuje") a sám může ležet ve VM nebo na serveru. **Poskytovatel** (typ `provider`, třeba firma, od které máte VPS nebo pronajatý server) leží v nejspodnějším patře a své servery a VPS "obsahuje". **Externí služba** (typ `external`: Cloudflare, veřejné DNS servery, peering jako NIX.CZ, Google) leží v nejvyšším patře: věci mimo vaši správu, na kterých vaše weby a servery "závisí". Jiné patro nastavíte atributem `vrstva` s hodnotou `providers`, `hardware`, `virtual`, `containers`, `services`, `web`, `domains`, `external` nebo číslem 0 až 7 (0 = poskytovatelé, 1 = hardware). Volba rozvržení zůstává v adrese stránky.
    - **3D:** patra jako disky nad sebou (hardware dole), objekty na obvodu disku. Objekty spojené vztahem leží ve stejném směru nad sebou. Tažením myší nebo prstem otočíte, kolečkem nebo dvěma prsty přiblížíte, kliknutím vyberete objekt (karta vpravo), dvojklikem otevřete jeho kartu. Klik v seznamu vlevo natočí mapu k objektu. Tlačítka: "Pohled shora", "Roztáhnout patra" a "Celý graf" (výchozí pohled). Najetí myší na objekt ztlumí vše mimo jeho sousedy. Server s agentem má pod názvem vytížení CPU, RAM, nejplnějšího disku (a GPU) z posledního hlášení, barevně podle stavu (viz níže). U víc než 60 objektů se popisky ukazují jen u objektů s problémem, u vybraného a jeho sousedů. 3D potřebuje WebGL. Bez něj zůstane mapa v patrech s upozorněním.

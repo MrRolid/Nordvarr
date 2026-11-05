@@ -22,6 +22,7 @@ $navItems = [
     <title><?= $title !== '' ? $v->t($title) . ' - ' : '' ?><?= $v->t('app.name') ?></title>
     <link rel="stylesheet" href="<?= $v->asset('css/app.css') ?>">
     <script type="module" src="<?= $v->asset('js/app.js') ?>"></script>
+    <?php if ($user !== null): ?><script type="module" src="<?= $v->asset('js/sounds.js') ?>"></script><?php endif; ?>
 </head>
 <body class="<?= $user !== null ? 'has-nav' : 'no-nav' ?>">
 <header class="topbar">
@@ -39,6 +40,7 @@ $navItems = [
     <div class="toolbar">
         <?= $v->raw($v->render('partials/lang', [])) ?>
         <?php if ($user !== null): ?>
+        <?= $v->raw($v->render('partials/sound', [])) ?>
         <span class="whoami"><?= $v->t('user.logged_in_as', ['email' => (string) $user['email']]) ?></span>
         <form method="post" action="<?= $v->url('/logout') ?>" class="inline">
             <?= $v->csrfField() ?>

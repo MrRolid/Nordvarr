@@ -209,6 +209,63 @@ test('události ze serveru: agent event a site, přehled Události s důležitos
   await expect(page.getByTestId('timeline')).toContainText('Nová objednávka č. 7');
 });
 
+test('zvukové upozornění: zvuk podle důležitosti, ztlumení na hodinu, volba zvuku', async ({ page, baseURL }) => {
+  await loginOk(page);
+  const env = {
+    PATH: `${join(fixtures, 'bin')}:/usr/local/bin:/usr/bin:/bin`,
+    NORDVARR_URL: baseURL,
+    NORDVARR_TOKEN: token,
+    NORDVARR_ROOT: join(work, 'root'),
+    NORDVARR_STATE_DIR: join(work, 'state'),
+    NORDVARR_HOSTNAME: 'e2e-gpu.example.com',
+    NORDVARR_CONF: join(work, 'neni.conf'),
+    LC_ALL: 'C',
+  };
+  const script = join(process.env.E2E_SITE, 'nordvarr/agent/nordvarr-agent.sh');
+  const event = async (...args) => promisify(execFile)('bash', [script, 'event', ...args], { env });
+  const menu = page.getByTestId('sound-menu');
+  await page.goto('/events');
+  await page.evaluate(() => window.localStorage.removeItem('nordvarr.sound.since'));
+  await page.reload();
+  await expect(menu).toHaveAttribute('data-polled', '1');
+  const poll = () => page.evaluate(() => window.nordvarrSound.poll());
+  const played = () => menu.getAttribute('data-played');
+
+  // Kritická událost: červený zvuk (výchozí siréna) a upozornění na obrazovce.
+  await page.waitForTimeout(1100);
+  await event('-s', 'critical', '-t', 'security', 'Zvuk: útok na přihlášení');
+  await poll();
+  await expect(menu).toHaveAttribute('data-last-played', 'critical:siren');
+  await expect(page.locator('[data-sound-toast]')).toContainText('Zvuk: útok na přihlášení');
+  await expect(page.locator('[data-sound-toast]')).toHaveClass(/sound-toast-critical/);
+
+  // Ztlumení na hodinu: upozornění se ukáže, zvuk ne.
+  await menu.locator('summary').click();
+  await page.getByTestId('sound-mute-hour').click();
+  await expect(menu).toHaveAttribute('data-muted', 'until');
+  await expect(menu.locator('[data-sound-state]')).toContainText('Ztlumeno do');
+  const before = await played();
+  await page.waitForTimeout(1100);
+  await event('-s', 'warning', 'Zvuk: varování během ztlumení');
+  await poll();
+  await expect(page.locator('[data-sound-toast]')).toContainText('Zvuk: varování během ztlumení');
+  expect(await played()).toBe(before);
+
+  // Po hodině se ztlumení zruší samo.
+  await page.evaluate(() => window.localStorage.setItem('nordvarr.sound.muted', String(Date.now() - 1000)));
+  await page.reload();
+  await expect(menu).toHaveAttribute('data-muted', 'no');
+
+  // Volba zvuku pro oranžovou úroveň se uloží a přehraje.
+  await menu.locator('summary').click();
+  await page.locator('#sound-warning').selectOption('gong');
+  await expect(menu).toHaveAttribute('data-last-played', 'warning:gong');
+  await page.waitForTimeout(1100);
+  await event('-s', 'warning', 'Zvuk: varování po ztlumení');
+  await poll();
+  await expect(menu).toHaveAttribute('data-last-played', 'warning:gong');
+});
+
 test('skript agenta jde stáhnout bez přihlášení', async ({ request }) => {
   const response = await request.get('/agent/nordvarr-agent.sh');
   expect(response.status()).toBe(200);

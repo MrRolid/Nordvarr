@@ -70,6 +70,9 @@ $server = static function (string $prefix) use ($v, $type, $val, $field, $err): 
         <?= $v->raw($field('bot_token', 'channel.bot_token', 'password')) ?>
         <?= $v->raw($field('chat_id', 'channel.chat_id')) ?>
         <p class="help"><?= $v->t('channel.telegram_help') ?></p>
+        <?php elseif ($type === 'discord'): ?>
+        <?= $v->raw($field('url', 'channel.discord_url', 'password')) ?>
+        <p class="help"><?= $v->t('channel.discord_help') ?></p>
         <?php else: ?>
         <?= $v->raw($field('url', 'channel.url', 'url')) ?>
         <?= $v->raw($field('secret', 'channel.secret', 'password')) ?>

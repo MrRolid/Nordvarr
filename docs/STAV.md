@@ -4,6 +4,16 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### 0.18.0 Zvuky, Discord, topologie ve 3D, README v angličtině (větev `faze-22-notifikace-zvuky`)
+
+Z požadavků vlastníka.
+
+- Topologie z hlavní navigace (bez parametrů) se otevře ve 3D se všemi objekty (režim filtru).
+- Kanál **Discord** (migrace `0012_discord.sql`): adresa webhooku zašifrovaná, zpráva jako embed s barvou podle druhu, bez označování uživatelů, chyby bez tokenu. E-mail se záložním SMTP, Telegram, obecný webhook a test odeslání už existovaly od F3.
+- **Zvukové upozornění** v prohlížeči: endpoint `/notify/pulse` (nové a vyřešené alerty bez potlačených, nové události; úroveň info, warning, critical), skript `sounds.js` (Web Audio, šest zvuků, volba zvuku pro každou úroveň, ztlumení na hodinu se samo zruší, upozornění na obrazovce, sdílený čas mezi kartami).
+- **README v angličtině** se snímky obrazovky (`docs/screenshots/`, anglické rozhraní, fiktivní data z e2e).
+- Testy: `PulseTest`, `DiscordChannelTest`, e2e `agent.spec.js` (zvuky), `topology.spec.js` a `mobile.spec.js` (výchozí 3D).
+
 ### 0.17.0 Události ze serverů a natočení kostky (větev `faze-21-udalosti`, agent 1.4.0)
 
 Z požadavků vlastníka: "na straně agenta přidávat nové domény s logy a další události (nový projekt, formulář podpory, objednávka, fail2ban/CrowdSec, vzkaz od AI agenta), vrstva událostí označených barvou důležitosti" a "kliknutí na stěnu kostky ji natočí, aby byla co nejlépe čitelná".
@@ -412,5 +422,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.17.0 (události, agent 1.4.0). Další kandidáti: notifikace kritických událostí do kanálů, události v mapě topologie.
+- Release 0.18.0. Další kandidáti: notifikace kritických událostí do kanálů, události v mapě topologie, NAVOD v angličtině.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
