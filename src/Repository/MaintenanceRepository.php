@@ -50,10 +50,16 @@ final class MaintenanceRepository
     /**
      * Ukončí probíhající okno teď (ends_at = now).
      */
+    /**
+     * Ukončí probíhající okno. Okno, které začalo ve stejné sekundě (časy jsou na sekundy),
+     * dostane začátek o sekundu dřív, aby platilo omezení konec > začátek.
+     */
     public function end(string $id, string $now): void
     {
-        $this->pdo->prepare('UPDATE maintenance_windows SET ends_at = ? WHERE id = ? AND starts_at < ? AND ends_at > ?')
-            ->execute([$now, $id, $now, $now]);
+        $before = Time::toDb(Time::fromDb($now)->modify('-1 second'));
+        $this->pdo->prepare(
+            'UPDATE maintenance_windows SET ends_at = ?, starts_at = MIN(starts_at, ?) WHERE id = ? AND starts_at <= ? AND ends_at > ?'
+        )->execute([$now, $before, $id, $now, $now]);
     }
 
     /**
