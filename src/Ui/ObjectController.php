@@ -420,6 +420,7 @@ final class ObjectController
                 $r->input('summary'),
                 str_replace("\r\n", "\n", $r->input('details')),
                 Time::toDb($occurred),
+                $r->input('severity', 'info'),
             );
         } catch (ValidationException $e) {
             return $this->back($object, 'err.' . $e->firstError(), '#timeline');

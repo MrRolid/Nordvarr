@@ -22,7 +22,9 @@ final class ObjectLogs
     public const TYPES = ['website', 'service', 'database', 'container'];
 
     /**
-     * Platné cesty z textu (oddělené novým řádkem, mezerou, čárkou nebo středníkem).
+     * Platné položky z textu: jedna na řádek (nebo oddělené čárkou či středníkem), každá je
+     * "cesta" nebo "cesta | filtr" (agent pak pošle jen řádky obsahující filtr, třeba název webu
+     * ze společného logu). Výsledkem jsou klíče "cesta" a "cesta|filtr".
      *
      * @return array{paths: list<string>, invalid: list<string>}
      */
@@ -30,12 +32,18 @@ final class ObjectLogs
     {
         $paths = [];
         $invalid = [];
-        foreach (preg_split('/[\s,;]+/', trim($value)) ?: [] as $part) {
+        foreach (preg_split('/[\r\n,;]+/', trim($value)) ?: [] as $part) {
+            $part = trim($part);
             if ($part === '') {
                 continue;
             }
-            if (self::isValidPath($part)) {
-                $paths[$part] = true;
+            $path = $part;
+            $filter = null;
+            if (str_contains($part, '|')) {
+                [$path, $filter] = array_map('trim', explode('|', $part, 2));
+            }
+            if (self::isValidPath($path) && ($filter === null || self::isValidFilter($filter))) {
+                $paths[$filter === null ? $path : $path . '|' . $filter] = true;
             } else {
                 $invalid[] = $part;
             }
@@ -53,6 +61,26 @@ final class ObjectLogs
             && preg_match('#^/[A-Za-z0-9._@+\-/]+$#', $path) === 1
             && preg_match('#(^|/)\.{1,2}(/|$)#', $path) !== 1
             && !str_ends_with($path, '/');
+    }
+
+    /**
+     * Filtr řádků: text bez mezer z bezpečných znaků (název webu, adresa, cesta v URL).
+     */
+    public static function isValidFilter(string $filter): bool
+    {
+        return preg_match('#^[A-Za-z0-9._:@/\-]{1,100}$#', $filter) === 1;
+    }
+
+    /**
+     * Klíč položky rozdělený na cestu a filtr (pro zobrazení).
+     *
+     * @return array{path: string, filter: string}
+     */
+    public static function split(string $key): array
+    {
+        $parts = explode('|', $key, 2);
+
+        return ['path' => $parts[0], 'filter' => $parts[1] ?? ''];
     }
 
     /**
@@ -103,7 +131,7 @@ final class ObjectLogs
 
         return [
             'paths' => $paths,
-            'value' => implode("\n", $paths),
+            'value' => implode("\n", array_map(static fn (string $p): string => str_replace('|', ' | ', $p), $paths)),
             'hosts' => array_values(array_map(static fn (array $h): string => (string) $h['hostname'], $hosts)),
             'entries' => $entries,
         ];

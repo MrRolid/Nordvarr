@@ -12,7 +12,9 @@ final class Vocabulary
 {
     public const OBJECT_TYPES = ['server', 'vm', 'cluster', 'container', 'service', 'website', 'database', 'domain', 'network_device', 'provider', 'external', 'other'];
     public const RELATIONSHIP_KINDS = ['depends_on', 'contains'];
-    public const EVENT_TYPES = ['deploy', 'config', 'maintenance', 'restart', 'incident', 'note', 'other'];
+    public const EVENT_TYPES = ['deploy', 'config', 'maintenance', 'restart', 'incident', 'note', 'other', 'security', 'business', 'message'];
+    /** Důležitost události od nejnižší. */
+    public const EVENT_SEVERITIES = ['info', 'notice', 'warning', 'critical'];
     public const LIFECYCLES = ['active', 'archived'];
     public const MANUAL_SOURCE = 'manual';
 

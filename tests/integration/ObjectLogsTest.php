@@ -50,9 +50,11 @@ final class ObjectLogsTest extends TestCase
 
     public function testParseAndValidatePaths(): void
     {
-        $parsed = ObjectLogs::parse(" /var/www/vhosts/example_com/access.log\n/var/log/httpd/error_log, /var/www/vhosts/example_com/access.log ;relativni ../etc/passwd /var/www/../etc/shadow /var/www/ /var/log/a b");
-        self::assertSame(['/var/www/vhosts/example_com/access.log', '/var/log/httpd/error_log', '/var/log/a'], $parsed['paths']);
-        self::assertSame(['relativni', '../etc/passwd', '/var/www/../etc/shadow', '/var/www/', 'b'], $parsed['invalid']);
+        $parsed = ObjectLogs::parse(" /var/www/vhosts/example_com/access.log\n/var/log/httpd/error_log, /var/www/vhosts/example_com/access.log ;relativni\n../etc/passwd\n/var/www/../etc/shadow\n/var/www/\n/var/log/a b"
+            . "\n/var/log/httpd/weby_access_log | shop.example.com\n/var/log/httpd/weby_access_log|shop.example.com\n/var/log/x | dva slova\n/var/log/y | ");
+        self::assertSame(['/var/www/vhosts/example_com/access.log', '/var/log/httpd/error_log', '/var/log/httpd/weby_access_log|shop.example.com'], $parsed['paths']);
+        self::assertSame(['relativni', '../etc/passwd', '/var/www/../etc/shadow', '/var/www/', '/var/log/a b', '/var/log/x | dva slova', '/var/log/y |'], $parsed['invalid']);
+        self::assertSame(['path' => '/var/log/httpd/weby_access_log', 'filter' => 'shop.example.com'], ObjectLogs::split('/var/log/httpd/weby_access_log|shop.example.com'));
         self::assertFalse(ObjectLogs::isValidPath('/var/log/"x'));
         self::assertFalse(ObjectLogs::isValidPath('/var/log/./x'));
         self::assertTrue(ObjectLogs::isValidPath('/var/www/vhosts/shop.example.com/logs/access_ssl.log'));
@@ -104,6 +106,15 @@ final class ObjectLogsTest extends TestCase
         self::assertStringNotContainsString('Tajne-heslo-1', $page);
         self::assertStringNotContainsString('chyba serveru', $page, 'Logy serveru se na kartě webu neukazují.');
         self::assertSame(1, substr_count($page, 'data-test="log-waiting"'));
+
+        // Společný log s filtrem: na kartě je cesta, filtr a ve formuláři zápis s mezerami kolem svislé čáry.
+        $this->post('/objects/' . $web . '/logs', ['paths' => '/var/log/httpd/weby_access_log | shop.example.com']);
+        self::assertSame(['/var/log/httpd/weby_access_log|shop.example.com'], $this->report($server)['log_paths']);
+        $this->report($server, ['logs' => [['path' => '/var/log/httpd/weby_access_log|shop.example.com', 'lines' => 'shop.example.com 203.0.113.5 "GET /kosik"']]]);
+        $page = $this->ui('GET', '/objects/' . $web)->body;
+        self::assertStringContainsString('jen řádky s &quot;shop.example.com&quot;', $page);
+        self::assertStringContainsString('GET /kosik', $page);
+        self::assertStringContainsString('>/var/log/httpd/weby_access_log | shop.example.com</textarea>', $page);
 
         // Vymazání cest.
         $this->post('/objects/' . $web . '/logs', ['paths' => '']);

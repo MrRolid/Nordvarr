@@ -100,15 +100,15 @@ function drawFaces(d, css, labels) {
             g.font = font(32);
             g.fillStyle = css('text');
             g.fillText(name, 30, y + 22);
-            bar(g, 118, y, 108, 26, it?.pct, it ? levelColor(it.level) : css('st-unknown'));
+            bar(g, 112, y, 90, 26, it?.pct, it ? levelColor(it.level) : css('st-unknown'));
             g.fillStyle = css('text');
             g.textAlign = 'right';
             g.fillText(it ? `${it.pct}%` : '-', FACE_PX - 28, y + 22);
             g.textAlign = 'left';
         });
-        g.font = font(26, 600);
+        g.font = font(22, 600);
         g.fillStyle = css('text');
-        g.fillText(fit(g, `${labels.net}: RX ${rate(det.rx_bps)}  TX ${rate(det.tx_bps)}`, FACE_PX - 60), 30, 290);
+        g.fillText(fit(g, `RX ${rate(det.rx_bps)} / TX ${rate(det.tx_bps)}`, FACE_PX - 60), 30, 290);
         if (res.stale) {
             g.fillStyle = css('st-unhealthy');
             g.fillText(labels.stale, 30, 96 - 4);
@@ -589,13 +589,28 @@ export function createMap3d(container, graph, options = {}) {
     const pointers = new Map();
     let moved = 0;
     let pinch = null;
-    const pick = (event) => {
+    const pickHit = (event) => {
         const rect = renderer.domElement.getBoundingClientRect();
         const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
         raycaster.setFromCamera(ndc, camera);
-        const hit = raycaster.intersectObjects([...nodes.values()].filter((n) => !n.off).map((n) => n.mesh), false)[0];
-        return hit ? hit.object.userData.id : null;
+        return raycaster.intersectObjects([...nodes.values()].filter((n) => !n.off).map((n) => n.mesh), false)[0] ?? null;
     };
+    const pick = (event) => pickHit(event)?.object.userData.id ?? null;
+    // Klik na stěnu kostky: kamera se natočí kolmo na stěnu a přiblíží, aby byl text co nejčitelnější.
+    const faceFocus = (n, localNormal) => {
+        const normal = localNormal.clone().applyQuaternion(n.mesh.quaternion).normalize();
+        const distance = CUBE * 2.3 * n.mesh.scale.x;
+        if (Math.abs(normal.y) > 0.9) {
+            animateTo({ polar: normal.y > 0 ? 0.02 : 2.8, distance, target: n.pos.clone() });
+        } else {
+            let azimuth = Math.atan2(normal.z, normal.x);
+            const delta = Math.atan2(Math.sin(azimuth - view.azimuth), Math.cos(azimuth - view.azimuth));
+            azimuth = view.azimuth + delta;
+            animateTo({ azimuth, polar: Math.PI / 2, distance, target: n.pos.clone() });
+        }
+        lastFace = { id: n.data.id, normal: [Math.round(normal.x), Math.round(normal.y), Math.round(normal.z)] };
+    };
+    let lastFace = null;
     const canvas = renderer.domElement;
     canvas.addEventListener('pointerdown', (event) => {
         canvas.setPointerCapture?.(event.pointerId);
@@ -629,7 +644,7 @@ export function createMap3d(container, graph, options = {}) {
         } else {
             view.azimuth += dx * 0.006;
             // Pod vodorovnou rovinu jen s kostkami (spodní stěna se sítí).
-            view.polar = Math.min(cubes ? 2.3 : 1.55, Math.max(0.02, view.polar - dy * 0.006));
+            view.polar = Math.min(cubes ? 2.8 : 1.55, Math.max(0.02, view.polar - dy * 0.006));
         }
         dirty = true;
     });
@@ -638,8 +653,11 @@ export function createMap3d(container, graph, options = {}) {
         pointers.delete(event.pointerId);
         if (pointers.size < 2) pinch = null;
         if (was && moved < 6 && pointers.size === 0) {
-            const id = pick(event);
+            const hit = pickHit(event);
+            const id = hit?.object.userData.id ?? null;
             if (id) options.onSelect?.(id);
+            const n = id ? nodes.get(id) : null;
+            if (n?.cube && hit.face) faceFocus(n, hit.face.normal);
         }
     };
     canvas.addEventListener('pointerup', release);
@@ -754,6 +772,8 @@ export function createMap3d(container, graph, options = {}) {
                 visibleNodes: [...nodes.values()].filter((n) => !n.off).length,
                 path: path ? [...path.nodes].sort() : null,
                 cubes: [...nodes.values()].filter((n) => n.cube).map((n) => n.data.id),
+                lastFace,
+                view: { azimuth: view.azimuth, polar: view.polar, distance: view.distance },
             };
         },
         dispose() {

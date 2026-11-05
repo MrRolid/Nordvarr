@@ -215,7 +215,7 @@ Tajné údaje (hesla, tokeny, privátní klíče, DSN s heslem) do atributů ani
 
 ### Události
 
-Idempotentní podle (zdroj tokenu, `event_id`). Typy: `deploy`, `config`, `maintenance`, `restart`, `incident`, `note`, `other`. Objekty se určují přes `external_id` (ze stejného zdroje) nebo `id`.
+Idempotentní podle (zdroj tokenu, `event_id`). Typy: `deploy`, `config`, `maintenance`, `restart`, `incident`, `note`, `other`, `security` (bezpečnost), `business` (obchod a zákazníci), `message` (vzkaz). Nepovinná důležitost `severity`: `info` (výchozí), `notice` (dobré vědět), `warning` (pozor), `critical` (kritické). Objekty se určují přes `external_id` (ze stejného zdroje) nebo `id`.
 
 ```
 curl -sS -X POST "$NV/api/v1/events" \
@@ -396,6 +396,15 @@ Každý web může mít logy ve vlastním souboru (třeba `CustomLog /var/www/vh
 3. Server pošle agentovi cesty v odpovědi na hlášení. Při změně cest agent pošle logy hned při dalším běhu, potom jednou za 10 minut (posledních 50 řádků, nejvýš 20 kB).
 4. Logy jsou na kartě webu, u každého souboru je server a stáří. Soubor, který agent zatím neposlal, je označený "čeká na agenta".
 
+**Společný log pro víc webů** (typicky hromadný hosting s `VirtualDocumentRoot`, kde všechny weby logují do jednoho souboru): zadejte cestu a za svislou čáru text, podle kterého se řádky webu poznají, například `/var/log/httpd/weby_access_log | shop.example.com`. Agent pošle posledních 50 řádků, které text obsahují (hledá v posledních 20 000 řádcích souboru). Výchozí formát logu Apache název webu neobsahuje, přidejte ho do konfigurace (na serveru za Cloudflare i skutečnou adresu návštěvníka):
+
+```
+LogFormat "%V %{CF-Connecting-IP}i %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" weby
+CustomLog /var/log/httpd/weby_access_log weby
+```
+
+Filtr hledá text kdekoli v řádku, `example.com` tedy zachytí i `shop.example.com`; zadejte co nejpřesnější název.
+
 Agent čte jen soubory pod povolenými adresáři `NORDVARR_LOG_ALLOW` (výchozí `/var/log` a `/var/www`), cestu ověřuje po rozbalení symbolických odkazů. Bez toho by kdokoli s přístupem do Nordvarru mohl nechat agenta (běží jako root) poslat libovolný soubor serveru, třeba `/etc/shadow`. Logy jinde povolíte v `/etc/nordvarr-agent.conf`, například `NORDVARR_LOG_ALLOW=/var/log /var/www /srv/app/logs`.
 
 ### Kontejnery Dockeru
@@ -458,4 +467,77 @@ Kontrola posílá notifikace i při stavu omezeně (lze vypnout). Hodnoty se ukl
 ```
 
 Odpověď: `{"object_id":"...","created":false,"check_id":"...","status":"healthy","problems":0}`. Neznámé klíče se ignorují, hodnoty mimo rozumný rozsah se uloží jako prázdné.
+
+## 13. Události ze serverů a aplikací
+
+Stránka **Události** (v hlavní navigaci) ukazuje všechno, co se stalo: nasazení, údržbu, zásahy, bezpečnostní události, objednávky, formuláře podpory, vzkazy. Každá událost má důležitost a podle ní barvu:
+
+| Důležitost | Barva | Příklad |
+|---|---|---|
+| `info` (informace) | šedá | AI agent na serveru něco upravil, běžná změna |
+| `notice` (dobré vědět) | modrá | nová objednávka, nový formulář podpory, nový web |
+| `warning` (pozor) | oranžová | fail2ban nebo CrowdSec zabanoval adresy, opakované chyby |
+| `critical` (kritické) | červená | útok, výpadek platby, něco, co chce okamžitou pozornost |
+
+Filtr nahoře vybere období, nejnižší důležitost a typ. Přehled ukazuje události za 24 hodin, karta objektu jeho události a události sousedů. Starší události (z verzí před 0.17.0) mají `info`, incidenty `warning`.
+
+### Ze serveru: agent
+
+Na serveru s agentem 1.4.0 a novějším (token agenta se čte z `/etc/nordvarr-agent.conf`, proto jako root):
+
+```
+# Vzkaz (výchozí typ message, důležitost info), například od AI agenta na serveru:
+nordvarr-agent.sh event "AI agent: aktualizoval jsem certifikát pro shop.example.com"
+
+# Bezpečnost s důležitostí a podrobnostmi:
+nordvarr-agent.sh event -s warning -t security "fail2ban zabanoval 203.0.113.7" "jail sshd, 12 pokusů"
+
+# Událost k webu (web musí v Nordvarru existovat), podrobnosti ze vstupu:
+echo "zákazník: Example s.r.o." | nordvarr-agent.sh event -s notice -t business -w shop.example.com "Nová objednávka č. 1042" -
+
+# Nový web na tomto serveru: založí objekt Web, vztah "závisí na" server, cesty k logům, s --checks i doporučené kontroly:
+nordvarr-agent.sh site shop.example.com /var/www/vhosts/shop_example_com/access.log --checks
+```
+
+Volba `-i <id>` dá události vlastní id; opakované odeslání se stejným id nevytvoří druhou událost.
+
+**fail2ban**: soubor `/etc/fail2ban/action.d/nordvarr.conf`
+
+```
+[Definition]
+actionban = /usr/local/bin/nordvarr-agent.sh event -s warning -t security -i "f2b-<name>-<ip>-<time>" "fail2ban (<name>) zabanoval <ip>" "pokusů: <failures>"
+actionunban =
+```
+
+a v `/etc/fail2ban/jail.local` u jailu `action = %(action_)s` a na dalším řádku `nordvarr`. Při mnoha banech zvolte `-s info`, aby přehled nezahltily.
+
+**CrowdSec**: notifikační plugin http (`/etc/crowdsec/notifications/http.yaml`), ověřte podle verze CrowdSec:
+
+```
+type: http
+name: nordvarr
+log_level: info
+format: |
+  {"hostname":"srv1.example.com","type":"security","severity":"warning","summary":"CrowdSec: {{len .}} nových rozhodnutí","details":"{{range .}}{{range .Decisions}}{{.Value}} {{.Scenario}}\n{{end}}{{end}}"}
+url: https://nordvarr.example.com/api/v1/agent/event
+method: POST
+headers:
+  Authorization: Bearer nv_...
+  Content-Type: application/json
+```
+
+(`hostname` musí odpovídat serveru s agentem, token je token agenta.)
+
+### Z aplikace: API
+
+Webová aplikace (objednávky, formulář podpory) nemá číst konfiguraci agenta. Vytvořte jí v **Nastavení -> API tokeny** vlastní token se scope `events:write` a posílejte události na `/api/v1/events` s id objektu webu (z adresy jeho karty):
+
+```
+curl -sS -X POST "$NV/api/v1/events" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"event_id":"order-1042","type":"business","severity":"notice","occurred_at":"2026-11-05T10:00:00Z",
+       "summary":"Nová objednávka č. 1042","objects":[{"id":"<id objektu webu>"}]}'
+```
+
+Osobní údaje zákazníků do událostí nedávejte (vidí je každý přihlášený a jdou do exportu pro LLM); stačí číslo objednávky nebo požadavku.
 

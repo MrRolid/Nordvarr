@@ -44,6 +44,10 @@ final class ApiApp
             fn (array $input, string $source): Response => $this->event($input, $source)));
         $router->post('/api/v1/agent/report', fn (): Response => $this->write($request, 'agent:write',
             fn (array $input, string $source): Response => self::json((new AgentService($this->pdo))->ingest($input, $source))));
+        $router->post('/api/v1/agent/event', fn (): Response => $this->write($request, 'agent:write',
+            fn (array $input, string $source): Response => self::json($r = (new \Nordvarr\Agent\AgentInbox($this->pdo))->event($input, $source), $r['created'] ? 201 : 200)));
+        $router->post('/api/v1/agent/site', fn (): Response => $this->write($request, 'agent:write',
+            fn (array $input, string $source): Response => self::json((new \Nordvarr\Agent\AgentInbox($this->pdo))->site($input, $source))));
         $router->get('/api/v1/objects/{id}/context', fn (array $p): Response => $this->context($request, $p['id']));
 
         $match = $router->match($request->method, $request->path);

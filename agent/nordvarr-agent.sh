@@ -12,6 +12,11 @@
 #   nordvarr-agent.sh --test     hlášení s výpisem odpovědi serveru
 #   nordvarr-agent.sh --dry-run  jen vypíše JSON, nic neodesílá
 #   nordvarr-agent.sh --version
+#   nordvarr-agent.sh event [-s info|notice|warning|critical] [-t typ] [-w web] [-i id] "Shrnutí" ["Podrobnosti" | -]
+#                                 událost do Nordvarru (typ: message, security, business, deploy, config,
+#                                 maintenance, restart, incident, note, other; podrobnosti "-" = ze vstupu)
+#   nordvarr-agent.sh site web.example.com [/cesta/k/logu ...] [--checks]
+#                                 založí nebo upraví web na tomto serveru (cesty k logům, doporučené kontroly)
 #
 # Konfigurace: /etc/nordvarr-agent.conf (vlastník root, práva 600), řádky KLÍČ=hodnota:
 #   NORDVARR_URL=https://nordvarr.example.com     (bez mod_rewrite: https://nordvarr.example.com/index.php?r=)
@@ -31,14 +36,15 @@
 set -u
 umask 077
 
-AGENT_VERSION="1.3.0"
+AGENT_VERSION="1.4.0"
 MODE="send"
 case "${1:-}" in
     --dry-run) MODE="dry" ;;
     --test) MODE="test" ;;
     --version) echo "nordvarr-agent $AGENT_VERSION"; exit 0 ;;
+    event|site) MODE="$1"; shift ;;
     "") ;;
-    *) echo "Použití: $0 [--test|--dry-run|--version]" >&2; exit 1 ;;
+    *) echo "Použití: $0 [--test|--dry-run|--version] | event ... | site ..." >&2; exit 1 ;;
 esac
 
 # Konfigurace: proměnné prostředí mají přednost, soubor se jen čte (nespouští).
@@ -102,6 +108,81 @@ read_first() {
 # --- Základní údaje -----------------------------------------------------------
 
 HOSTNAME_VALUE="${NORDVARR_HOSTNAME:-$(hostname -f 2>/dev/null || hostname 2>/dev/null || cat "$ROOT/proc/sys/kernel/hostname" 2>/dev/null)}"
+
+# --- Podpříkazy event a site (jedno odeslání, bez sběru metrik) -------------------
+
+# Odešle JSON na adresu API agenta; vypíše odpověď, při chybě skončí kódem 2.
+post_api() {
+    local path="$1" body="$2" headers response code
+    headers="$STATE_DIR/headers-$$"
+    response="$STATE_DIR/response-$$"
+    printf 'Authorization: Bearer %s\nContent-Type: application/json\n' "$TOKEN" > "$headers"
+    code="$(printf '%s' "$body" | curl -sS -m 20 -o "$response" -w '%{http_code}' -X POST -H @"$headers" --data-binary @- \
+        "${URL%/}$path" 2>&1)"
+    rm -f "$headers"
+    if [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+        echo "OK: $(cat "$response")"
+        rm -f "$response"
+        return 0
+    fi
+    echo "Odeslání selhalo (HTTP ${code:-000}): $(cat "$response" 2>/dev/null)" >&2
+    rm -f "$response"
+    return 2
+}
+
+# Identifikace serveru stejná jako v hlášení.
+host_json() {
+    printf '"hostname":%s' "$(jstr "$HOSTNAME_VALUE")"
+    [ -n "${NORDVARR_EXTERNAL_ID:-}" ] && printf ',"external_id":%s' "$(jstr "$NORDVARR_EXTERNAL_ID")"
+    [ -n "${NORDVARR_OBJECT_ID:-}" ] && printf ',"object_id":%s' "$(jstr "$NORDVARR_OBJECT_ID")"
+    return 0
+}
+
+if [ "$MODE" = "event" ]; then
+    EV_SEVERITY="info"; EV_TYPE="message"; EV_SITE=""; EV_ID=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -s|--severity) EV_SEVERITY="${2:-}"; shift 2 ;;
+            -t|--type) EV_TYPE="${2:-}"; shift 2 ;;
+            -w|--site) EV_SITE="${2:-}"; shift 2 ;;
+            -i|--id) EV_ID="${2:-}"; shift 2 ;;
+            --) shift; break ;;
+            -?*) echo "Neznámá volba: $1" >&2; exit 1 ;;
+            *) break ;;
+        esac
+    done
+    EV_SUMMARY="${1:-}"
+    EV_DETAILS="${2:-}"
+    [ "$EV_DETAILS" = "-" ] && EV_DETAILS="$(head -c 4000)"
+    if [ -z "$EV_SUMMARY" ]; then
+        echo "Použití: $0 event [-s info|notice|warning|critical] [-t typ] [-w web] [-i id] \"Shrnutí\" [\"Podrobnosti\" | -]" >&2
+        exit 1
+    fi
+    BODY="{$(host_json),\"type\":$(jstr "$EV_TYPE"),\"severity\":$(jstr "$EV_SEVERITY"),\"summary\":$(jstr "${EV_SUMMARY:0:300}"),\"details\":$(jstr "${EV_DETAILS:0:4000}")"
+    [ -n "$EV_SITE" ] && BODY="$BODY,\"site\":$(jstr "$EV_SITE")"
+    [ -n "$EV_ID" ] && BODY="$BODY,\"event_id\":$(jstr "$EV_ID")"
+    post_api /api/v1/agent/event "$BODY}"
+    exit $?
+fi
+
+if [ "$MODE" = "site" ]; then
+    SITE_NAME=""; SITE_CHECKS="false"; SITE_LOGS=()
+    for arg in "$@"; do
+        case "$arg" in
+            --checks) SITE_CHECKS="true" ;;
+            -?*) echo "Neznámá volba: $arg" >&2; exit 1 ;;
+            *) if [ -z "$SITE_NAME" ]; then SITE_NAME="$arg"; else SITE_LOGS+=("$(jstr "$arg")"); fi ;;
+        esac
+    done
+    if [ -z "$SITE_NAME" ]; then
+        echo "Použití: $0 site web.example.com [/cesta/k/logu ...] [--checks]" >&2
+        exit 1
+    fi
+    BODY="{$(host_json),\"name\":$(jstr "$SITE_NAME"),\"checks\":$SITE_CHECKS"
+    [ "${#SITE_LOGS[@]}" -gt 0 ] && BODY="$BODY,\"logs\":[$(join_by_comma "${SITE_LOGS[@]}")]"
+    post_api /api/v1/agent/site "$BODY}"
+    exit $?
+fi
 OS_NAME=""
 if [ -r "$ROOT/etc/os-release" ]; then
     OS_NAME="$(sed -n 's/^PRETTY_NAME=//p' "$ROOT/etc/os-release" | head -n 1 | tr -d '"')"
@@ -302,15 +383,18 @@ if [ "${NORDVARR_LOGS:-}" != "0" ] && [ "$LOG_INTERVAL" -gt 0 ] && [ $(( NOW_EPO
     fi
     # Logy webů a služeb zadané v Nordvarru (z poslední odpovědi serveru), jen z povolených adresářů.
     # Cesta se ověřuje po rozbalení odkazů, aby nešlo přes symbolický odkaz číst jiné soubory.
+    # Položka je "cesta" nebo "cesta|filtr" (jen řádky obsahující filtr, třeba název webu ze společného logu).
+    WEB_LOGS=()
     if [ -f "$STATE_DIR/log-paths" ]; then
-        while IFS= read -r p; do
-            [[ "$p" =~ ^/[A-Za-z0-9._@+/-]+$ ]] || continue
+        while IFS= read -r item; do
+            [[ "$item" =~ ^(/[A-Za-z0-9._@+/-]+)(\|([A-Za-z0-9._:@/-]{1,100}))?$ ]] || continue
+            p="${BASH_REMATCH[1]}"
             [[ "$p" =~ (^|/)\.\.?(/|$) ]] && continue
             real="$(realpath -e -- "$ROOT$p" 2>/dev/null)" || continue
             for allow in ${NORDVARR_LOG_ALLOW:-/var/log /var/www}; do
                 allow_real="$(realpath -e -- "$ROOT${allow%/}" 2>/dev/null)" || continue
                 if [[ "$real" == "$allow_real"/* ]]; then
-                    case " $LOG_FILES " in *" $ROOT$p "*) ;; *) LOG_FILES="$LOG_FILES $ROOT$p" ;; esac
+                    WEB_LOGS+=("$item")
                     break
                 fi
             done
@@ -323,6 +407,19 @@ if [ "${NORDVARR_LOGS:-}" != "0" ] && [ "$LOG_INTERVAL" -gt 0 ] && [ $(( NOW_EPO
         lines="$(tail -n 50 "$f" 2>/dev/null | tail -c 20000)"
         LOG_ITEMS+=("{\"path\":$(jstr "${f#"$ROOT"}"),\"lines\":$(jstr "$lines")}")
         [ "${#LOG_ITEMS[@]}" -ge 20 ] && break
+    done
+    for item in "${WEB_LOGS[@]}"; do
+        [ "${#LOG_ITEMS[@]}" -ge 20 ] && break
+        p="${item%%|*}"
+        case " $LOG_FILES " in *" $ROOT$item "*) continue ;; esac
+        [ -r "$ROOT$p" ] || continue
+        if [ "$item" = "$p" ]; then
+            lines="$(tail -n 50 "$ROOT$p" 2>/dev/null | tail -c 20000)"
+        else
+            # Filtr: posledních 50 odpovídajících řádků z konce souboru (nejvýš posledních 20 000 řádků).
+            lines="$(tail -n 20000 "$ROOT$p" 2>/dev/null | grep -F -- "${item#*|}" | tail -n 50 | tail -c 20000)"
+        fi
+        LOG_ITEMS+=("{\"path\":$(jstr "$item"),\"lines\":$(jstr "$lines")}")
     done
     LOGS_JSON="[$(join_by_comma "${LOG_ITEMS[@]}")]"
     [ "$MODE" = "dry" ] || echo "$NOW_EPOCH" > "$LOG_STAMP"
@@ -369,7 +466,7 @@ rm -f "$HEADERS"
 if [ "$CODE" = "200" ]; then
     rm -f "$STATE_DIR/last-error"
     # Cesty k logům webů z odpovědi; když se změnily, logy se pošlou hned při dalším běhu.
-    paths="$(sed -n 's/.*"log_paths":\[\([^]]*\)\].*/\1/p' "$RESPONSE" | tr ',' '\n' | tr -d '"' | grep -E '^/[A-Za-z0-9._@+/-]+$' | grep -vE '(^|/)\.\.?(/|$)' | head -n 20)"
+    paths="$(sed -n 's/.*"log_paths":\[\([^]]*\)\].*/\1/p' "$RESPONSE" | tr ',' '\n' | tr -d '"' | grep -E '^/[A-Za-z0-9._@+/-]+(\|[A-Za-z0-9._:@/-]{1,100})?$' | grep -vE '(^|/)\.\.?(/|$)' | head -n 20)"
     if [ "$paths" != "$(cat "$STATE_DIR/log-paths" 2>/dev/null)" ]; then
         if [ -n "$paths" ]; then printf '%s\n' "$paths" > "$STATE_DIR/log-paths"; else rm -f "$STATE_DIR/log-paths"; fi
         rm -f "$LOG_STAMP"

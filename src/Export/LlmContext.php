@@ -249,6 +249,7 @@ final class LlmContext
         return array_map(static fn (array $e): array => [
             'occurred_at' => (string) $e['occurred_at'],
             'type' => (string) $e['type'],
+            'severity' => (string) $e['severity'],
             'source' => (string) $e['source'],
             'summary' => self::mask((string) $e['summary']),
             'details' => self::cut(self::mask((string) $e['details']), self::MAX_DETAIL_CHARS),
@@ -534,7 +535,8 @@ final class LlmContext
             $out[] = $t->t('llm.no_events');
         }
         foreach ($data['events_7d'] as $e) {
-            $line = '- ' . $this->time($e['occurred_at']) . ' [' . $t->t('event.type.' . $e['type']) . '] ' . self::oneLine($e['summary'])
+            $label = $t->t('event.type.' . $e['type']) . ($e['severity'] !== 'info' ? ', ' . $t->t('event.severity.' . $e['severity']) : '');
+            $line = '- ' . $this->time($e['occurred_at']) . ' [' . $label . '] ' . self::oneLine($e['summary'])
                 . ' (' . implode(', ', $e['objects']) . ')';
             if ($e['details'] !== '') {
                 $line .= ': ' . self::oneLine($e['details']);

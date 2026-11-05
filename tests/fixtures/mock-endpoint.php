@@ -9,6 +9,7 @@ declare(strict_types=1);
  *   /hook/ok                  200
  *   /hook/fail                500
  *   .../api/v1/agent/report   200 (hlášení hostového agenta; log_paths z log-paths.json, je-li)
+ *   .../api/v1/agent/event    201, .../api/v1/agent/site 200 (podpříkazy agenta)
  */
 
 $dir = (string) getenv('NORDVARR_MOCK_DIR');
@@ -41,6 +42,9 @@ if (preg_match('#^/bot([^/]+)/sendMessage$#', $path, $m) === 1) {
     // Cesty k logům webů pro agenta, když je test připravil v souboru log-paths.json.
     $logPaths = $dir !== '' && is_file($dir . '/log-paths.json') ? ',"log_paths":' . trim((string) file_get_contents($dir . '/log-paths.json')) : '';
     echo '{"object_id":"mock","created":false,"status":"healthy"' . $logPaths . '}';
+} elseif (str_ends_with($path, '/api/v1/agent/event') || str_ends_with($path, '/api/v1/agent/site')) {
+    http_response_code(str_ends_with($path, '/event') ? 201 : 200);
+    echo '{"id":"mock","created":true}';
 } elseif ($path === '/hook/ok') {
     echo '{"received":true}';
 } elseif ($path === '/hook/fail') {
