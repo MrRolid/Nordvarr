@@ -1,302 +1,305 @@
-# Rozhodnutí
-
-Rozhodnutí odlišná od SPEC.md nebo taková, která SPEC nechává otevřená.
-
-## 2026-10-20 (F0 Kostra)
-
-1. **Migrace po fázích.** Migrace `0001_zaklad.sql` vytváří jen tabulky, které F0 potřebuje (`users`, `login_attempts`, `audit_log`, `settings`, `schema_migrations`). Ostatní tabulky datového modelu přidají migrace fází, které je používají. Důvod: schéma se ověří kódem, který ho používá, a zároveň se tím reálně testuje aktualizace přes migrace.
-2. **Hezké adresy se zapínají samy.** `public/.htaccess` při aktivním mod_rewrite nastaví proměnnou `NORDVARR_REWRITE=1` a aplikace pak generuje adresy `/login`. Bez mod_rewrite generuje `index.php?r=/login`. Router přijímá oba tvary vždy. Nic se nenastavuje ručně.
-3. **Omezení pokusů o přihlášení.** Počítají se neúspěšné pokusy od posledního úspěchu za poslední hodinu, zvlášť pro e-mail a pro IP. Od 5. selhání musí mezi pokusy uplynout 1, 2, 4, 8, 16 s (místo `sleep()`, které by blokovalo PHP proces), od 10. selhání je zámek 15 minut od posledního selhání. Odmítnutý pokus během zámku se nezapočítává, aby se zámek neprodlužoval donekonečna. Odpověď je HTTP 429 s obecnou hláškou. Neexistující účet se ověřuje proti náhradnímu hashi, aby nešel poznat podle času odpovědi.
-4. **Zneplatnění session po změně hesla** přes sloupec `users.session_version`: změna hesla ho zvýší a každá session s jinou hodnotou se zahodí.
-5. **Session soubory** jsou v `data_dir/sessions` (mimo webroot, nezávislé na nastavení hostingu). Instalátor, který ještě nezná datový adresář, používá výchozí úložiště session PHP.
-6. **Volba jazyka** se ukládá do cookie `nordvarr_lang` (formulář s CSRF). Uživatelské nastavení jazyka v DB zatím není potřeba.
-7. **Minimální délka hesla** admina je 10 znaků.
-8. **Datový adresář nesmí být uvnitř adresáře aplikace** (aktualizace nahráním souborů by ho mohla přepsat). Do datového adresáře se kromě `.htaccess` dává i prázdný `index.html`. V kořeni aplikace je navíc `.htaccess` se zákazem přístupu (pojistka, když se do webrootu nahraje celý adresář `nordvarr/`, ne jen `public/`).
-9. **Kontrola dostupnosti datového adresáře z webu.** Pokud leží mimo DOCUMENT_ROOT, je v pořádku. Pokud leží uvnitř, instalátor vždy varuje a navíc zkusí soubor databáze stáhnout přes HTTP; když se to podaří, zobrazí důraznější varování.
-10. **`config.php` vzniká jako poslední krok instalace** a zapisuje se v režimu `x` (selže, pokud mezitím vznikl). Jeho existence instalátor blokuje.
-11. **Worker v F0** jen drží zámek proti souběhu a zapisuje čas posledního běhu do `settings.worker_last_run`, aby řádek pro cron z instalátoru fungoval od začátku. Kontroly přidá F2.
-12. **Položky navigace** (Inventář, Topologie, Alerty, Nastavení) vedou v F0 na zástupné stránky s informací, ve které fázi přibudou. Díky tomu jde ověřit layout i mobilní spodní lištu.
-13. **`bin/dev-router.php`** nahrazuje `.htaccess` pro vestavěný server PHP (vývoj a e2e testy). Do release zipu se nedává, stejně jako `bin/build-release.sh`.
-14. **Řádek pro cron** používá `php` z PATH, protože `PHP_BINARY` je pod PHP-FPM cesta k FPM, ne k CLI. Cesta ke skriptu se do uvozovek dává jen tehdy, když obsahuje neobvyklé znaky.
-15. **Knihovny JS** budou v `public/assets/vendor/` (CLAUDE.md píše `assets/vendor/`, SPEC má webroot `public/`). Seznam verzí bude v `public/assets/vendor/VERSIONS.md`. V F0 žádná knihovna není.
-16. **Testovací nástroje:** PHPUnit 12, Playwright `@playwright/test` 1.56.1 (shoda s Chromiem předinstalovaným v cloud VM). CI pouští PHPUnit na PHP 8.4 i 8.5, e2e na 8.4. E2E testy sestaví zip, rozbalí ho do prázdného dočasného adresáře a instalují z něj.
-17. **Verze** v souboru `VERSION` je během vývoje `0.1.0-dev`, release 0.1.0 je až v F5.
-
-## 2026-10-20 (F1 Inventář)
-
-1. **Upsert jako úplný stav zdroje.** Když vstup upsertu obsahuje klíč `attributes`, bere se jako kompletní sada atributů daného zdroje: atributy tohoto zdroje, které ve vstupu chybí, se smažou. Totéž platí pro `relationships` (odchozí vztahy objektu od tohoto zdroje). Když klíč ve vstupu chybí, nic se nemaže. Tagy se jen přidávají, protože jsou sdílené s ručními úpravami. Ruční atributy a vztahy (zdroj `manual`) upsert nikdy nemaže.
-2. **Cíle vztahů v upsertu** se hledají podle `to_external_id` jen v rámci zdroje tokenu. Odkaz na neexistující objekt vrátí 422 se seznamem `missing_external_ids` a nic se nezapíše (celý upsert běží v transakci).
-3. **Vztah je unikátní podle (od, do, druh)** bez ohledu na zdroj. Když stejný vztah už existuje od jiného zdroje, upsert ho nezdvojí ani nesmaže.
-4. **Události** musí patřit aspoň k jednomu objektu. Objekty se odkazují přes `external_id` (v rámci zdroje tokenu) nebo přes interní `id`. Stejné `event_id` z jiného zdroje je jiná událost. Opakované odeslání vrátí 200 a existující id, obsah se nemění.
-5. **Časová osa objektu** ukazuje jeho události a události přímých sousedů (oba směry, oba druhy vztahů), nejnovějších 50. U události souseda je vidět, ke kterému sousedovi patří.
-6. **Ruční události z UI** (zdroj `manual`): SPEC je výslovně nezmiňuje, ale bez nich by časová osa šla plnit jen přes API.
-7. **Export** obsahuje objekty, externí id, atributy, tagy, vztahy, dokumentaci s revizemi a události. Neobsahuje uživatele, tokeny, audit ani nastavení. Tajné údaje se maskují (`***`) podle klíče atributu a v URL/DSN; po importu takového exportu zůstanou zamaskované. Maskování řetězců s vysokou entropií a kanárkové testy pro export pro LLM jsou v F5.
-8. **Import nahradí celý inventář** (ne slučování), vyžaduje potvrzení a předtím se udělá záloha databáze do `backups/`. Neplatný soubor nic nezmění (transakce). Limit 20 MB, na hostingu ho může dál omezit `upload_max_filesize`.
-9. **API tokeny** mají tvar `nv_<12 hex>_<48 hex>`, ukládá se prefix a HMAC-SHA256 s tajemstvím aplikace (změna `app_secret` tokeny zneplatní). Zdroje `manual` a `import` jsou pro tokeny vyhrazené.
-10. **Limit 120 požadavků za minutu** se počítá v pevném minutovém okně (tabulka `api_rate_limits`). Překročení vrací 429 s `Retry-After`.
-11. **API přijímá jen JSON** (`Content-Type: application/json`, max. 1 MB). Session se pro `/api/` vůbec nestartuje, cookies se ignorují.
-12. **Atributy** ukládají text, nebo JSON (pole, čísla, logické hodnoty) s příznakem `is_json`. Při rozporu platí ruční hodnota; bez ruční hodnoty se jako platná neoznačí žádná.
-13. **Filtr podle stavu** v inventáři přibude v F2 spolu s kontrolami (stav zatím neexistuje). Místo něj je filtr aktivní/archivované.
-14. **Správa uživatelů** v nastavení zatím není (F1 ji nezmiňuje, MVP má jednoho admina z instalátoru). Role `viewer` je připravená: nesmí odeslat žádný POST kromě přihlášení, odhlášení a jazyka.
-15. **Mazání objektu** je fyzické (kaskádově atributy, vztahy, dokumentace, vazby událostí), vyžaduje potvrzení a zapisuje se do auditu. Pro běžné vyřazení slouží archivace.
-16. **Ukázková data** nahrává `php bin/nordvarr.php demo-data` přes upsert se zdrojem `demo` (40 objektů, 8 událostí, ukázkový rozpor atributu). Do inventáře s jinými objekty jen s `--force`.
-17. **Markdown v dokumentaci** posouvá úrovně nadpisů o jednu (`#` -> `h2`), protože `h1` stránky je název objektu.
-
-## 2026-10-20 (F2 Kontroly)
-
-1. **Výsledky kontrol** (`check_results`) mají celočíselné id místo UUIDv7 kvůli objemu (stovky kontrol každou minutu, retence 14 dní). Ostatní tabulky dál používají UUIDv7.
-2. **Výchozí počet selhání před změnou stavu** je 2 u `http`, `tcp` a `ping`, ale 1 u `tls_expiry`, `domain_expiry` a `heartbeat`. Tyto kontroly běží zřídka (6 h, 24 h) nebo už toleranci obsahují, takže dvojí potvrzení by znamenalo zpoždění o den. U kontroly je hodnota nastavitelná (1 až 10).
-3. **Stavový automat:** do horšího stavu (i z počátečního `unknown`) až po N selháních po sobě; pak stav sleduje poslední výsledek, takže i zlepšení z `unhealthy` na `degraded` se projeví hned. Zpět do `healthy` po prvním úspěchu. Výsledek, který začal dřív než poslední započítaný, jde jen do historie.
-4. **Stav `paused` se nepočítá do uloženého stavu**, ale při zobrazení: vypnutá kontrola nebo archivovaný objekt. Objekt bez kontrol má zvláštní stav "bez kontrol" (`none`). Pozastavení údržbovým oknem přidá F3.
-5. **`http`:** ověření TLS je vždy zapnuté (bez volby), proxy z prostředí se nepoužívá, nepovolený kód 1xx až 3xx a příliš mnoho přesměrování dávají `unknown_error`. Hledání textu vyžaduje metodu GET.
-6. **`tcp` a `tls_expiry` běží přes curl s `CONNECT_ONLY`** ve stejném `curl_multi` jako `http` (paralelně až 20). `tls_expiry` čte certifikát bez ověření důvěry (sleduje jen platnost v čase) a podporuje jen přímé TLS, ne STARTTLS. Když cíl není dostupný, je stav `unknown` (expiraci nejde zjistit), nikoli `unhealthy`; výpadek služby hlásí její `http`/`tcp` kontrola.
-7. **`ping`** volá `ping -n -c 1 -W <timeout>`, až 20 procesů současně. Bez odpovědi -> `unhealthy` s `check_timeout` (SPEC pro ping vlastní kód nemá), neznámé jméno -> `dns_failure`, chybějící příkaz nebo oprávnění -> `unknown` s `tool_missing`. Cestu k příkazu jde změnit v `config.php` (`ping_binary`).
-8. **RDAP:** bootstrap IANA se drží v tabulce `http_cache` 7 dní. Nedostupný RDAP, 404 nebo chybějící server pro TLD dávají `unknown` (s `unknown_error`, při chybě DNS `dns_failure`), protože o expiraci domény to nic neříká. Adresu bootstrapu jde změnit v `config.php` (`rdap_bootstrap_url`). Interval `domain_expiry` je pevně 24 h.
-9. **Heartbeat:** token (32 hex) je uložený čitelně, protože je součástí adresy, kterou admin potřebuje opakovaně zobrazit. Do exportu nejde; po importu vznikne nový. Tolerance (`grace_s`) je výchozí 300 s. Po zmeškání se kontrola vyhodnotí znovu za interval, příchozí signál ji vrátí do `healthy` hned.
-10. **Worker** posune termín dalšího běhu ještě před spuštěním kontrol (při pádu se kontrola neopakuje každou minutu). Když databáze čeká na migrace, worker nic nespustí. Agregace se přepočítávají od hodiny před poslední údržbou (zachytí pozdní výsledky i výpadek workeru). Souhrn za 24 h se bere z agregací, takže aktuální hodina se v něm projeví až po hodinové údržbě.
-11. **Přehled se obnovuje přes `/overview/data`**, který vrací hotové HTML sekcí v JSON (vykresluje server, prohlížeč jen nahradí obsah). ETag je SHA-1 tohoto HTML, při shodě `If-None-Match` vrací 304. Interval 15 s (aktivní karta) / 60 s (na pozadí), při chybě se zdvojnásobuje až do 5 minut. "Nefunguje teď" zahrnuje kontroly ve stavu `unhealthy` a `degraded`.
-12. **Hlavička objektu** už v F2 ukazuje stav s důvodem (např. "TCP: tcp_refused, 3 min") a stav přímých závislostí (objekty, na kterých závisí nebo ve kterých je obsažen). Zbytek diagnostické karty je v F4.
-13. **Kontroly jsou součástí exportu a importu inventáře** (konfigurace bez stavu a historie, URL s přihlašovacími údaji maskované). Formát má dál verzi 1, klíč `checks` je volitelný, takže export z F1 jde importovat.
-14. **Ukázková data** dostala jen heartbeat noční zálohy. Jiné kontroly by mířily na dokumentační adresy a jen by čekaly na timeout.
-15. **Testy kontrol** běží proti lokálním fixture serverům (`php -S` s více workery, TLS server s certifikáty vygenerovanými v testu), falešnému příkazu `ping` a RDAP z fixture JSON přes vyměnitelného HTTP klienta. Chyba DNS u curl se netestuje, protože by vyžadovala skutečný DNS dotaz.
-
-## 2026-10-21 (F3 Alerty a notifikace)
-
-1. **Alerty se odvozují z aktuálního stavu kontrol** jedním průchodem po každém běhu workeru, ne přímo při zápisu výsledku. Díky tomu se stejně zpracují výsledky workeru, heartbeat i změny z UI a potlačení se rozhoduje až nad všemi výsledky jednoho běhu (web a databáze spadlé ve stejné minutě se vyhodnotí správně). Heartbeat, který dorazí mezi běhy, se do alertů promítne nejpozději při dalším běhu (do minuty).
-2. **Kdy se alert zavře:** jen při návratu do `healthy`. Přechod do `unknown` nebo do `degraded` bez `notify_on_degraded` alert nechá otevřený. Vypnutí kontroly nebo archivace objektu alert tiše uzavře (`paused`), smazání kontroly také (`check_deleted`). Alert uchovává snímek typu, názvu a důvodu kontroly, takže historie zůstane i po smazání kontroly.
-3. **Potlačení o jeden krok** se vyhodnocuje v pořadí otevření. Když nový alert potlačil jiný nový alert, který je nakonec sám potlačený, rozhodne se znovu, takže potlačovat smí jen nepotlačený alert (řetěz hypervizor -> VM -> služba: VM je potlačená, služba se hlásí). Při vzájemné závislosti dvou objektů se hlásí jeden z nich.
-4. **Když se příčina vyřeší a potlačený alert trvá dál,** odejde o něm jedna notifikace ("nefunguje i po vyřešení příčiny") a dál se chová jako běžný alert. Pravděpodobná příčina zůstává viditelná. SPEC tento případ neřeší, bez toho by trvající výpadek zůstal bez upozornění.
-5. **Notifikace o obnovení** se posílá, jen když o alertu dřív nějaká notifikace odešla (u potlačeného alertu tedy ne).
-6. **Údržbové okno:** během okna se nic neposílá a otevřené alerty objektů v rozsahu se označí; po konci okna za každý stále otevřený alert odejde jedna notifikace ("po údržbě stále nefunguje"). Obnovení během okna je tiché. S `pause_checks` kontroly objektu neběží, mají stav `paused` a jejich alerty zůstávají beze změny; po konci okna jsou kontroly hned na řadě.
-7. **Fronta `deliveries`:** 5 pokusů celkem (opakování po 1, 5, 15 a 60 minutách), pak `failed`. Každý pokus je v tabulce `delivery_attempts` a v UI (detail alertu, detail kanálu, stránka "Odeslané notifikace"). Testovací odeslání proběhne hned z UI a neopakuje se.
-8. **Tajné položky kanálů** (hesla SMTP, token Telegramu, tajemství webhooku) jsou v databázi zašifrované AES-256-GCM klíčem odvozeným z `app_secret` (rozšíření openssl, které SPEC už vyžaduje). Do formuláře se nikdy nevracejí; prázdné pole při úpravě ponechá dosavadní hodnotu, při změně serveru nebo uživatele se staré heslo zahodí. Změna `app_secret` kanály rozbije (je potřeba zadat tajemství znovu).
-9. **SMTP klient:** `ssl` (implicitní TLS, výchozí port 465), `starttls` (výchozí 587, server musí STARTTLS nabízet) a `none`. Certifikát se ve výchozím stavu ověřuje (vypnout jde u kanálu). Přihlášení přes nešifrované spojení je povolené jen na localhost. Preferuje se AUTH PLAIN, jinak AUTH LOGIN. Záložní server se zkusí při jakékoli chybě primárního (spojení, TLS, přihlášení, odmítnutí).
-10. **Webhook:** podpis `X-Nordvarr-Signature: sha256=<hex HMAC-SHA256 těla>`, navíc hlavička `X-Nordvarr-Event`. POST nesleduje přesměrování. Úspěch je jakákoli odpověď 2xx.
-11. **Telegram:** chyba nesmí prozradit token (je součástí URL), proto se v hlášení nahrazuje `***`. Adresu API jde v `config.php` změnit (`telegram_api_url`), testy tak běží proti lokálnímu mocku.
-12. **Pravidla kanálů** (`channel_rules`): bez tagů dostane kanál vše, jinak alerty objektů s kterýmkoli z tagů.
-13. **Odkazy v notifikacích** potřebují adresu aplikace, kterou worker z cronu nezná. Uloží se sama při prvním požadavku admina (`base_url` v nastavení, bez mod_rewrite i s `index.php?r=`) a jde ji změnit v nastavení. Jazyk notifikací je nastavitelný (výchozí čeština), časy jsou v časové zóně z nastavení.
-14. **Připomínky** jsou nastavitelné v nastavení (výchozí 24 h, 0 = vypnuto), počítají se od poslední notifikace k alertu. Potlačené alerty a alerty v údržbě připomínky nedostávají.
-15. **Historie doručení** se maže po 400 dnech spolu s hodinovými agregacemi.
-16. **Testy** běží proti lokálnímu falešnému SMTP serveru (STARTTLS, implicitní TLS, AUTH PLAIN/LOGIN, výpadek, odmítnutý příjemce) a lokálnímu mock endpointu pro Telegram a webhooky; v e2e přijímá webhooky malý HTTP server v Node. Test paralelismu kontrol používá vlastní pomalý server obsluhující všechna spojení současně, protože `php -S` s workery jich zvládá jen část a test byl nestabilní.
-
-## 2026-10-21 (F4 Topologie a diagnostická karta)
-
-1. **Klik na uzel otevře kartu v bočním panelu mapy** (stav, příčina, kontroly, incidenty za 90 dní, poslední změny, dokumentace) s tlačítkem na plnou kartu objektu; dvojklik vede rovnou na kartu objektu. SPEC říká "klik na uzel otevře kartu"; panel umožní procházet graf bez opouštění mapy.
-2. **Výchozí střed okolí** (SPEC ho neurčuje): objekt s nejstarším nepotlačeným otevřeným alertem úrovně `unhealthy`, potom `degraded`, jinak aktivní objekt s nejvíce vztahy. Výchozí hloubka jsou 2 kroky.
-3. **Rozvržení:** dagre shora dolů, nebo zleva doprava, pokud se tak graf do mapy vejde výrazně větší. V režimu filtru s více než 24 uzly se použije silové rozložení `cose` (součást Cytoscape), protože dagre by objekty v málo vrstvách roztáhl do velmi široké řady s nečitelnými popisky. Uzly jsou pak menší s popiskem pod sebou a popisky hran se ukazují jen u zvýrazněného uzlu.
-4. **Barva uzlu** je prstenec s podíly stavů jeho kontrol (zelená, žlutá, červená, šedá), záře u objektů `unhealthy` a `degraded`; objekt bez kontrol má neutrální obrys, pozastavený a v údržbě čárkovaný. Pravděpodobná příčina se v grafu kreslí jako oranžová hrana od potlačeného objektu k příčině (po `závisí na`, nebo po `obsahuje` od hostitele).
-5. **Metriky CPU, RAM, GPU a podobně se v mapě nezobrazují:** vyžadovaly by hostového agenta, který je mimo rozsah MVP. Uzel ukazuje latenci první kontroly `http`/`tcp`/`ping`, stav, důvod a počet alertů.
-6. **Okolí** zahrnuje i archivované objekty, které jsou ve vztahu se středem (vztah stále existuje), režim filtru jen aktivní. Limit 300 uzlů platí i pro okolí (pak se ořízne a pod seznamem uzlů je upozornění s celkovým počtem).
-7. **Cytoscape a CSP:** knihovna při startu vkládá `<style>` s jedním pravidlem, což CSP `style-src 'self'` blokuje. Místo povolení inline stylů je pravidlo v `app.css` a na stránce je prázdný prvek s id `__________cytoscape_stylesheet`, podle kterého knihovna pozná, že styl už existuje.
-8. **Knihovny:** Cytoscape.js 3.34.2, dagre 0.8.5 a cytoscape-dagre 2.5.0 (MIT) jako minifikované UMD soubory z npm, načtené běžnými `<script>` bez sestavování; kontrolní součty jsou ve `VERSIONS.md`.
-9. **Diagnostická hlavička** je samostatná šablona `partials/diagnosis.php` s endpointem `/objects/{id}/diagnosis` (JSON s HTML, ETag) a obnovuje se stejně jako přehled. "Poslední změna" bere nejnovější událost za 24 h z časové osy objektu a přímých sousedů a ukazuje, u kterého souseda nastala. Počet alertů za 90 dní zahrnuje i potlačené alerty; odkaz vede na novou sekci s historií incidentů (posledních 20).
-10. **Zástupná stránka** z F0 (`templates/placeholder.php`) byla odstraněna, všechny položky navigace už mají vlastní stránku.
-
-
-## 2026-10-21 (F5 Export, bezpečnost, dokumentace)
-
-1. **Export pro LLM je samostatná stránka** (`/objects/{id}/llm`) s Markdownem v poli jen pro čtení a tlačítkem "Kopírovat". Tlačítko "Zkopírovat pro LLM" na kartě na ni vede, takže je vidět, co se kopíruje. `navigator.clipboard` funguje jen na HTTPS (a localhost); jinde se text označí a zobrazí se výzva ke zkopírování klávesami.
-2. **Nový scope `context:read`** pro `GET /api/v1/objects/{id}/context`. SPEC jmenuje jen dva zapisovací scope; čtení kontextu vydává data z inventáře, proto ho zapisovací tokeny (Ansible, CI) nemají. Nový token má ve formuláři předvybrané jen zapisovací scope. API vrací JSON, s `?format=markdown` stejný Markdown jako UI; jazyk Markdownu je jazyk notifikací, nebo `?lang=`.
-3. **Přísné maskování jen v exportu pro LLM.** Export inventáře (záloha) dál maskuje jen podle klíče, URL a DSN, aby šel bez ztráty importovat zpět; maskování podle entropie by v záloze poškodilo legitimní hodnoty. Pravidla entropie: aspoň 20 znaků z `[A-Za-z0-9+/=_-]`, malá i velká písmena i číslice a Shannonova entropie aspoň 3,5 bitu na znak; čistě hex řetězce se maskují od 41 znaků (hash commitu do 40 a UUID zůstanou).
-4. **Limit 24 kB platí pro Markdown i JSON.** Když se nevejdou, ubírá se postupně dokumentace (půlením), události, okolí, atributy a kontroly (každé nejméně na 5 položek); export pak nese příznak `truncated` a poznámku. Markdown se v krajním případě ořízne na hranici znaku UTF-8.
-5. **Okolí v exportu:** do 2 kroků v obou směrech po obou druzích vztahů. Ve 2. kroku se vztah popisuje vůči prostřednímu objektu ("závisí na nginx na web1"), protože tranzitivní vztah k exportovanému objektu by mohl být zavádějící. Řazení: nezdravé (`unhealthy`, `degraded`, `unknown` od nejhoršího), pak podle poslední události za 7 dní, pak blíž, pak podle názvu. Události se berou z objektu a sousedů zařazených do exportu, podrobnosti události a detail důvodu jsou zkrácené na 300 znaků.
-6. **Nadpisy dokumentace** se v exportu posunou o dvě úrovně (`#` -> `###`), aby nenarušily strukturu exportu.
-7. **Změna hesla a obnova z CLI.** SPEC uvádí v nastavení "uživatelé" a v kap. 11 zneplatnění session po změně hesla, ale heslo zatím nešlo změnit. Doplněna sekce Nastavení -> Účet (jen vlastní heslo; správa dalších uživatelů není, MVP má jednoho admina) a příkaz `reset-password`, který vygeneruje náhodné heslo a vypíše ho jednou. Neúspěšné ověření současného hesla se počítá do omezení přihlašování.
-8. **Opravy z bezpečnostního průchodu:** `umask 0027` v `index.php`, `install.php` a CLI; `config.php` dostane práva 0640 před zápisem; cesty se zpětným lomítkem nebo řídicími znaky se normalizují na `/`; odkazy v Markdownu se zpětným lomítkem se zahodí; ověřuje se nejvýš 4096 bajtů hesla; worker maže pokusy o přihlášení starší 2 dnů; zálohy před importem se drží posledních 10; tělo POST zahozené kvůli `post_max_size` vrací 413 se srozumitelnou hláškou.
-9. **Vědomě neřešeno v aplikaci:** HSTS (patří do konfigurace webového serveru), reverzní proxy (aplikace nedůvěřuje hlavičkám `X-Forwarded-*`, protože by šly podvrhnout), retence auditu. Popsané v `docs/NAVOD.md`.
-10. **Release 0.1.0:** `VERSION` je `0.1.0`. Tag `v0.1.0` agent nevytváří: CI z tagu sestaví a zveřejní release, to má proběhnout až z `main` po sloučení všech fází.
-11. **Hostový agent** je podle SPEC kap. 14 mimo rozsah MVP. Vlastník o něj 21. 10. 2026 výslovně požádal. Aby release 0.1.0 odpovídal SPEC, bude agent samostatná fáze F6 po release; `SPEC.md` se nemění, návrh je v `docs/STAV.md` (Další krok).
-
-## 2026-10-21 (F6 Hostový agent)
-
-Vlastník fázi zadal výslovně ("jen linux, nvidia ano, teploty ano, stav opotřebení disku a hlášení problémů, zaplnění disku"), i když SPEC kap. 14 hostového agenta řadí mimo MVP. `SPEC.md` se nemění, rozsah je popsaný zde a v `docs/STAV.md`.
-
-1. **Agent je skript pro bash + curl**, ne binárka ani PHP: na serverech nic dalšího instalovat nemusí a kód jde přečíst. Spouští ho systemd timer nebo cron každou minutu; démon by potřeboval vlastní hlídání.
-2. **CPU a síť se počítají z rozdílu čítačů od minulého běhu** (uložené ve stavovém adresáři), takže hodnota je průměr za minutu a skript nemusí čekat. První běh tyto hodnoty nemá.
-3. **SMART posílá agent jako syrový `smartctl -j` a rozbor dělá server** (PHP je testovatelné a opravy nevyžadují aktualizaci agentů). Čte se jednou za 15 minut; hlášení bez SMART ponechá na serveru poslední stav. Při chybě odeslání se SMART pošle znovu příště.
-4. **První hlášení založí objekt typu Server** (podle zdroje tokenu a `external_id`, výchozí `host:<hostname>`) a kontrolu Agent s výchozími prahy. Nejde o automatické objevování sítě: objekt založí jen agent nainstalovaný adminem s jeho tokenem. Připojení k existujícímu objektu přes `NORDVARR_OBJECT_ID`; když `external_id` už patří jinému objektu, API vrátí 422.
-5. **Kontrola Agent:** interval 60 s, tolerance 180 s, práh 3 hlášení po sobě, notifikace i při stavu omezeně. Prahy viz `docs/NAVOD.md`. U teplot platí nižší z prahu kontroly a kritické meze čidla; mez `max` čidla znamená omezeně. Při stejné závažnosti určuje kód důvodu pořadí: selhávající disk, teplota, zaplnění, opotřebení, chyby disku, RAM, CPU. Detail výsledku obsahuje všechny problémy (max. 300 znaků).
-6. **Opotřebení:** NVMe `percentage_used`, u ATA normalizovaná hodnota atributů 177, 202, 231 nebo 233 (100 - hodnota). Chyby (přemapované, čekající, neopravitelné sektory, chyby média, chyby v logu) jsou omezeně, selhání podle SMART, atribut pod prahem výrobce a kritické varování NVMe jsou nefunguje.
-7. **Čas hlášení** je čas agenta, jen když se od času serveru liší nejvýš o 5 minut; jinak čas příjmu (rozladěné hodiny serveru nesmí rozbít graf ani hlídání).
-8. **Ukládání:** poslední hlášení a SMART v `agent_hosts`, souhrnné hodnoty každého hlášení v `agent_samples` (48 h, jeden řádek na hlášení), hodinové souhrny v `agent_hourly` (400 dní) počítá hodinová údržba workeru. Podrobné hodnoty (jednotlivé disky, čidla) se drží jen z posledního hlášení.
-9. **Přestavba tabulky `checks`** v migraci 0005 (SQLite neumí změnit omezení CHECK). Migrator proto nově vypíná cizí klíče mimo transakci, po migraci spustí `PRAGMA foreign_key_check` a klíče zase zapne (postup z dokumentace SQLite); jinak by DROP TABLE kaskádově smazal výsledky a alerty.
-10. **Pruhy a graf jsou SVG generované na serveru** (šířky jako atributy), protože CSP zakazuje inline styly. Graf za 24 h je v 5minutových úsecích, mezera v datech přeruší čáru.
-11. **Soubory agenta jsou veřejně ke stažení** na `/agent/<soubor>` (jen pevný seznam souborů), aby šel agent nainstalovat příkazem curl přímo na serveru bez přihlášení. Neobsahují nic tajného.
-12. **Verze:** agent je nová funkce nad MVP, vydává se jako 0.2.0. Release 0.1.0 se samostatně nevydal: vlastník rozhodl vydat rovnou 0.2.0 se všemi fázemi F0 až F6.
-13. **Test omezení pokusů při změně hesla** (F5) byl závislý na rychlosti stroje a na tom, jestli se pokus trefí do stejné sekundy jako přihlášení; přepsán deterministicky, oprava je i na větvi F5.
-
-## 2026-10-23 (oprava po nasazení, 0.2.1)
+# Decisions
+
+Decisions that differ from SPEC.md or that SPEC leaves open.
+
+## 2026-10-20 (F0 Skeleton)
+
+1. **Migrations per phase.** The migration `0001_zaklad.sql` creates only the tables F0 needs (`users`, `login_attempts`, `audit_log`, `settings`, `schema_migrations`). The other tables of the data model are added by migrations of the phases that use them. Reason: the schema is verified by the code that uses it, and upgrading via migrations is tested for real at the same time.
+2. **Pretty URLs switch on by themselves.** With mod_rewrite active, `public/.htaccess` sets the variable `NORDVARR_REWRITE=1` and the application then generates URLs like `/login`. Without mod_rewrite it generates `index.php?r=/login`. The router always accepts both forms. Nothing is configured by hand.
+3. **Login attempt limiting.** Failed attempts since the last success within the last hour are counted, separately per e-mail and per IP. From the 5th failure, 1, 2, 4, 8, 16 s must pass between attempts (instead of `sleep()`, which would block the PHP process); from the 10th failure there is a lockout of 15 minutes from the last failure. A rejected attempt during the lockout is not counted, so the lockout does not extend forever. The response is HTTP 429 with a generic message. A non-existent account is verified against a dummy hash so that it cannot be detected by response time.
+4. **Session invalidation after a password change** via the column `users.session_version`: a password change increments it and every session with a different value is discarded.
+5. **Session files** are in `data_dir/sessions` (outside the webroot, independent of hosting settings). The installer, which does not yet know the data directory, uses the default PHP session storage.
+6. **Language choice** is stored in the cookie `nordvarr_lang` (form with CSRF). A per-user language setting in the DB is not needed yet.
+7. **Minimum password length** for the admin is 10 characters.
+8. **The data directory must not be inside the application directory** (an upgrade by uploading files could overwrite it). Besides `.htaccess`, an empty `index.html` is also put into the data directory. The application root additionally has a `.htaccess` denying access (a safeguard for when the whole `nordvarr/` directory is uploaded to the webroot, not just `public/`).
+9. **Checking whether the data directory is reachable from the web.** If it lies outside DOCUMENT_ROOT, it is fine. If it lies inside, the installer always warns and additionally tries to download the database file over HTTP; if that succeeds, it shows a stronger warning.
+10. **`config.php` is created as the last step of installation** and is written in mode `x` (fails if it has been created in the meantime). Its existence blocks the installer.
+11. **The worker in F0** only holds a lock against concurrent runs and writes the time of the last run to `settings.worker_last_run`, so that the cron line from the installer works from the start. Checks are added in F2.
+12. **Navigation items** (Inventory, Topology, Alerts, Settings) lead in F0 to placeholder pages saying in which phase they will be added. This makes it possible to verify the layout and the mobile bottom bar.
+13. **`bin/dev-router.php`** replaces `.htaccess` for the PHP built-in server (development and e2e tests). It is not included in the release zip, just like `bin/build-release.sh`.
+14. **The cron line** uses `php` from PATH, because under PHP-FPM `PHP_BINARY` is the path to FPM, not to the CLI. The script path is quoted only when it contains unusual characters.
+15. **JS libraries** will be in `public/assets/vendor/` (CLAUDE.md says `assets/vendor/`, SPEC has the webroot `public/`). The version list will be in `public/assets/vendor/VERSIONS.md`. There is no library in F0.
+16. **Test tools:** PHPUnit 12, Playwright `@playwright/test` 1.56.1 (matching the Chromium preinstalled in the cloud VM). CI runs PHPUnit on PHP 8.4 and 8.5, e2e on 8.4. E2E tests build the zip, extract it into an empty temporary directory and install from it.
+17. **The version** in the file `VERSION` is `0.1.0-dev` during development; release 0.1.0 comes only in F5.
+
+## 2026-10-20 (F1 Inventory)
+
+1. **Upsert as the complete state of a source.** When the upsert input contains the key `attributes`, it is taken as the complete set of attributes from that source: attributes from this source that are missing from the input are deleted. The same applies to `relationships` (the object's outgoing relationships from this source). When the key is missing from the input, nothing is deleted. Tags are only added, because they are shared with manual edits. Manual attributes and relationships (source `manual`) are never deleted by an upsert.
+2. **Relationship targets in an upsert** are looked up by `to_external_id` only within the token's source. A reference to a non-existent object returns 422 with a list `missing_external_ids` and nothing is written (the whole upsert runs in a transaction).
+3. **A relationship is unique by (from, to, kind)** regardless of source. When the same relationship already exists from another source, the upsert neither duplicates nor deletes it.
+4. **Events** must belong to at least one object. Objects are referenced via `external_id` (within the token's source) or via the internal `id`. The same `event_id` from another source is a different event. Sending again returns 200 and the existing id; the content does not change.
+5. **The object timeline** shows its events and the events of its direct neighbors (both directions, both kinds of relationships), the newest 50. For a neighbor's event it is visible which neighbor it belongs to.
+6. **Manual events from the UI** (source `manual`): SPEC does not mention them explicitly, but without them the timeline could only be filled via the API.
+7. **Export** contains objects, external ids, attributes, tags, relationships, documentation with revisions and events. It does not contain users, tokens, audit or settings. Secrets are masked (`***`) by attribute key and in URLs/DSNs; after importing such an export they stay masked. Masking of high-entropy strings and canary tests for the LLM export are in F5.
+8. **Import replaces the whole inventory** (no merging), requires confirmation, and a database backup to `backups/` is made beforehand. An invalid file changes nothing (transaction). Limit 20 MB; on hosting it may be further limited by `upload_max_filesize`.
+9. **API tokens** have the form `nv_<12 hex>_<48 hex>`; the prefix and an HMAC-SHA256 with the application secret are stored (changing `app_secret` invalidates tokens). The sources `manual` and `import` are reserved and cannot be used by tokens.
+10. **The limit of 120 requests per minute** is counted in a fixed one-minute window (table `api_rate_limits`). Exceeding it returns 429 with `Retry-After`.
+11. **The API accepts only JSON** (`Content-Type: application/json`, max. 1 MB). No session is started at all for `/api/`; cookies are ignored.
+12. **Attributes** store text, or JSON (arrays, numbers, booleans) with the flag `is_json`. In case of a conflict the manual value wins; without a manual value none is marked as effective.
+13. **The status filter** in the inventory will be added in F2 together with checks (status does not exist yet). Instead there is an active/archived filter.
+14. **User management** in settings is not there yet (F1 does not mention it, the MVP has one admin from the installer). The role `viewer` is prepared: it must not send any POST except login, logout and language.
+15. **Deleting an object** is physical (cascading to attributes, relationships, documentation, event links), requires confirmation and is written to the audit log. Archiving is used for ordinary retirement.
+16. **Demo data** is loaded by `php bin/nordvarr.php demo-data` via upsert with the source `demo` (40 objects, 8 events, a sample attribute conflict). Into an inventory with other objects only with `--force`.
+17. **Markdown in documentation** shifts heading levels by one (`#` -> `h2`), because the page's `h1` is the object name.
+
+## 2026-10-20 (F2 Checks)
+
+1. **Check results** (`check_results`) have an integer id instead of UUIDv7 because of the volume (hundreds of checks every minute, retention 14 days). Other tables still use UUIDv7.
+2. **The default number of failures before a status change** is 2 for `http`, `tcp` and `ping`, but 1 for `tls_expiry`, `domain_expiry` and `heartbeat`. These checks run rarely (6 h, 24 h) or already include a tolerance, so double confirmation would mean a delay of a day. The value is configurable per check (1 to 10).
+3. **State machine:** to a worse state (also from the initial `unknown`) only after N consecutive failures; then the state follows the latest result, so even an improvement from `unhealthy` to `degraded` shows immediately. Back to `healthy` after the first success. A result that started earlier than the last counted one goes only into history.
+4. **The `paused` state is not part of the stored state** but is computed on display: a disabled check or an archived object. An object without checks has a special state "no checks" (`none`). Pausing by a maintenance window is added in F3.
+5. **`http`:** TLS verification is always on (no option), proxies from the environment are not used, a disallowed 1xx to 3xx code and too many redirects give `unknown_error`. Searching for text requires the GET method.
+6. **`tcp` and `tls_expiry` run via curl with `CONNECT_ONLY`** in the same `curl_multi` as `http` (up to 20 in parallel). `tls_expiry` reads the certificate without trust verification (it only watches validity in time) and supports only direct TLS, not STARTTLS. When the target is unreachable, the state is `unknown` (the expiry cannot be determined), not `unhealthy`; an outage of the service is reported by its `http`/`tcp` check.
+7. **`ping`** calls `ping -n -c 1 -W <timeout>`, up to 20 processes at once. No reply -> `unhealthy` with `check_timeout` (SPEC has no dedicated code for ping), unknown name -> `dns_failure`, missing command or permission -> `unknown` with `tool_missing`. The path to the command can be changed in `config.php` (`ping_binary`).
+8. **RDAP:** the IANA bootstrap is kept in the table `http_cache` for 7 days. An unavailable RDAP, 404 or a missing server for the TLD give `unknown` (with `unknown_error`, on a DNS error `dns_failure`), because that says nothing about the domain expiry. The bootstrap URL can be changed in `config.php` (`rdap_bootstrap_url`). The `domain_expiry` interval is fixed at 24 h.
+9. **Heartbeat:** the token (32 hex) is stored in readable form, because it is part of the URL the admin needs to display repeatedly. It is not included in the export; a new one is created after import. The tolerance (`grace_s`) defaults to 300 s. After a miss the check is evaluated again after the interval; an incoming signal returns it to `healthy` immediately.
+10. **The worker** moves the next run time forward before running the checks (after a crash the check is not repeated every minute). When the database is waiting for migrations, the worker runs nothing. Aggregates are recomputed from one hour before the last maintenance (this catches late results and worker outages). The 24 h summary is taken from the aggregates, so the current hour shows in it only after the hourly maintenance.
+11. **The overview refreshes via `/overview/data`**, which returns ready-made HTML of the sections in JSON (the server renders, the browser only replaces the content). The ETag is the SHA-1 of this HTML; on an `If-None-Match` match it returns 304. Interval 15 s (active tab) / 60 s (in the background), doubling on error up to 5 minutes. "Not working now" includes checks in the `unhealthy` and `degraded` states.
+12. **The object header** already shows in F2 the status with the reason (e.g. "TCP: tcp_refused, 3 min") and the status of direct dependencies (objects it depends on or is contained in). The rest of the diagnostic card is in F4.
+13. **Checks are part of the inventory export and import** (configuration without state and history, URLs with credentials masked). The format still has version 1 and the key `checks` is optional, so an export from F1 can be imported.
+14. **Demo data** got only a nightly backup heartbeat. Other checks would target documentation addresses and would only wait for a timeout.
+15. **Check tests** run against local fixture servers (`php -S` with multiple workers, a TLS server with certificates generated in the test), a fake `ping` command and RDAP from fixture JSON via a replaceable HTTP client. A curl DNS error is not tested, because it would require a real DNS query.
+
+## 2026-10-21 (F3 Alerts and notifications)
+
+1. **Alerts are derived from the current state of checks** in a single pass after each worker run, not directly when a result is written. This way worker results, heartbeats and changes from the UI are processed the same way, and suppression is decided only over all results of one run (a website and a database that went down in the same minute are evaluated correctly). A heartbeat that arrives between runs is reflected in alerts at the latest in the next run (within a minute).
+2. **When an alert closes:** only on return to `healthy`. A transition to `unknown`, or to `degraded` without `notify_on_degraded`, leaves the alert open. Disabling the check or archiving the object closes the alert silently (`paused`), and so does deleting the check (`check_deleted`). The alert keeps a snapshot of the check's type, name and reason, so the history remains even after the check is deleted.
+3. **One-step suppression** is evaluated in the order of opening. When a new alert suppressed another new alert and is itself suppressed in the end, the decision is made again, so only a non-suppressed alert may suppress (chain hypervisor -> VM -> service: the VM is suppressed, the service is reported). With a mutual dependency between two objects, one of them is reported.
+4. **When the cause is resolved and the suppressed alert persists,** one notification is sent about it ("down even after the cause was resolved") and from then on it behaves as an ordinary alert. The probable cause stays visible. SPEC does not cover this case; without it an ongoing outage would go unnotified.
+5. **A recovery notification** is sent only when some notification about the alert was sent earlier (so not for a suppressed alert).
+6. **Maintenance window:** nothing is sent during the window and open alerts of objects in scope are marked; after the window ends, one notification is sent for each alert still open ("still down after maintenance"). Recovery during the window is silent. With `pause_checks` the object's checks do not run, they have the state `paused` and their alerts stay unchanged; after the window ends the checks are due immediately.
+7. **The `deliveries` queue:** 5 attempts in total (retries after 1, 5, 15 and 60 minutes), then `failed`. Every attempt is in the table `delivery_attempts` and in the UI (alert detail, channel detail, the "Sent notifications" page). A test send happens immediately from the UI and is not retried.
+8. **Channel secrets** (SMTP passwords, Telegram token, webhook secret) are encrypted in the database with AES-256-GCM using a key derived from `app_secret` (the openssl extension, which SPEC already requires). They are never returned to the form; an empty field when editing keeps the existing value, and when the server or user changes, the old password is discarded. Changing `app_secret` breaks the channels (the secrets have to be entered again).
+9. **SMTP client:** `ssl` (implicit TLS, default port 465), `starttls` (default 587, the server must offer STARTTLS) and `none`. The certificate is verified by default (can be turned off per channel). Login over an unencrypted connection is allowed only on localhost. AUTH PLAIN is preferred, otherwise AUTH LOGIN. The fallback server is tried on any error of the primary (connection, TLS, login, rejection).
+10. **Webhook:** signature `X-Nordvarr-Signature: sha256=<hex HMAC-SHA256 of the body>`, plus the header `X-Nordvarr-Event`. The POST does not follow redirects. Success is any 2xx response.
+11. **Telegram:** an error must not reveal the token (it is part of the URL), so it is replaced with `***` in the message. The API URL can be changed in `config.php` (`telegram_api_url`), so tests run against a local mock.
+12. **Channel rules** (`channel_rules`): without tags a channel gets everything, otherwise alerts of objects with any of the tags.
+13. **Links in notifications** need the application URL, which the worker running from cron does not know. It is saved automatically on the first admin request (`base_url` in settings, without mod_rewrite also with `index.php?r=`) and can be changed in settings. The notification language is configurable (Czech by default); times are in the time zone from settings.
+14. **Reminders** are configurable in settings (default 24 h, 0 = off) and are counted from the last notification for the alert. Suppressed alerts and alerts in maintenance do not get reminders.
+15. **Delivery history** is deleted after 400 days together with the hourly aggregates.
+16. **Tests** run against a local fake SMTP server (STARTTLS, implicit TLS, AUTH PLAIN/LOGIN, outage, rejected recipient) and a local mock endpoint for Telegram and webhooks; in e2e, webhooks are received by a small HTTP server in Node. The check parallelism test uses its own slow server handling all connections at once, because `php -S` with workers handles only some of them and the test was flaky.
+
+## 2026-10-21 (F4 Topology and diagnostic card)
+
+1. **Clicking a node opens a card in the map's side panel** (status, cause, checks, incidents in 90 days, recent changes, documentation) with a button to the full object card; a double click goes straight to the object card. SPEC says "clicking a node opens the card"; the panel allows browsing the graph without leaving the map.
+2. **Default neighborhood center** (SPEC does not specify it): the object with the oldest non-suppressed open alert of level `unhealthy`, then `degraded`, otherwise the active object with the most relationships. The default depth is 2 steps.
+3. **Layout:** dagre top to bottom, or left to right if the graph fits into the map noticeably larger that way. In filter mode with more than 24 nodes, the force-directed layout `cose` (part of Cytoscape) is used, because dagre would stretch objects in few layers into a very wide row with unreadable labels. Nodes are then smaller with the label below them, and edge labels are shown only for the highlighted node.
+4. **Node color** is a ring with the shares of its checks' states (green, yellow, red, gray), with a glow for `unhealthy` and `degraded` objects; an object without checks has a neutral outline, a paused one and one in maintenance a dashed one. The probable cause is drawn in the graph as an orange edge from the suppressed object to the cause (along `depends on`, or along `contains` from the host).
+5. **CPU, RAM, GPU and similar metrics are not shown in the map:** they would require a host agent, which is outside the MVP scope. A node shows the latency of the first `http`/`tcp`/`ping` check, the status, the reason and the number of alerts.
+6. **The neighborhood** also includes archived objects that are in a relationship with the center (the relationship still exists); filter mode only active ones. The limit of 300 nodes also applies to the neighborhood (it is then trimmed and a notice with the total count is shown below the node list).
+7. **Cytoscape and CSP:** on startup the library inserts a `<style>` with one rule, which the CSP `style-src 'self'` blocks. Instead of allowing inline styles, the rule is in `app.css` and the page has an empty element with the id `__________cytoscape_stylesheet`, by which the library recognizes that the style already exists.
+8. **Libraries:** Cytoscape.js 3.34.2, dagre 0.8.5 and cytoscape-dagre 2.5.0 (MIT) as minified UMD files from npm, loaded with ordinary `<script>` tags without a build; checksums are in `VERSIONS.md`.
+9. **The diagnostic header** is a separate template `partials/diagnosis.php` with the endpoint `/objects/{id}/diagnosis` (JSON with HTML, ETag) and refreshes the same way as the overview. "Last change" takes the newest event within 24 h from the timeline of the object and its direct neighbors and shows at which neighbor it happened. The number of alerts in 90 days includes suppressed alerts; the link leads to a new section with the incident history (the last 20).
+10. **The placeholder page** from F0 (`templates/placeholder.php`) has been removed; all navigation items now have their own page.
+
+
+## 2026-10-21 (F5 Export, security, documentation)
+
+1. **The LLM export is a separate page** (`/objects/{id}/llm`) with Markdown in a read-only field and a "Copy" button. The "Copy for LLM" button on the card leads to it, so it is visible what is being copied. `navigator.clipboard` works only on HTTPS (and localhost); elsewhere the text is selected and a prompt to copy it with the keyboard is shown.
+2. **A new scope `context:read`** for `GET /api/v1/objects/{id}/context`. SPEC names only two write scopes; reading the context hands out inventory data, so write tokens (Ansible, CI) do not have it. A new token has only the write scopes preselected in the form. The API returns JSON, with `?format=markdown` the same Markdown as the UI; the Markdown language is the notification language, or `?lang=`.
+3. **Strict masking only in the LLM export.** The inventory export (backup) still masks only by key, URL and DSN, so that it can be imported back without loss; entropy-based masking would damage legitimate values in a backup. Entropy rules: at least 20 characters from `[A-Za-z0-9+/=_-]`, lowercase and uppercase letters and digits, and a Shannon entropy of at least 3.5 bits per character; pure hex strings are masked from 41 characters (a commit hash up to 40 and UUIDs stay).
+4. **The 24 kB limit applies to both Markdown and JSON.** When they do not fit, documentation (by halving), events, neighborhood, attributes and checks are reduced step by step (each to at least 5 items); the export then carries the flag `truncated` and a note. As a last resort the Markdown is cut at a UTF-8 character boundary.
+5. **Neighborhood in the export:** up to 2 steps in both directions along both kinds of relationships. In the 2nd step the relationship is described relative to the middle object ("depends on nginx on web1"), because a transitive relationship to the exported object could be misleading. Ordering: unhealthy ones (`unhealthy`, `degraded`, `unknown` from the worst), then by the last event within 7 days, then closer, then by name. Events are taken from the object and the neighbors included in the export; event details and reason details are shortened to 300 characters.
+6. **Documentation headings** are shifted by two levels in the export (`#` -> `###`), so they do not break the structure of the export.
+7. **Password change and recovery from the CLI.** SPEC lists "users" in settings and in chap. 11 session invalidation after a password change, but the password could not be changed yet. Added the section Settings -> Account (own password only; there is no management of other users, the MVP has one admin) and the command `reset-password`, which generates a random password and prints it once. A failed verification of the current password counts toward login limiting.
+8. **Fixes from the security pass:** `umask 0027` in `index.php`, `install.php` and the CLI; `config.php` gets permissions 0640 before writing; paths with a backslash or control characters are normalized to `/`; Markdown links with a backslash are dropped; at most 4096 bytes of a password are verified; the worker deletes login attempts older than 2 days; the last 10 pre-import backups are kept; a POST body discarded because of `post_max_size` returns 413 with an understandable message.
+9. **Deliberately not handled in the application:** HSTS (belongs in the web server configuration), reverse proxies (the application does not trust `X-Forwarded-*` headers, because they could be spoofed), audit retention. Described in `docs/NAVOD.md`.
+10. **Release 0.1.0:** `VERSION` is `0.1.0`. The agent does not create the tag `v0.1.0`: CI builds and publishes the release from the tag, and that should happen only from `main` after all phases are merged.
+11. **The host agent** is outside the MVP scope according to SPEC chap. 14. The owner explicitly asked for it on 21. 10. 2026. So that release 0.1.0 matches SPEC, the agent will be a separate phase F6 after the release; `SPEC.md` does not change, the proposal is in `docs/STAV.md` (Next step).
+
+## 2026-10-21 (F6 Host agent)
+
+The owner requested the phase explicitly ("linux only, nvidia yes, temperatures yes, disk wear status and problem reporting, disk usage"), even though SPEC chap. 14 places the host agent outside the MVP. `SPEC.md` does not change; the scope is described here and in `docs/STAV.md`.
+
+1. **The agent is a script for bash + curl**, not a binary nor PHP: nothing else needs to be installed on the servers and the code can be read. It is run by a systemd timer or cron every minute; a daemon would need its own supervision.
+2. **CPU and network are computed from the difference of counters since the previous run** (stored in the state directory), so the value is an average over a minute and the script does not have to wait. The first run does not have these values.
+3. **The agent sends SMART as raw `smartctl -j` and the server does the parsing** (PHP is testable and fixes do not require updating the agents). It is read once every 15 minutes; a report without SMART leaves the last state on the server. If sending fails, SMART is sent again next time.
+4. **The first report creates an object of type Server** (by the token's source and `external_id`, default `host:<hostname>`) and an Agent check with default thresholds. This is not automatic network discovery: an object is created only by an agent installed by the admin with the admin's token. Attaching to an existing object via `NORDVARR_OBJECT_ID`; when the `external_id` already belongs to another object, the API returns 422.
+5. **The Agent check:** interval 60 s, tolerance 180 s, threshold 3 consecutive reports, notifications also in the degraded state. Thresholds: see `docs/NAVOD.md`. For temperatures the lower of the check threshold and the sensor's critical limit applies; the sensor's `max` limit means degraded. At equal severity the reason code determines the order: failing disk, temperature, usage, wear, disk errors, RAM, CPU. The result detail contains all problems (max. 300 characters).
+6. **Wear:** NVMe `percentage_used`, for ATA the normalized value of attributes 177, 202, 231 or 233 (100 - value). Errors (reallocated, pending, uncorrectable sectors, media errors, errors in the log) are degraded; failure according to SMART, an attribute below the manufacturer threshold and an NVMe critical warning are unhealthy.
+7. **The report time** is the agent's time only when it differs from the server time by at most 5 minutes; otherwise the time of receipt (a server with a wrong clock must not break the graph or the monitoring).
+8. **Storage:** the last report and SMART in `agent_hosts`, summary values of each report in `agent_samples` (48 h, one row per report), hourly summaries in `agent_hourly` (400 days) computed by the worker's hourly maintenance. Detailed values (individual disks, sensors) are kept only from the last report.
+9. **Rebuilding the `checks` table** in migration 0005 (SQLite cannot change a CHECK constraint). The migrator therefore now disables foreign keys outside the transaction, runs `PRAGMA foreign_key_check` after the migration and enables the keys again (the procedure from the SQLite documentation); otherwise DROP TABLE would cascade-delete results and alerts.
+10. **Bars and the graph are SVG generated on the server** (widths as attributes), because CSP forbids inline styles. The 24 h graph is in 5-minute segments; a gap in the data breaks the line.
+11. **The agent files are publicly downloadable** at `/agent/<file>` (only a fixed list of files), so that the agent can be installed with a curl command directly on the server without logging in. They contain nothing secret.
+12. **Version:** the agent is a new feature on top of the MVP and is released as 0.2.0. Release 0.1.0 was not released separately: the owner decided to release 0.2.0 straight away with all phases F0 to F6.
+13. **The test of attempt limiting on password change** (F5) depended on the speed of the machine and on whether the attempt fell into the same second as the login; rewritten deterministically, the fix is also on the F5 branch.
+
+## 2026-10-23 (fix after deployment, 0.2.1)
 
-1. **Datový adresář smí být uvnitř adresáře aplikace** (mimo složky s kódem `public`, `src`, `templates`, `lang`, `migrations`, `bin`, `agent`, `vendor`). Nahrazuje F0 bod 8. Důvod: při instalaci na server, kde webový server zapisuje jen do adresáře domény (vlastník nepoužívá Plesk, podobnost cesty `/var/www/vhosts/...` je náhoda), takže adresář vedle aplikace vytvořit nešel a uvnitř aplikace ho instalátor zakazoval; instalace nebyla možná. Riziko přepsání při aktualizaci je malé (nahrání souborů přes staré nic nemaže), adresář chrání `.htaccess` v kořeni aplikace i jeho vlastní, a pokud by ležel ve webrootu, instalátor dál varuje a zkouší ho stáhnout přes HTTP.
-2. **Návrh datového adresáře** bere první použitelnou možnost: `nordvarr-data` vedle aplikace, potom `nordvarr-data` v adresáři aplikace. Použitelná je možnost, kterou webový server smí vytvořit nebo do ní zapisovat a kterou povoluje `open_basedir`; přednost mají možnosti mimo webroot.
-3. **Instalátor ověří zapisovatelnost** datového adresáře už při kontrole formuláře a srozumitelně napíše, proč adresář nejde použít (dřív se zobrazila jen technická chyba "Adresář nelze vytvořit").
+1. **The data directory may be inside the application directory** (outside the code folders `public`, `src`, `templates`, `lang`, `migrations`, `bin`, `agent`, `vendor`). Replaces F0 item 8. Reason: when installing on a server where the web server can write only to the domain directory (the owner does not use Plesk, the similarity of the path `/var/www/vhosts/...` is a coincidence), a directory next to the application could not be created and the installer forbade one inside the application; installation was impossible. The risk of overwriting during an upgrade is small (uploading files over old ones deletes nothing), the directory is protected by the `.htaccess` in the application root as well as its own, and if it lay in the webroot, the installer still warns and tries to download it over HTTP.
+2. **The suggested data directory** takes the first usable option: `nordvarr-data` next to the application, then `nordvarr-data` in the application directory. An option is usable when the web server may create it or write to it and `open_basedir` allows it; options outside the webroot take precedence.
+3. **The installer verifies writability** of the data directory already when validating the form and explains clearly why the directory cannot be used (previously only the technical error "Directory cannot be created" was shown).
 
-## 2026-10-23 (F7 Rychlé nastavení monitoringu)
+## 2026-10-23 (F7 Quick monitoring setup)
 
-Vlastník po nasazení napsal, že má objekty bez kontrol a neví, jak hlídání zapnout, a zadal pokračování dalšími milníky. SPEC nic takového nepředepisuje, `SPEC.md` se nemění.
+After deployment the owner wrote that they have objects without checks and do not know how to turn on monitoring, and asked to continue with further milestones. SPEC prescribes nothing like this; `SPEC.md` does not change.
 
-1. **Nic se nezakládá samo.** Návrhy se jen ukážou a admin je potvrdí (na kartě objektu výběrem, v inventáři výběrem objektů). Jinak by úprava názvu nebo atributu tiše přidávala kontroly a alerty.
-2. **Pravidla návrhů:** web -> HTTP na atribut `url`/`adresa`, jinak `https://<název>/` (jen když název je jméno hosta s tečkou, ne IP), u https certifikát TLS; doména -> expirace domény z názvu; server, VM, síťové zařízení -> ping na `ip`/`ipv4`/`ipv6`/`host`/`hostname`, jinak na název (IP nebo jméno s tečkou); služba, databáze, jiné -> HTTP na `url` (+ TLS), bez `url` TCP na `host`/`ip`/`server` a `port`. U služby se z názvu nic nehádá. Klíče atributů se porovnávají bez ohledu na velikost písmen, použije se platná hodnota (při rozporu ruční).
-3. **Ping místo TCP u serverů:** nevyžaduje znát port. Kde ping na serveru Nordvarru nejde (hosting), návod doporučuje TCP.
-4. **Nové kontroly mají výchozí nastavení typu** (interval, práh, notifikace), stejně jako ruční formulář bez úprav. Duplicita se pozná podle typu a cíle kontroly.
-5. **Hromadné tlačítko v inventáři** používá stejný formulář jako hromadná úprava (`formaction`), aby výběr objektů fungoval bez JavaScriptu.
-6. **Verze 0.3.0:** nová funkce nad 0.2.1.
+1. **Nothing is created automatically.** Suggestions are only shown and the admin confirms them (on the object card by selection, in the inventory by selecting objects). Otherwise editing a name or attribute would silently add checks and alerts.
+2. **Suggestion rules:** website -> HTTP to the attribute `url`/`adresa`, otherwise `https://<name>/` (only when the name is a host name with a dot, not an IP), for https a TLS certificate; domain -> domain expiry from the name; server, VM, network device -> ping to `ip`/`ipv4`/`ipv6`/`host`/`hostname`, otherwise to the name (IP or a name with a dot); service, database, other -> HTTP to `url` (+ TLS), without `url` TCP to `host`/`ip`/`server` and `port`. For a service nothing is guessed from the name. Attribute keys are compared case-insensitively; the effective value is used (in a conflict the manual one).
+3. **Ping instead of TCP for servers:** it does not require knowing the port. Where ping does not work on the Nordvarr server (hosting), the guide recommends TCP.
+4. **New checks have the type's default settings** (interval, threshold, notifications), the same as the manual form without changes. A duplicate is recognized by the check type and target.
+5. **The bulk button in the inventory** uses the same form as bulk editing (`formaction`), so that selecting objects works without JavaScript.
+6. **Version 0.3.0:** a new feature on top of 0.2.1.
 
-## 2026-11-02 (F8 Patra v mapě)
-
-Vlastník navrhl 3D zobrazení vrstev infrastruktury. Rozbor a návrh jsou v `docs/NAVRH-3D-MAPA.md`. Vlastník s doporučeními souhlasil: patra nad sebou (ne slupky v sobě), projekty jako tagy, logy mimo rozsah, 3D jako druhý pohled vedle 2D, začít krokem A (patra ve 2D). `SPEC.md` se nemění.
+## 2026-11-02 (F8 Floors in the map)
+
+The owner proposed a 3D view of infrastructure layers. The analysis and proposal are in `docs/NAVRH-3D-MAPA.md`. The owner agreed with the recommendations: floors stacked on top of each other (not nested shells), projects as tags, logs out of scope, 3D as a second view next to 2D, start with step A (floors in 2D). `SPEC.md` does not change.
 
-1. **Patra nejdřív ve 2D** ve stávající mapě Cytoscape. Ověří model vrstev na skutečných datech bez nové knihovny. Výpočet rozvržení je na serveru a použije ho i případný 3D pohled.
-2. **Sedm pater zdola:** hardware a síť (`server`, `network_device`), virtuální stroje a VPS (`vm`), kontejnery, služby a databáze (`service`, `database`), weby a API (`website`), domény (`domain`), internet a externí služby (`other`).
-3. **Nové typy objektů (kontejner, cluster) se zatím nepřidávají.** Vyžadovaly by přestavbu tabulky `objects` (omezení CHECK) a úpravy všude, kde se typy vyjmenovávají. Místo toho jde patro přepsat atributem `vrstva` (také `patro` nebo `layer`), takže služba v Dockeru může ležet v patře kontejnerů. Neplatná hodnota se ignoruje. Při rozporu zdrojů platí ruční hodnota, stejně jako u ostatních atributů.
-4. **Rozvržení je deterministické** (řádek = patro, vodorovná poloha = průměr poloh sousedů v jiných patrech, šest průchodů střídavě zdola a shora, minimální rozestup 1, shody podle názvu). Vazby uvnitř patra polohu neurčují. Stejná data dají vždy stejnou mapu, ruční pozice se dál neukládají (SPEC kap. 14).
-5. **Patro s více než 10 objekty se zalomí** do dalších řádků, jinak by byl pás při filtru přes celý inventář příliš široký a text nečitelný.
-6. **Prázdná patra se nekreslí.** Řádky se v prohlížeči roztáhnou podle poměru stran mapy (nejvýš na dvojnásobek), aby široký graf nezůstal plochý.
-7. **Volba rozvržení** je parametr adresy `layout=floors` (žádné ukládání do profilu). Výchozí zůstává automatické rozvržení.
-8. **Verze 0.4.0.**
+1. **Floors first in 2D** in the existing Cytoscape map. This verifies the layer model on real data without a new library. The layout is computed on the server and a possible 3D view will use it too.
+2. **Seven floors from the bottom:** hardware and network (`server`, `network_device`), virtual machines and VPS (`vm`), containers, services and databases (`service`, `database`), websites and APIs (`website`), domains (`domain`), internet and external services (`other`).
+3. **New object types (container, cluster) are not added yet.** They would require rebuilding the `objects` table (CHECK constraint) and changes everywhere the types are enumerated. Instead the floor can be overridden with the attribute `vrstva` (also `patro` or `layer`), so a service in Docker can lie on the containers floor. An invalid value is ignored. In a conflict between sources the manual value wins, as with other attributes.
+4. **The layout is deterministic** (row = floor, horizontal position = average of the positions of neighbors on other floors, six passes alternately from the bottom and from the top, minimum spacing 1, ties by name). Links within a floor do not determine the position. The same data always give the same map; manual positions are still not stored (SPEC chap. 14).
+5. **A floor with more than 10 objects wraps** into additional rows; otherwise, with a filter over the whole inventory, the band would be too wide and the text unreadable.
+6. **Empty floors are not drawn.** Rows are stretched in the browser according to the aspect ratio of the map (at most to double), so that a wide graph does not stay flat.
+7. **The layout choice** is the URL parameter `layout=floors` (nothing is stored in a profile). The default remains the automatic layout.
+8. **Version 0.4.0.**
 
-## 2026-11-02 (F9 3D pohled na patra)
+## 2026-11-02 (F9 3D view of the floors)
 
-Krok B z `docs/NAVRH-3D-MAPA.md`. Vlastník po sloučení F8 napsal "slouč a pokračuj", 3D tedy vzniklo bez vyzkoušení pater na jeho datech (návrh to doporučoval). `SPEC.md` se nemění.
+Step B from `docs/NAVRH-3D-MAPA.md`. After F8 was merged the owner wrote "merge and continue", so 3D was built without trying the floors on the owner's data (which the proposal recommended). `SPEC.md` does not change.
 
-1. **three.js 0.170.0** jako jediný soubor `three.module.min.js` (od verze 0.171 je knihovna rozdělená do více souborů). Vložená beze změny, se záznamem ve `VERSIONS.md`.
-2. **Bez doplňků z `examples/` (OrbitControls, CSS2DRenderer).** Importují modul `three` holým jménem, což bez buildu vyžaduje import mapu, a ta musí být inline skript, který CSP zakazuje. Ovládání kamery a popisky jsou proto vlastní, přímo v `topology3d.js`.
-3. **Modul se načítá dynamicky** (`import()`) až při přepnutí na 3D, ostatní pohledy tak nestahují 700 kB navíc. Adresa modulu přichází ze šablony s parametrem verze, aby se po aktualizaci nenačetla stará verze z mezipaměti.
-4. **Tvar: patra nad sebou** (varianta C návrhu). Úhel na obvodu = vodorovná poloha z F8, výška = patro. Zalomené patro (víc než 10 objektů) dá další řádky na menším poloměru. Poloměr roste s počtem sloupců, rozestup pater s poloměrem.
-5. **Popisky jako HTML nad plátnem**, polohu nastavuje skript přes CSSOM (`style.transform`). CSP (`style-src 'self'`) to dovoluje, zakázané jsou jen inline styly v HTML. Při více než 60 objektech se ukazují jen popisky objektů s problémem, vybraného objektu a jeho sousedů.
-6. **Vykreslování jen při změně** (pohyb, animace, nová data), ne v každém snímku. Mapa v klidu nezatěžuje procesor.
-7. **Bez WebGL** se 3D nezapne: mapa přejde do pater a ukáže upozornění. Volba `layout=3d` v adrese se v takovém prohlížeči přepíše na `layout=floors`.
-8. **Verze 0.5.0.**
+1. **three.js 0.170.0** as a single file `three.module.min.js` (from version 0.171 the library is split into multiple files). Included unchanged, with an entry in `VERSIONS.md`.
+2. **No add-ons from `examples/` (OrbitControls, CSS2DRenderer).** They import the module `three` by a bare name, which without a build requires an import map, and that has to be an inline script, which CSP forbids. Camera controls and labels are therefore custom, directly in `topology3d.js`.
+3. **The module is loaded dynamically** (`import()`) only when switching to 3D, so other views do not download an extra 700 kB. The module URL comes from the template with a version parameter, so that an old version is not loaded from the cache after an upgrade.
+4. **Shape: floors stacked on top of each other** (variant C of the proposal). Angle on the circumference = horizontal position from F8, height = floor. A wrapped floor (more than 10 objects) gives additional rows on a smaller radius. The radius grows with the number of columns, the floor spacing with the radius.
+5. **Labels as HTML above the canvas**, the position is set by the script via CSSOM (`style.transform`). CSP (`style-src 'self'`) allows this; only inline styles in HTML are forbidden. With more than 60 objects only the labels of objects with a problem, the selected object and its neighbors are shown.
+6. **Rendering only on change** (movement, animation, new data), not on every frame. A map at rest does not load the CPU.
+7. **Without WebGL** 3D does not turn on: the map switches to floors and shows a notice. The option `layout=3d` in the URL is rewritten to `layout=floors` in such a browser.
+8. **Version 0.5.0.**
 
-## 2026-11-02 (F10 Hledání, patra a režim problému)
+## 2026-11-02 (F10 Search, floors and problem mode)
 
-Krok C z `docs/NAVRH-3D-MAPA.md`. `SPEC.md` se nemění.
+Step C from `docs/NAVRH-3D-MAPA.md`. `SPEC.md` does not change.
 
-1. **Hledání filtruje seznam objektů v levém panelu**, ne graf. Seznam je stejný ve všech rozvrženích a funguje i na mobilu. Hledá se v názvu, typu a důvodu stavu, bez diakritiky a velikosti písmen.
-2. **Cesta k příčině se hledá v prohlížeči** nejkratší cestou v zobrazeném grafu bez ohledu na směr vztahů. Server zná jen příčinu (F3/F4), ne cestu k ní. Když příčina v zobrazeném grafu není (okolí s hloubkou 1), tlačítko se neukáže.
-3. **Zdroj režimu problému:** vybraný objekt s příčinou, jinak první takový objekt v seznamu (seřazeném od nejhoršího stavu). Režim se nezapíná sám při načtení: mapa by jinak po každém výpadku skákala.
-4. **Vypnutá patra se nepamatují** (ani v adrese, ani v prohlížeči). Jde o pomůcku při zkoumání, výchozí stav má ukazovat všechno.
-5. **Plynulý přechod mezi 3D a 2D (z návrhu) se nedělá.** Tlačítko Pohled shora ve 3D dává podobný výsledek a animace přechodu mezi dvěma knihovnami by vyžadovala vlastní vykreslování 2D grafu.
-6. **Verze 0.6.0.**
+1. **Search filters the object list in the left panel**, not the graph. The list is the same in all layouts and also works on mobile. It searches the name, type and status reason, ignoring diacritics and case.
+2. **The path to the cause is found in the browser** as the shortest path in the displayed graph regardless of the direction of relationships. The server knows only the cause (F3/F4), not the path to it. When the cause is not in the displayed graph (neighborhood with depth 1), the button is not shown.
+3. **Source of problem mode:** the selected object with a cause, otherwise the first such object in the list (sorted from the worst state). The mode does not turn on by itself on load: otherwise the map would jump after every outage.
+4. **Disabled floors are not remembered** (neither in the URL nor in the browser). It is an aid for investigation; the default state should show everything.
+5. **A smooth transition between 3D and 2D (from the proposal) is not done.** The Top view button in 3D gives a similar result, and animating a transition between two libraries would require custom rendering of the 2D graph.
+6. **Version 0.6.0.**
 
-## 2026-11-02 (F11 Kontejnery a clustery, metriky ve 3D)
+## 2026-11-02 (F11 Containers and clusters, metrics in 3D)
 
-Krok D z `docs/NAVRH-3D-MAPA.md`. `SPEC.md` se nemění. SPEC kap. 5 uvádí pevný seznam typů objektů, `cluster` a `container` jsou jeho rozšíření na přání vlastníka (seznam zůstává pevný, jen delší).
+Step D from `docs/NAVRH-3D-MAPA.md`. `SPEC.md` does not change. SPEC chap. 5 gives a fixed list of object types; `cluster` and `container` are an extension of it at the owner's request (the list stays fixed, just longer).
 
-1. **Typy `container` a `cluster`** nahrazují F8 bod 3 (patro kontejnerů jen přes atribut `vrstva`). Atribut `vrstva` zůstává pro výjimky. Kontejner a cluster mají stejné patro, cluster kontejnery obsahuje (vztah "obsahuje"), a proto leží ve stejném sloupci.
-2. **Migrace 0006 přestaví tabulku `objects`** stejně jako 0005 tabulku `checks`. Migrator vypne cizí klíče mimo transakci a po migraci ověří `PRAGMA foreign_key_check`, takže DROP TABLE nesmaže atributy, vztahy, kontroly ani historii. Ověřeno testem nad daty z předchozích migrací.
-3. **Doporučené kontroly** pro kontejner a cluster jako pro službu. Ping se nenavrhuje, kontejner obvykle nemá vlastní adresu dosažitelnou ze serveru Nordvarru.
-4. **Metriky ve 3D** jsou text pod názvem serveru (stejný jako druhý řádek popisku ve 2D), ne pruhy. Pruhy u stovek koulí by byly nečitelné a text se obnovuje se stejnými daty.
-5. **Ukázková data** mají cluster a dva kontejnery, aby patro kontejnerů nebylo v ukázce prázdné. Testy s počtem ukázkových objektů upraveny ze 40 na 43.
-6. **Verze 0.7.0.**
+1. **The types `container` and `cluster`** replace F8 item 3 (the containers floor only via the attribute `vrstva`). The attribute `vrstva` remains for exceptions. Container and cluster have the same floor; a cluster contains containers (relationship "contains"), and therefore they lie in the same column.
+2. **Migration 0006 rebuilds the `objects` table** the same way 0005 rebuilt the `checks` table. The migrator disables foreign keys outside the transaction and verifies `PRAGMA foreign_key_check` after the migration, so DROP TABLE does not delete attributes, relationships, checks or history. Verified by a test on data from previous migrations.
+3. **Suggested checks** for container and cluster are the same as for a service. Ping is not suggested; a container usually does not have its own address reachable from the Nordvarr server.
+4. **Metrics in 3D** are text below the server name (the same as the second line of the label in 2D), not bars. Bars on hundreds of spheres would be unreadable, and the text is refreshed with the same data.
+5. **Demo data** has a cluster and two containers, so that the containers floor is not empty in the demo. Tests with the number of demo objects changed from 40 to 43.
+6. **Version 0.7.0.**
 
-## 2026-11-03 (F12 Kontejnery Dockeru z agenta)
-
-Vlastník napsal "slouč a pokračuj" po F11, pokračuje se kandidátem uvedeným v F11. SPEC hostového agenta nemá (F6 je nad rámec), `SPEC.md` se nemění.
+## 2026-11-03 (F12 Docker containers from the agent)
+
+The owner wrote "merge and continue" after F11; work continues with the candidate named in F11. SPEC does not have the host agent (F6 is beyond its scope); `SPEC.md` does not change.
 
-1. **Agent posílá syrový výstup `docker ps -a --format {{json .}}`**, rozbor dělá server, stejně jako u SMART (F6 bod 3). Skript zůstává bez dalších závislostí (žádné jq). Řádky, které nezačínají `{`, nebo delší než 20 kB se zahodí; zbytek ověří server.
-2. **Bez přístupu k dockeru** (agent neběží jako root ani není ve skupině docker) posílá agent `containers_error` a karta serveru to napíše. Když docker není nainstalovaný, agent o kontejnerech nic neposílá.
-3. **Kontejnery jsou objekty typu kontejner**, které server obsahuje. Identita podle jména kontejneru na daném serveru (externí id `docker:<externí id serveru>/<jméno>` se zdrojem tokenu agenta), protože id kontejneru se mění při každém novém vytvoření (`docker compose up` po aktualizaci obrazu). Dokumentace a vztahy u objektu kontejneru tak přežijí aktualizace.
-4. **Zmizelý kontejner se archivuje, nemaže.** Smazání by vzalo i ručně doplněnou dokumentaci a historii. Když se kontejner se stejným jménem vrátí, archivace se zruší.
-5. **Atributy jen se stálými hodnotami** (`image`, `docker_state`, `health`, `compose_project`), ne text `Up 2 hours`, který se mění každou minutu. Atribut se zapisuje jen při změně, prázdná hodnota se odstraní.
-6. **Problémy kontejnerů hlásí kontrola Agent serveru** (`container_down`, omezeně), ne vlastní kontrola kontejneru: vlastní kontrola by potřebovala nový typ kontroly (přestavba tabulky `checks`) a stav kontejneru se stejně dozvídáme jen z hlášení serveru. Kontejner ukončený s kódem 0 se za problém nepovažuje (jednorázové úlohy, migrace).
-7. **Verze 0.8.0, agent 1.1.0.**
+1. **The agent sends the raw output of `docker ps -a --format {{json .}}`**, the server does the parsing, as with SMART (F6 item 3). The script stays without further dependencies (no jq). Lines that do not start with `{`, or longer than 20 kB, are dropped; the server validates the rest.
+2. **Without access to docker** (the agent does not run as root and is not in the docker group) the agent sends `containers_error` and the server card says so. When docker is not installed, the agent sends nothing about containers.
+3. **Containers are objects of type container** contained in the server. Identity is by the container name on the given server (external id `docker:<external id of the server>/<name>` with the source of the agent's token), because the container id changes with every recreation (`docker compose up` after an image update). Documentation and relationships on the container object thus survive updates.
+4. **A disappeared container is archived, not deleted.** Deleting would also take manually added documentation and history. When a container with the same name returns, the archiving is undone.
+5. **Attributes only with stable values** (`image`, `docker_state`, `health`, `compose_project`), not the text `Up 2 hours`, which changes every minute. An attribute is written only on change; an empty value is removed.
+6. **Container problems are reported by the server's Agent check** (`container_down`, degraded), not by a check of the container itself: such a check would need a new check type (rebuilding the `checks` table), and we learn the container state only from the server's report anyway. A container that exited with code 0 is not considered a problem (one-off jobs, migrations).
+7. **Version 0.8.0, agent 1.1.0.**
 
-## 2026-11-03 (F13 Vlastní stav kontejneru)
+## 2026-11-03 (F13 Container's own status)
 
-Kandidát z F12. `SPEC.md` se nemění.
+A candidate from F12. `SPEC.md` does not change.
 
-1. **Nový typ kontroly `container`** nahrazuje F12 bod 6 (problémy kontejnerů na kontrole serveru). Kontejner tak má vlastní stav v mapě, historii, alerty a notifikace a funguje u něj potlačení alertů a pravděpodobná příčina (server kontejner obsahuje). Tabulka `checks` se kvůli omezení CHECK přestavěla migrací 0007.
-2. **Kontrolu zakládá jen agent** (stejně jako kontrolu Agent u serveru): ruční kontrola kontejneru by neměla odkud brát data. Ve formuláři pro novou kontrolu typ není, POST s ním skončí chybou.
-3. **Stavy:** healthcheck `unhealthy`, restartování, `dead` a konec s nenulovým kódem jsou "nefunguje", pozastavený a nespuštěný kontejner "omezeně", konec s kódem 0 "funguje" (jednorázové úlohy). Healthcheck ve stavu `starting` se počítá jako funguje, aby start kontejneru nevyvolal alert.
-4. **Práh 2 hlášení po sobě, notifikace jen při stavu nefunguje** (výchozí, jde změnit u kontroly). Krátký restart při nasazení se tak nehlásí.
-5. **Smazaný kontejner** dostane jednou výsledek `container_missing` (neznámý) při archivaci, pak už žádný. Když server přestane hlásit, worker dá kontrolám jeho kontejnerů stav neznámý (`agent_missing`), ne nefunguje: o kontejneru v tu chvíli nic nevíme a výpadek hlásí kontrola serveru.
-6. **Verze 0.9.0.**
+1. **A new check type `container`** replaces F12 item 6 (container problems on the server check). A container thus has its own status in the map, history, alerts and notifications, and alert suppression and the probable cause work for it (the server contains the container). The `checks` table was rebuilt by migration 0007 because of the CHECK constraint.
+2. **The check is created only by the agent** (just like the Agent check on a server): a manual container check would have no source of data. The type is not in the form for a new check; a POST with it ends with an error.
+3. **States:** healthcheck `unhealthy`, restarting, `dead` and exit with a non-zero code are "unhealthy"; a paused and a never-started container are "degraded"; exit with code 0 is "healthy" (one-off jobs). A healthcheck in the `starting` state counts as healthy, so that starting a container does not trigger an alert.
+4. **Threshold of 2 consecutive reports, notifications only in the unhealthy state** (default, can be changed per check). A short restart during deployment is thus not reported.
+5. **A deleted container** gets the result `container_missing` (unknown) once when archived, then no more. When the server stops reporting, the worker gives the checks of its containers the state unknown (`agent_missing`), not unhealthy: at that moment we know nothing about the container, and the outage is reported by the server check.
+6. **Version 0.9.0.**
 
-## 2026-11-04 (vydání ručním spuštěním CI)
+## 2026-11-04 (release by running CI manually)
 
-1. **Release jde vydat ručním spuštěním workflow CI na `main`** (workflow_dispatch). Tag se vezme ze souboru `VERSION` a vznikne spolu s vydáním na právě testovaném commitu, takže se nemůže opakovat chyba z vydání `v0.3.0` (tag na starém commitu). Důvod: z prostředí agenta nejde odeslat tag (proxy) a vlastník chtěl, aby vydání udělal agent. Vydání přes web GitHubu a odeslání tagu fungují dál.
-2. **Ochrana:** když tag s verzí už existuje a ukazuje na jiný commit, ruční spuštění skončí chybou (je potřeba zvýšit `VERSION` nebo tag smazat). Release vznikne až po úspěšných testech (`needs: [phpunit, e2e]`).
+1. **A release can be published by manually running the CI workflow on `main`** (workflow_dispatch). The tag is taken from the file `VERSION` and is created together with the release on the commit just tested, so the mistake from the `v0.3.0` release (tag on an old commit) cannot happen again. Reason: a tag cannot be pushed from the agent's environment (proxy) and the owner wanted the agent to do the release. Releasing via the GitHub web UI and pushing a tag still work.
+2. **Safeguard:** when a tag with the version already exists and points to a different commit, the manual run ends with an error (`VERSION` has to be increased or the tag deleted). The release is created only after successful tests (`needs: [phpunit, e2e]`).
 
-## 2026-11-04 (oprava 0.9.1, starší libcurl)
+## 2026-11-04 (fix 0.9.1, older libcurl)
 
-1. **Podpora libcurl starší než 7.85** (AlmaLinux/RHEL 9 má 7.76): místo `CURLOPT_PROTOCOLS_STR` se tam použije `CURLOPT_PROTOCOLS` se stejným omezením na http a https. Novější systémy dál používají textovou variantu (číselná je v libcurl označená jako zastaralá).
-2. **Chyba workeru do logu v datovém adresáři** (`logs/worker-error.log`): řádek pro cron posílá výstup do `/dev/null`, takže pád workeru nebyl nikde vidět. Log se nečistí automaticky, zapisuje se jen při chybě.
+1. **Support for libcurl older than 7.85** (AlmaLinux/RHEL 9 has 7.76): instead of `CURLOPT_PROTOCOLS_STR`, `CURLOPT_PROTOCOLS` with the same restriction to http and https is used there. Newer systems still use the text variant (the numeric one is marked as deprecated in libcurl).
+2. **Worker errors go to a log in the data directory** (`logs/worker-error.log`): the cron line sends output to `/dev/null`, so a worker crash was not visible anywhere. The log is not cleaned automatically; it is written only on error.
 
-## 2026-11-04 (0.9.2 Proklik na web a doména webu)
+## 2026-11-04 (0.9.2 Website link and the website's domain)
 
-1. **Proklik jen pro http a https** a vždy do nové karty s `rel="noopener noreferrer"`. Jiné hodnoty (třeba `javascript:`) zůstanou textem.
-2. **Expirace domény webu na objektu typu doména**, ne na webu: doména je samostatná věc (může mít víc webů, e-mail, DNS) a v patrech mapy leží na patře domén. Web na ní "závisí", takže výpadek domény se ukáže jako pravděpodobná příčina u webu. Objekt domény se hledá podle názvu bez ohledu na velikost písmen, aby se nezakládal dvakrát.
-3. **Registrovaná doména bez úplného seznamu veřejných přípon** (Public Suffix List by byl velký soubor navíc): poslední dvě úrovně, u známých dvouúrovňových přípon (`co.uk`, `com.au` a podobné) tři. U neobvyklých přípon může návrh vyjít špatně; návrh se dá odškrtnout.
+1. **Links only for http and https**, always into a new tab with `rel="noopener noreferrer"`. Other values (for example `javascript:`) stay as text.
+2. **The website's domain expiry on an object of type domain**, not on the website: the domain is a separate thing (it can have multiple websites, e-mail, DNS) and in the map floors it lies on the domains floor. The website "depends on" it, so a domain outage shows as the probable cause for the website. The domain object is looked up by name case-insensitively, so it is not created twice.
+3. **Registered domain without the full public suffix list** (the Public Suffix List would be a big extra file): the last two levels, three for known two-level suffixes (`co.uk`, `com.au` and similar). For unusual suffixes the suggestion may come out wrong; the suggestion can be unchecked.
 
-## 2026-11-04 (F14 Poskytovatelé a externí služby)
+## 2026-11-04 (F14 Providers and external services)
 
-1. **Dva nové typy objektů** místo jednoho obecného: poskytovatel je "pod" infrastrukturou (obsahuje servery a VPS), externí služba je "nad" ní (weby a servery na ní závisí). Rozlišení dává vztahům a patrům smysl a výpadek poskytovatele se ukáže jako pravděpodobná příčina u jeho serverů.
-2. **Patro Poskytovatelé má číslo 0**, aby se nezměnil význam čísel 1 až 7 u atributu `vrstva` z F8.
-3. **Externí služby sdílí patro s typem `other`** (Internet a externí služby). Typ `other` zůstává pro věci, které jinam nepatří.
-4. **Verze 0.10.0.**
+1. **Two new object types** instead of one generic: a provider is "below" the infrastructure (contains servers and VPS), an external service is "above" it (websites and servers depend on it). The distinction gives relationships and floors meaning, and a provider outage shows as the probable cause for its servers.
+2. **The Providers floor has number 0**, so that the meaning of numbers 1 to 7 for the attribute `vrstva` from F8 does not change.
+3. **External services share a floor with the type `other`** (Internet and external services). The type `other` remains for things that do not belong elsewhere.
+4. **Version 0.10.0.**
 
-## 2026-11-05 (F15 Služby a logy z agenta)
+## 2026-11-05 (F15 Services and logs from the agent)
 
-1. **Služby jako problém kontroly serveru, ne jako objekty** (na rozdíl od kontejnerů v F12/F13): služby systemd jsou součást serveru a v inventáři už bývají ručně založené služby (např. "nginx na web1"), automatické objekty by vznikaly duplicitně. Stav je v tabulce na kartě serveru.
-2. **Spadlá nebo zapnutá a neběžící služba = nefunguje.** Vypnutá služba se bez výslovného seznamu nehlásí vůbec (je jen nainstalovaná).
-3. **Logy jednou za 10 minut, 50 řádků, nejvýš 20 kB na soubor a 20 souborů**, jak chtěl vlastník. Agent je posílá syrové, server je hned při příjmu maskuje (stejné maskování jako export pro LLM) a ukládá jen poslední stav (žádná historie logů, Nordvarr není sběr logů).
-4. **Logy do exportu pro LLM nejdou** (mohou obsahovat osobní údaje návštěvníků).
-5. **Verze 0.11.0, agent 1.2.0.**
+1. **Services as a problem of the server check, not as objects** (unlike containers in F12/F13): systemd services are part of the server, and the inventory often already has manually created services (e.g. "nginx on web1"), so automatic objects would be created as duplicates. The status is in a table on the server card.
+2. **A failed service, or an enabled service that is not running = unhealthy.** A disabled service is not reported at all without an explicit list (it is merely installed).
+3. **Logs once every 10 minutes, 50 lines, at most 20 kB per file and 20 files**, as the owner wanted. The agent sends them raw, the server masks them immediately on receipt (the same masking as the LLM export) and stores only the latest state (no log history, Nordvarr is not a log collector).
+4. **Logs are not included in the LLM export** (they may contain personal data of visitors).
+5. **Version 0.11.0, agent 1.2.0.**
 
-## 2026-11-05 (F16 Dokumentace v kategoriích)
+## 2026-11-05 (F16 Documentation in categories)
 
-1. **Pevný seznam kategorií** (provozní, runbook, DR, incidenty, ostatní) místo libovolných souborů s názvem: odpovídá tomu, co vlastník vyjmenoval, nevyžaduje správu názvů a pořadí a na kartě je vždy ve stejném pořadí (runbook hned za provozní dokumentací, protože se při výpadku hledá nejdřív). Kategorie "Ostatní" pokryje zbytek.
-2. **Dosavadní dokumentace je provozní** a API (`docs_markdown`) i panel v topologii dál pracují jen s ní, aby se nezměnilo chování existujících integrací.
-3. **Export inventáře zůstává ve verzi 1**: provozní dokumentace je dál v `docs`, ostatní kategorie v novém poli `docs_other` a revize mají pole `category` (chybí-li, je to provozní). Starší export jde naimportovat, starší verze Nordvarru nová pole ignoruje (ztratí jen ostatní kategorie).
-4. **Export pro LLM obsahuje všechny kategorie** pod nadpisy kategorií ve stejném limitu 4000 znaků; runbook a DR jsou při řešení incidentu užitečné.
-5. **Verze 0.12.0.**
+1. **A fixed list of categories** (operations, runbook, DR, incidents, other) instead of arbitrary named files: it matches what the owner listed, does not require managing names and order, and is always in the same order on the card (the runbook right after the operations documentation, because it is what people look for first during an outage). The "Other" category covers the rest.
+2. **The existing documentation is operations documentation**, and the API (`docs_markdown`) and the panel in the topology still work only with it, so that the behavior of existing integrations does not change.
+3. **The inventory export stays at version 1**: operations documentation is still in `docs`, the other categories in the new field `docs_other`, and revisions have the field `category` (if missing, it is operations). An older export can be imported; an older version of Nordvarr ignores the new fields (it loses only the other categories).
+4. **The LLM export contains all categories** under category headings within the same limit of 4000 characters; the runbook and DR are useful when handling an incident.
+5. **Version 0.12.0.**
 
-## 2026-11-05 (0.13.0 Ruční datum expirace domény)
+## 2026-11-05 (0.13.0 Manual domain expiry date)
 
-1. **Místo zálohy přes WHOIS ruční datum expirace.** Registr `.eu` (EURid) nemá RDAP a ve WHOIS datum expirace (ani vytvoření) nezveřejňuje, takže WHOIS by pro `.eu` nic nepřinesl. Totéž platí pro další registry, které datum skrývají. WHOIS by navíc potřeboval odchozí port 43, který hostingy často blokují, a parsování textu, který se liší registr od registru.
-2. **Datum z RDAP má přednost** před ručním: po prodloužení se v RDAP změní samo, ruční datum by mohlo být zastaralé. Ruční datum se použije i při nedostupném RDAP (s poznámkou v detailu), protože je to údaj vlastníka.
-3. **Ruční datum je půlnoc UTC daného dne.** Přesný čas registry neuvádějí a s rezervou 30 a 7 dní na tom nezáleží.
-4. **Verze 0.13.0.**
+1. **A manual expiry date instead of a WHOIS fallback.** The `.eu` registry (EURid) has no RDAP and does not publish the expiry date (nor the creation date) in WHOIS, so WHOIS would bring nothing for `.eu`. The same applies to other registries that hide the date. WHOIS would also need outbound port 43, which hosting providers often block, and parsing of text that differs from registry to registry.
+2. **The date from RDAP takes precedence** over the manual one: after a renewal it changes in RDAP by itself, while the manual date could be outdated. The manual date is also used when RDAP is unavailable (with a note in the detail), because it is the owner's information.
+3. **The manual date is midnight UTC of the given day.** Registries do not give an exact time, and with margins of 30 and 7 days it does not matter.
+4. **Version 0.13.0.**
 
-## 2026-11-05 (0.14.0 Stav prostředků v topologii)
+## 2026-11-05 (0.14.0 Resource status in the topology)
 
-1. **Barvy podle prahů kontroly agenta**, aby mapa a stav kontroly říkaly totéž: červená je tam, kde kontrola hlásí problém. Oranžová "blíží se" u CPU a RAM začíná 15 bodů pod prahem (kontrola sama má pro CPU a RAM jen jeden práh), u disku je to práh pro omezeně.
-2. **Jen nejplnější disk** (včetně inodů), ne všechny: v uzlu je místo na tři pruhy. Ostatní disky jsou na kartě serveru a v panelu.
-3. **Ve 2D obrázek SVG v uzlu** (Cytoscape neumí vícebarevný popisek). CSP obrázky `data:` povoluje, text v obrázku je escapovaný.
-4. **GPU bez barvy**: plné vytížení GPU je u výpočetních serverů běžný stav, ne problém.
-5. **Verze 0.14.0.**
+1. **Colors according to the agent check thresholds**, so that the map and the check status say the same thing: red is where the check reports a problem. The orange "approaching" for CPU and RAM starts 15 points below the threshold (the check itself has only one threshold for CPU and RAM); for disk it is the degraded threshold.
+2. **Only the fullest disk** (including inodes), not all of them: the node has room for three bars. The other disks are on the server card and in the panel.
+3. **In 2D an SVG image in the node** (Cytoscape cannot do a multicolored label). CSP allows `data:` images; the text in the image is escaped.
+4. **GPU without color**: full GPU utilization is a normal state for compute servers, not a problem.
+5. **Version 0.14.0.**
 
-## 2026-11-05 (0.15.0 Servery jako kostky ve 3D)
+## 2026-11-05 (0.15.0 Servers as cubes in 3D)
 
-1. **Rozložení stěn:** souhrn na dvou protilehlých stěnách natočených ven a dovnitř kruhu pater, takže je vidět z obvyklého pohledu i z druhé strany válce. Kamera běžně nejde pod patro, proto je na spodní stěně síť (její hodnoty jsou i v souhrnu) a při zapnutých kostkách jde kamerou sjet i pod vodorovnou rovinu.
-2. **Graf posledních 30 minut** ze vzorků agenta (jeden vzorek za minutu); data jdou se stejným obnovováním mapy jako zbytek grafu (ETag), takže kostky se samy aktualizují.
-3. **Volba kostek v `localStorage`** (jen pohodlí jednoho prohlížeče), ne v adrese ani na serveru.
-4. **Verze 0.15.0.**
+1. **Face layout:** the summary is on two opposite faces turned outward and inward of the floor circle, so it is visible from the usual view and from the other side of the cylinder. The camera normally does not go below a floor, so the network is on the bottom face (its values are also in the summary), and with cubes switched on the camera can also move below the horizontal plane.
+2. **Graph of the last 30 minutes** from the agent samples (one sample per minute); the data come with the same map refresh as the rest of the graph (ETag), so the cubes update themselves.
+3. **The cubes option in `localStorage`** (only a convenience for one browser), not in the URL nor on the server.
+4. **Version 0.15.0.**
 
-## 2026-11-05 (0.16.0 Logy webů)
+## 2026-11-05 (0.16.0 Website logs)
 
-1. **Cesty zadává vlastník v Nordvarru a agent je dostane v odpovědi na hlášení** (vzdálená konfigurace), ne jen v souboru agenta: vlastník chtěl nastavovat cesty u webu a weby přibývají častěji než servery.
-2. **Bezpečnost: agent čte jen pod povolenými adresáři** z vlastní konfigurace (`NORDVARR_LOG_ALLOW`, výchozí `/var/log /var/www`) a cestu ověřuje po rozbalení symbolických odkazů (`realpath`). Agent běží jako root, bez omezení by přístup do Nordvarru znamenal čtení libovolného souboru na všech serverech. Server i agent navíc odmítnou cesty s `..`, mezerami a jinými než bezpečnými znaky.
-3. **Souvislost webu se serverem přes vztahy do vzdálenosti 2** (stejně jako okolí v topologii): web na serveru, web závislý na službě na serveru. Když web souvisí s víc servery, cesty dostanou všechny a chybějící soubor agent přeskočí.
-4. **Cesty v atributu `logy`**, ne v nové tabulce: jdou nastavit i přes API (upsert) a přenáší se exportem inventáře.
-5. **Verze 0.16.0, agent 1.3.0.**
+1. **The owner enters the paths in Nordvarr and the agent gets them in the response to its report** (remote configuration), not only in the agent's file: the owner wanted to set paths on the website, and websites are added more often than servers.
+2. **Security: the agent reads only under allowed directories** from its own configuration (`NORDVARR_LOG_ALLOW`, default `/var/log /var/www`) and verifies the path after resolving symbolic links (`realpath`). The agent runs as root; without a restriction, access to Nordvarr would mean reading any file on all servers. Both the server and the agent also reject paths with `..`, spaces and characters other than safe ones.
+3. **The link between a website and a server via relationships up to distance 2** (the same as the neighborhood in the topology): a website on a server, a website depending on a service on a server. When a website is related to several servers, all of them get the paths and the agent skips a missing file.
+4. **Paths in the attribute `logy`**, not in a new table: they can also be set via the API (upsert) and are carried over by the inventory export.
+5. **Version 0.16.0, agent 1.3.0.**
 
-## 2026-11-05 (0.17.0 Události ze serverů)
+## 2026-11-05 (0.17.0 Events from servers)
 
-1. **Čtyři úrovně důležitosti** (`info`, `notice`, `warning`, `critical`) nezávislé na typu: objednávka i ban jsou různé typy, ale důležitost určuje odesílatel podle situace. Stávající incidenty dostaly `warning`, ostatní `info`.
-2. **Tři nové typy** místo obecného "jiné": `security` (fail2ban, CrowdSec), `business` (objednávky, formuláře), `message` (vzkaz, výchozí pro agenta). Typ je v CHECK omezení, tabulka se přestavěla.
-3. **Agent posílá události vlastním endpointem** `/api/v1/agent/event` se svým tokenem (scope `agent:write`), událost se váže na jeho server; id události je jedinečné v rámci serveru. Aplikacím doporučujeme vlastní token `events:write` a obecné `/api/v1/events`, aby neměly token agenta.
-4. **Web ze serveru** (`nordvarr-agent.sh site`) se hledá podle názvu (stejně jako doména u doporučených kontrol), vztah a cesty k logům mají zdroj `agent`. Doporučené kontroly jen na výslovné `--checks`: web, který ještě není veřejný, by hned hlásil výpadek.
-5. **Notifikace kritických událostí do kanálů zatím nejsou**: události jsou přehled, alerty zůstávají u kontrol. Kandidát na další verzi.
-6. **Filtr logu jako `cesta | text`** (pevný text, `grep -F`), ne regulární výraz: bezpečné předání agentovi (jen znaky bez mezer) a stačí na název webu ve společném logu. Hledá se v posledních 20 000 řádcích, aby čtení velkého logu nezatížilo server.
-7. **Verze 0.17.0, agent 1.4.0.**
+1. **Four severity levels** (`info`, `notice`, `warning`, `critical`) independent of the type: an order and a ban are different types, but the severity is decided by the sender according to the situation. Existing incidents got `warning`, others `info`.
+2. **Three new types** instead of a generic "other": `security` (fail2ban, CrowdSec), `business` (orders, forms), `message` (a message, the default for the agent). The type is in a CHECK constraint; the table was rebuilt.
+3. **The agent sends events via its own endpoint** `/api/v1/agent/event` with its token (scope `agent:write`); the event is tied to its server, and the event id is unique within the server. For applications we recommend their own token `events:write` and the generic `/api/v1/events`, so that they do not hold the agent's token.
+4. **A website from the server** (`nordvarr-agent.sh site`) is looked up by name (the same as the domain for suggested checks); the relationship and log paths have the source `agent`. Suggested checks only on an explicit `--checks`: a website that is not public yet would immediately report an outage.
+5. **Notifications of critical events to channels are not there yet**: events are an overview, alerts stay with checks. A candidate for the next version.
+6. **Log filter as `path | text`** (fixed text, `grep -F`), not a regular expression: safe to pass to the agent (only characters without spaces) and sufficient for a website name in a shared log. It searches the last 20 000 lines, so that reading a large log does not load the server.
+7. **Version 0.17.0, agent 1.4.0.**
 
-## 2026-11-05 (0.18.0 Zvuky, Discord, README)
+## 2026-11-05 (0.18.0 Sounds, Discord, README)
 
-1. **README v angličtině** na přání vlastníka ("v popisu projektu používat pouze angličtinu"). Odchylka od CLAUDE.md (dokumentace česky) se týká popisu projektu (README); podrobný návod `docs/NAVOD.md`, stav a rozhodnutí zůstávají česky, dokud vlastník nerozhodne jinak.
-2. **Discord jako vlastní typ kanálu**, ne jako obecný webhook: Discord vyžaduje vlastní formát zprávy a adresa webhooku je tajná (obsahuje token), proto se ukládá zašifrovaná a hostitel je omezený na domény Discordu.
-3. **Zvuky v prohlížeči přes Web Audio** (generované tóny), žádné zvukové soubory: nic dalšího v `assets/vendor`, žádné licence, funguje s CSP. Nastavení zvuků a ztlumení je v `localStorage` (pohodlí jednoho prohlížeče). Zvuk spouští jen to, co by poslalo notifikaci: potlačené alerty (příčina jinde, údržba) mlčí.
-4. **Topologie z navigace ve 3D se vším**; odkazy s parametry (okolí objektu z karty, filtr) fungují dál stejně.
-5. **Verze 0.18.0.**
+1. **README in English** at the owner's request ("use only English in the project description"). The deviation from CLAUDE.md (documentation in Czech) concerns the project description (README); the detailed guide `docs/NAVOD.md`, the status and the decisions stay in Czech until the owner decides otherwise.
+2. **Discord as its own channel type**, not as a generic webhook: Discord requires its own message format and the webhook URL is secret (it contains a token), so it is stored encrypted and the host is restricted to Discord domains.
+3. **Sounds in the browser via Web Audio** (generated tones), no sound files: nothing more in `assets/vendor`, no licenses, works with CSP. Sound and mute settings are in `localStorage` (a convenience for one browser). A sound is triggered only by what would send a notification: suppressed alerts (cause elsewhere, maintenance) stay silent.
+4. **Topology from the navigation in 3D with everything**; links with parameters (object neighborhood from the card, filter) still work the same way.
+5. **Version 0.18.0.**
 
+## 2026-11-05 (Documentation in English)
+
+1. **All project documentation is in English** at the owner's request: README, the administrator guide `docs/NAVOD.md`, the work status `docs/STAV.md`, the decision log and design notes. File names stay the same because `SPEC.md` (which must not change and stays in Czech) refers to them. The user interface stays bilingual (Czech and English).

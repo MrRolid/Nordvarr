@@ -1,58 +1,61 @@
-# Nordvarr - pravidla pro agenta
+# Nordvarr - rules for the agent
 
-## Na začátku každé session
+## At the start of every session
 
-1. Přečti `SPEC.md` (zdroj pravdy) a `docs/STAV.md` (stav práce). Pokud `docs/STAV.md` neexistuje, jsi ve fázi F0.
-2. Zjisti, která fáze je další nedokončená, a pracuj jen na ní. Do další fáze se bez pokynu nepouštěj.
+1. Read `SPEC.md` (the source of truth, in Czech) and `docs/STAV.md` (work status). If `docs/STAV.md` does not exist, you are in phase F0.
+2. Find the next unfinished phase or request and work only on it. Do not start the next phase without being asked.
 
-## Prostředí (cloud VM)
+## Environment (cloud VM)
 
-- Potřebuješ PHP 8.4 s rozšířeními pdo_sqlite, curl, openssl, mbstring, dále Composer, Node.js LTS a Playwright s Chromiem.
-- Co chybí, nainstaluj (na Ubuntu PHP 8.4 z PPA ondrej/php). Každý příkaz, který jsi k instalaci potřeboval, zapiš do `scripts/setup-cloud.sh`, aby šel skript použít jako setup prostředí pro další session. Skript musí být idempotentní.
-- Pokud instalace kvůli omezení sítě nejde, zastav se a v závěrečném shrnutí přesně napiš, jaký přístup k síti je potřeba povolit.
-- Kód nesmí používat nic novějšího než PHP 8.4.
+- You need PHP 8.4 with the extensions pdo_sqlite, curl, openssl, mbstring, plus Composer, Node.js LTS and Playwright with Chromium.
+- Install whatever is missing (on Ubuntu, PHP 8.4 from the ondrej/php PPA). Write every command you needed for the installation into `scripts/setup-cloud.sh`, so the script can be used as the environment setup for the next session. The script must be idempotent.
+- If the installation is not possible because of network restrictions, stop and state in the final summary exactly which network access has to be allowed.
+- The code must not use anything newer than PHP 8.4.
 
-## Git a odevzdání
+## Git and delivery
 
-- Pracuj na nové větvi `faze-<N>-<kratky-popis>` (například `faze-0-kostra`), nikdy přímo na `main`.
-- Commituj průběžně po logických krocích, zprávy commitů česky a stručně.
-- Na konci session pushni větev. Pull request do `main` založ, pokud to prostředí umožňuje; pokud ne, napiš to ve shrnutí.
-- Popis PR a závěrečné shrnutí česky: co je hotové, jak jsi to testoval, co jsi rozhodl jinak než SPEC, známé problémy, co je další fáze.
+- Work on a new branch `faze-<N>-<short-description>` (for example `faze-0-kostra`), never directly on `main`.
+- Commit continuously after logical steps, with short commit messages.
+- At the end of the session push the branch. Open a pull request to `main` if the environment allows it; if not, say so in the summary.
+- The PR description is in English: what is done, how it was tested, what was decided differently from SPEC, known issues, what comes next. The final summary for the owner is in Czech.
+- Merge a PR only when the owner says so ("slouč").
 
-## Testy
+## Tests
 
-- Před odevzdáním spusť `composer test` a `npm run e2e`. Obojí musí projít.
-- Testy nikdy nemaž, nepřeskakuj ani neoslabuj jen proto, aby prošly. Když test selže kvůli prostředí, napiš to ve shrnutí.
-- Žádné volání skutečných externích služeb v testech (SMTP, Telegram, RDAP, cizí weby). Používej lokální fixture servery a mocky.
-- Testy pracují v dočasných adresářích a po sobě uklízí.
+- Before delivery run `composer test` and `npm run e2e`. Both must pass.
+- Never delete, skip or weaken tests just to make them pass. If a test fails because of the environment, say so in the summary.
+- No calls to real external services in tests (SMTP, Telegram, Discord, RDAP, third-party websites). Use local fixture servers and mocks.
+- Tests work in temporary directories and clean up after themselves.
 
-## Pravidla kódu
+## Code rules
 
-- PHP s `declare(strict_types=1);`, styl PSR-12, namespace `Nordvarr\`.
-- Bez frameworku a bez runtime závislostí z Composeru. Composer jen pro vývojové nástroje.
-- Databáze jen přes vrstvu repozitářů a prepared statements. Žádné SQL skládané z uživatelského vstupu.
-- Veškerý výstup do HTML přes escapovací funkci. Žádné inline skripty ani inline obsluhy událostí (CSP).
-- Žádné CDN. JavaScriptové knihovny jen s pevnou verzí v `assets/vendor/` a se záznamem ve `assets/vendor/VERSIONS.md` (verze, zdroj, licence).
-- Při pochybnosti zvol jednodušší řešení. Abstrakce přidávej jen tam, kde je SPEC výslovně chce (vrstva repozitářů, rozhraní notifikačních kanálů).
-- `config.php` a datový adresář jsou v `.gitignore`. V repozitáři je jen `config.example.php`.
+- PHP with `declare(strict_types=1);`, PSR-12 style, namespace `Nordvarr\`.
+- No framework and no runtime dependencies from Composer. Composer is only for development tools.
+- Database access only through the repository layer and prepared statements. No SQL built from user input.
+- All HTML output goes through the escaping function. No inline scripts and no inline event handlers (CSP).
+- No CDN. JavaScript libraries only with a pinned version in `assets/vendor/` and an entry in `assets/vendor/VERSIONS.md` (version, source, licence).
+- When in doubt, choose the simpler solution. Add abstractions only where SPEC explicitly asks for them (repository layer, notification channel interface).
+- `config.php` and the data directory are in `.gitignore`. Only `config.example.php` is in the repository.
 
-## Data a soukromí
+## Data and privacy
 
-- Do repozitáře nikdy nedávej tajné údaje, tokeny ani hesla.
-- Ukázková a testovací data jen s fiktivními jmény (`example.com`, `example.net`) a dokumentačními IP rozsahy (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`, `2001:db8::/32`). Nikdy skutečné názvy serverů nebo domén vlastníka.
+- Never put secrets, tokens or passwords into the repository.
+- Sample and test data only with fictitious names (`example.com`, `example.net`) and documentation IP ranges (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`, `2001:db8::/32`). Never real server or domain names of the owner.
 
-## Texty a typografie
+## Texts and typography
 
-- Dokumentace, komentáře, texty UI a commity česky (UI má i anglický překlad v `lang/en.php`).
-- Piš jen znaky z klávesnice: žádná dlouhá pomlčka (místo ní spojovník s mezerami, čárka nebo dvojtečka), rovné uvozovky, rovný apostrof, tři tečky jako tři tečky, šipka jako `->`. České texty s diakritikou.
+- Project documentation (README, `docs/`) and PR descriptions are in English (owner's decision, 2026-11-05). `SPEC.md` stays in Czech.
+- The user interface is bilingual: Czech in `lang/cs.php`, English in `lang/en.php`; every new text needs both.
+- Code comments: keep the language of the surrounding file (most existing comments are in Czech).
+- Use only keyboard characters: no em dash or en dash (use a hyphen with spaces, a comma or a colon instead), straight quotes, a straight apostrophe, three dots as three dots, an arrow as `->`. Czech texts with diacritics. `TypographyTest` checks this.
 
-## Dokumentace průběhu
+## Progress documentation
 
-- `docs/STAV.md`: na konci každé session aktualizuj: hotové fáze, rozpracované věci, známé problémy, další krok.
-- `docs/ROZHODNUTI.md`: každé rozhodnutí odlišné od SPEC nebo rozhodnutí, které SPEC nechává otevřené (datum, co, proč).
-- `SPEC.md` neměň. Výjimkou je oprava zjevné chyby, kterou uvedeš ve shrnutí.
+- `docs/STAV.md`: update at the end of every session: completed phases, work in progress, known issues, next step.
+- `docs/ROZHODNUTI.md`: every decision that differs from SPEC or that SPEC leaves open (date, what, why).
+- Do not change `SPEC.md`. The only exception is fixing an obvious mistake, which you mention in the summary. The file names `docs/STAV.md`, `docs/ROZHODNUTI.md` and `docs/NAVOD.md` stay as they are because SPEC refers to them.
 
-## Co nedělat
+## What not to do
 
-- Žádné nasazování na servery, žádné placené služby, žádné volání LLM API.
-- Nepřidávej funkce z kapitoly "Mimo rozsah MVP".
+- No deployments to servers, no paid services, no calls to LLM APIs.
+- Do not add features from the chapter "Mimo rozsah MVP" (out of scope for the MVP) in SPEC.
