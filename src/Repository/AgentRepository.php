@@ -112,6 +112,31 @@ final class AgentRepository
     }
 
     /**
+     * Vzorky více objektů od daného času, nejstarší první (pro grafy v mapě).
+     *
+     * @param list<string> $objectIds
+     * @return array<string, list<array<string, mixed>>> id objektu => vzorky
+     */
+    public function samplesFor(array $objectIds, string $since): array
+    {
+        if ($objectIds === []) {
+            return [];
+        }
+        $placeholders = implode(', ', array_fill(0, count($objectIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT object_id, at, cpu_pct, mem_pct, net_rx_bps, net_tx_bps FROM agent_samples
+             WHERE object_id IN ($placeholders) AND at >= ? ORDER BY at"
+        );
+        $stmt->execute([...array_values($objectIds), $since]);
+        $out = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $out[(string) $row['object_id']][] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
      * Přepočítá hodinové agregace pro hodiny od $fromHour (včetně).
      */
     public function aggregate(string $fromHour): void

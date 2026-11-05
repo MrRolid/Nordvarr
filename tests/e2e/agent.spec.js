@@ -124,6 +124,20 @@ test('agent na serveru: hlášení, karta s metrikami a SMART, kontrola a alert'
   await expect(label.locator('[data-res="disk"]')).toHaveClass(/res-crit/);
   await expect(label.locator('[data-res="disk"]')).toHaveAttribute('title', '/mnt/zalohy disk (inody)');
   await expect(label.locator('[data-res="gpu"]')).toHaveClass(/res-none/);
+
+  // Servery jako kostky: server s agentem je kostka, ostatní objekty zůstanou koule; volba se pamatuje.
+  const serverId = await page.evaluate(() => document.getElementById('cy').cy.nodes().filter((x) => x.data('name') === 'e2e-gpu.example.com')[0].id());
+  const cubes = () => page.evaluate(() => document.getElementById('map3d').map3d.stats().cubes);
+  expect(await cubes()).toEqual([]);
+  await page.getByTestId('cubes-toggle').click();
+  await expect(page.getByTestId('cubes-toggle')).toHaveAttribute('aria-pressed', 'true');
+  expect(await cubes()).toEqual([serverId]);
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('map3d')?.map3d !== undefined);
+  expect(await cubes()).toEqual([serverId]);
+  await expect(page.getByTestId('cubes-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('cubes-toggle').click();
+  expect(await cubes()).toEqual([]);
 });
 
 test('skript agenta jde stáhnout bez přihlášení', async ({ request }) => {

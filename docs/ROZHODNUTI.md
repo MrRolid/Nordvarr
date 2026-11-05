@@ -266,3 +266,10 @@ Kandidát z F12. `SPEC.md` se nemění.
 3. **Ve 2D obrázek SVG v uzlu** (Cytoscape neumí vícebarevný popisek). CSP obrázky `data:` povoluje, text v obrázku je escapovaný.
 4. **GPU bez barvy**: plné vytížení GPU je u výpočetních serverů běžný stav, ne problém.
 5. **Verze 0.14.0.**
+
+## 2026-11-05 (0.15.0 Servery jako kostky ve 3D)
+
+1. **Rozložení stěn:** souhrn na dvou protilehlých stěnách natočených ven a dovnitř kruhu pater, takže je vidět z obvyklého pohledu i z druhé strany válce. Kamera běžně nejde pod patro, proto je na spodní stěně síť (její hodnoty jsou i v souhrnu) a při zapnutých kostkách jde kamerou sjet i pod vodorovnou rovinu.
+2. **Graf posledních 30 minut** ze vzorků agenta (jeden vzorek za minutu); data jdou se stejným obnovováním mapy jako zbytek grafu (ETag), takže kostky se samy aktualizují.
+3. **Volba kostek v `localStorage`** (jen pohodlí jednoho prohlížeče), ne v adrese ani na serveru.
+4. **Verze 0.15.0.**

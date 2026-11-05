@@ -122,7 +122,9 @@ final class Topology
         $paused = $maintenance->pausedObjects();
         $objects = (new ObjectRepository($this->pdo))->findMany($ids);
         $tags = (new TagRepository($this->pdo))->forObjects($ids);
-        $hosts = (new AgentRepository($this->pdo))->hosts($ids);
+        $agents = new AgentRepository($this->pdo);
+        $hosts = $agents->hosts($ids);
+        $samples = $agents->samplesFor(array_keys($hosts), Time::toDb(Time::now()->modify('-' . (HostResources::HISTORY + 1) . ' minutes')));
         $floorOverrides = (new AttributeRepository($this->pdo))->validValues($ids, Floors::ATTRIBUTE_KEYS);
 
         $checksByObject = [];
@@ -185,6 +187,7 @@ final class Topology
                 'subtitle' => isset($hosts[$id]) ? $this->hostSubtitle($hosts[$id]) : $this->subtitle($object, $status, $latency, count($checks)),
                 'host' => isset($hosts[$id]),
                 'resources' => isset($hosts[$id]) ? HostResources::evaluate($hosts[$id], self::agentConfig($checks)) : null,
+                'hostDetails' => isset($hosts[$id]) ? HostResources::details($hosts[$id], self::agentConfig($checks), $samples[$id] ?? []) : null,
                 'floor' => $floor,
             ]];
         }

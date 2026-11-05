@@ -139,9 +139,11 @@ $statusOrder = ['unhealthy', 'degraded', 'unknown', 'healthy', 'paused', 'none']
                 <button type="button" class="small" data-cy="cause" data-test="cause-mode" hidden aria-pressed="false"><?= $v->t('topology.to_cause') ?></button>
                 <button type="button" class="small" data-3d="top" data-3d-only hidden><?= $v->t('topology.top_view') ?></button>
                 <button type="button" class="small" data-3d="spread" data-3d-only hidden aria-pressed="false"><?= $v->t('topology.spread') ?></button>
+                <button type="button" class="small" data-3d="cubes" data-3d-only hidden aria-pressed="false" data-test="cubes-toggle" title="<?= $v->t('topology.cubes_help') ?>"><?= $v->t('topology.cubes') ?></button>
                 <button type="button" class="small" data-cy="fit"><?= $v->t('topology.fit') ?></button>
             </div>
-            <div id="map3d" class="map3d" data-test="map3d" hidden data-module="<?= $v->asset('js/topology3d.js') ?>" aria-label="<?= $v->t('topology.map3d') ?>"></div>
+            <div id="map3d" class="map3d" data-test="map3d" hidden data-module="<?= $v->asset('js/topology3d.js') ?>" aria-label="<?= $v->t('topology.map3d') ?>"
+                data-labels="<?= $v->e(json_encode(['net' => $v->t('topology.cube_net'), 'disks' => $v->t('topology.cube_disks'), 'stale' => $v->t('topology.cube_stale')], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)) ?>"></div>
             <p class="map3d-missing" data-webgl-missing data-test="webgl-missing" hidden><?= $v->t('topology.webgl_missing') ?></p>
             <?php endif; ?>
         </section>

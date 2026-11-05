@@ -407,6 +407,26 @@ if (el && window.cytoscape) {
         else cy.fit(undefined, 30);
     });
     document.querySelector('[data-3d="top"]')?.addEventListener('click', () => map3d?.topView());
+    // Servery jako kostky: volba se pamatuje v prohlížeči.
+    const cubesButton = document.querySelector('[data-3d="cubes"]');
+    const CUBES_KEY = 'nordvarr.topology.cubes';
+    let cubesOn = false;
+    try {
+        cubesOn = window.localStorage.getItem(CUBES_KEY) === '1';
+    } catch {
+        // Bez úložiště zůstane výchozí volba.
+    }
+    cubesButton?.setAttribute('aria-pressed', String(cubesOn));
+    cubesButton?.addEventListener('click', () => {
+        cubesOn = !cubesOn;
+        cubesButton.setAttribute('aria-pressed', String(cubesOn));
+        try {
+            window.localStorage.setItem(CUBES_KEY, cubesOn ? '1' : '0');
+        } catch {
+            // Volba platí jen do obnovení stránky.
+        }
+        map3d?.setCubes(cubesOn);
+    });
     const spreadButton = document.querySelector('[data-3d="spread"]');
     spreadButton?.addEventListener('click', () => {
         const on = spreadButton.getAttribute('aria-pressed') !== 'true';
@@ -427,7 +447,15 @@ if (el && window.cytoscape) {
         if (!map3d) {
             const module = await import(box3d.dataset.module);
             if (mode !== '3d') return;
+            let labels = {};
+            try {
+                labels = JSON.parse(box3d.dataset.labels ?? '{}');
+            } catch {
+                // Anglické výchozí popisky v modulu.
+            }
             map3d = module.createMap3d(box3d, lastGraph, {
+                cubes: cubesOn,
+                labels,
                 onSelect: (id) => select(id),
                 onOpen: (id) => { window.location.href = urlFor(el.dataset.objectUrl, id); },
             });

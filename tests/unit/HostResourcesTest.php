@@ -79,4 +79,28 @@ final class HostResourcesTest extends TestCase
         self::assertSame(['mem'], array_column($r['items'], 'key'), 'Chybějící hodnoty se vynechají.');
         self::assertSame([], HostResources::evaluate(['snapshot' => [], 'last_report_at' => self::NOW], [], self::NOW)['items']);
     }
+
+    public function testDetailsForCube(): void
+    {
+        $samples = [];
+        for ($i = 0; $i < 40; $i++) {
+            $samples[] = ['cpu_pct' => (float) $i, 'mem_pct' => 50.04, 'net_rx_bps' => $i === 39 ? null : 1000.0, 'net_tx_bps' => 10.0];
+        }
+        $d = HostResources::details(self::host() + ['hostname' => 'gpu1.example.com'], [], $samples);
+        self::assertSame('gpu1.example.com', $d['hostname']);
+        self::assertSame(['/data', '/'], array_column($d['disks'], 'detail'), 'Nejplnější disk první.');
+        self::assertSame(['warn', 'ok'], array_column($d['disks'], 'level'));
+        self::assertSame(2.5, $d['load']);
+        self::assertSame(16, $d['cores']);
+        self::assertSame(1300000.0, $d['rx_bps']);
+        self::assertCount(HostResources::HISTORY, $d['history']['cpu'], 'Jen posledních 30 vzorků.');
+        self::assertSame(10.0, $d['history']['cpu'][0]);
+        self::assertSame(50.0, $d['history']['mem'][0]);
+        self::assertNull($d['history']['rx'][29]);
+
+        $empty = HostResources::details(['snapshot' => [], 'last_report_at' => self::NOW], [], []);
+        self::assertSame([], $empty['disks']);
+        self::assertNull($empty['load']);
+        self::assertSame([], $empty['history']['cpu']);
+    }
 }
