@@ -208,4 +208,4 @@ php -S 127.0.0.1:8080 -t public bin/dev-router.php   # local server
 bin/build-release.sh      # dist/nordvarr-<version>.zip
 ```
 
-The detailed administrator guide (in Czech) is in [`docs/NAVOD.md`](docs/NAVOD.md), the specification in [`SPEC.md`](SPEC.md) and the development log in [`docs/STAV.md`](docs/STAV.md).
+The detailed administrator guide is in [`docs/NAVOD.md`](docs/NAVOD.md), the development log in [`docs/STAV.md`](docs/STAV.md), the decision log in [`docs/ROZHODNUTI.md`](docs/ROZHODNUTI.md) and the original specification (in Czech) in [`SPEC.md`](SPEC.md).
