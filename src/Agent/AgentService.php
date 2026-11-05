@@ -41,7 +41,7 @@ final class AgentService
 
     /**
      * @param array<string, mixed> $input
-     * @return array{object_id: string, created: bool, check_id: string, status: string, problems: int}
+     * @return array{object_id: string, created: bool, check_id: string, status: string, problems: int, log_paths: list<string>}
      */
     public function ingest(array $input, string $source, ?DateTimeImmutable $now = null): array
     {
@@ -85,7 +85,15 @@ final class AgentService
             $this->checks->checks->setNextRun($checkId, Time::toDb($now->modify('+' . self::window($check) . ' seconds')));
         }
 
-        return ['object_id' => $objectId, 'created' => $created, 'check_id' => $checkId, 'status' => $status, 'problems' => count($problems)];
+        return [
+            'object_id' => $objectId,
+            'created' => $created,
+            'check_id' => $checkId,
+            'status' => $status,
+            'problems' => count($problems),
+            // Logy webů a služeb, které má agent číst (agent je ověří proti svým povoleným adresářům).
+            'log_paths' => ObjectLogs::pathsForHost($this->pdo, $objectId),
+        ];
     }
 
     /**

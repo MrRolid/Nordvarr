@@ -670,3 +670,7 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .doc-tabs a { padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 4px; text-decoration: none; }
 .doc-tabs a.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .doc-tabs a.active .muted { color: inherit; }
+
+/* Logy webu na kartě objektu (F20) */
+.logs-edit { margin-top: .75rem; }
+.logs-edit > summary { cursor: pointer; color: var(--accent); }

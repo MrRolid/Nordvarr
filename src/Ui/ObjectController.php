@@ -52,6 +52,7 @@ final class ObjectController
         $router->get('/objects/{id}/docs', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->docsForm($o)));
         $router->post('/objects/{id}/docs', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->saveDocs($o)));
         $router->get('/objects/{id}/docs/revisions/{rid}', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->revision($o, $p['rid'])));
+        $router->post('/objects/{id}/logs', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->saveLogPaths($o)));
         $router->post('/objects/{id}/events', fn (array $p): Response => $this->withObject($p, fn (array $o): Response => $this->addEvent($o)));
     }
 
@@ -193,6 +194,7 @@ final class ObjectController
         return $this->ctx->page('object', $this->diagnosis($object, $checks) + [
             'host' => $host,
             'suggestions' => \Nordvarr\Checks\Suggestions::load($this->ctx->pdo, $id),
+            'objectLogs' => in_array($object['type'], \Nordvarr\Agent\ObjectLogs::TYPES, true) ? \Nordvarr\Agent\ObjectLogs::forObject($this->ctx->pdo, $id) : null,
             'title' => 'object.detail',
             'object' => $object,
             'checks' => $checks,
@@ -228,6 +230,30 @@ final class ObjectController
         }
 
         return $this->back($object, 'object.attribute_saved', '#attributes');
+    }
+
+    /**
+     * Cesty k logům webu nebo služby (atribut "logy"), které čte agent souvisejícího serveru.
+     *
+     * @param array<string, mixed> $object
+     */
+    private function saveLogPaths(array $object): Response
+    {
+        $id = (string) $object['id'];
+        $parsed = \Nordvarr\Agent\ObjectLogs::parse($this->ctx->request->input('paths'));
+        if ($parsed['invalid'] !== []) {
+            return $this->back($object, 'logs.invalid_path', '#logs');
+        }
+        $value = implode("\n", $parsed['paths']);
+        $changed = $value === ''
+            ? $this->inventory->attributes->remove($id, \Nordvarr\Agent\ObjectLogs::ATTRIBUTE, Vocabulary::MANUAL_SOURCE)
+            : $this->inventory->attributes->set($id, \Nordvarr\Agent\ObjectLogs::ATTRIBUTE, $value, false, Vocabulary::MANUAL_SOURCE) !== null;
+        if ($changed) {
+            $this->inventory->objects->touch($id);
+            $this->ctx->audit('object.log_paths', ['object_id' => $id, 'paths' => $parsed['paths']]);
+        }
+
+        return $this->back($object, 'logs.saved', '#logs');
     }
 
     /**

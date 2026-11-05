@@ -6,6 +6,7 @@
 /** @var list<array{key: string, values: list<array<string, mixed>>, conflict: bool, valid: ?string}> $attributes */
 /** @var array{outgoing: list<array<string, mixed>>, incoming: list<array<string, mixed>>} $relationships */
 /** @var array<string, array{html: string, updated_at: string, updated_by: string, revisions: int}> $docs */
+/** @var array<string, mixed>|null $objectLogs */
 /** @var list<array<string, mixed>> $timeline */
 /** @var array<string, array<string, mixed>> $timelineObjects */
 /** @var array<string, string> $objectNames */
@@ -221,6 +222,43 @@ $id = (string) $object['id'];
     </form>
     <?php endif; ?>
 </section>
+
+<?php if ($objectLogs !== null): ?>
+<section class="card" id="logs">
+    <h2><?= $v->t('logs.title') ?></h2>
+    <?php if ($objectLogs['paths'] === []): ?>
+    <p class="muted"><?= $v->t('logs.none') ?></p>
+    <?php else: ?>
+    <?php if ($objectLogs['hosts'] === []): ?>
+    <p class="alert-box" data-test="logs-no-agent"><?= $v->t('logs.no_agent') ?></p>
+    <?php endif; ?>
+    <div data-test="object-logs">
+        <?php foreach ($objectLogs['entries'] as $entry): ?>
+        <details class="host-log"<?= $entry['lines'] !== null ? ' open' : '' ?>>
+            <summary><code><?= $v->e($entry['path']) ?></code>
+                <?php if ($entry['lines'] !== null): ?>
+                <span class="muted small-text"><?= $v->e($entry['host']) ?>, <?= $v->ago((string) $entry['logs_at']) ?></span>
+                <?php else: ?>
+                <span class="muted small-text" data-test="log-waiting"><?= $v->t('logs.waiting') ?></span>
+                <?php endif; ?>
+            </summary>
+            <pre><?= $v->e($entry['lines'] === null ? $v->t('logs.waiting_help') : ($entry['lines'] !== '' ? $entry['lines'] : $v->t('host.log_empty'))) ?></pre>
+        </details>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    <details class="logs-edit"<?= $objectLogs['paths'] === [] ? ' open' : '' ?>>
+        <summary><?= $v->t('logs.edit') ?></summary>
+        <form method="post" action="<?= $v->url('/objects/' . $id . '/logs') ?>" class="form" data-test="logs-form">
+            <?= $v->csrfField() ?>
+            <label for="log-paths"><?= $v->t('logs.paths') ?></label>
+            <textarea id="log-paths" name="paths" rows="3" class="mono" placeholder="/var/www/vhosts/example_com/access.log"><?= $v->e($objectLogs['value']) ?></textarea>
+            <p class="help"><?= $v->t('logs.help') ?></p>
+            <button type="submit"><?= $v->t('logs.save') ?></button>
+        </form>
+    </details>
+</section>
+<?php endif; ?>
 
 <section class="card" id="docs">
     <div class="page-head">

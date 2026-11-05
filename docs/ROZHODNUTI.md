@@ -273,3 +273,11 @@ Kandidát z F12. `SPEC.md` se nemění.
 2. **Graf posledních 30 minut** ze vzorků agenta (jeden vzorek za minutu); data jdou se stejným obnovováním mapy jako zbytek grafu (ETag), takže kostky se samy aktualizují.
 3. **Volba kostek v `localStorage`** (jen pohodlí jednoho prohlížeče), ne v adrese ani na serveru.
 4. **Verze 0.15.0.**
+
+## 2026-11-05 (0.16.0 Logy webů)
+
+1. **Cesty zadává vlastník v Nordvarru a agent je dostane v odpovědi na hlášení** (vzdálená konfigurace), ne jen v souboru agenta: vlastník chtěl nastavovat cesty u webu a weby přibývají častěji než servery.
+2. **Bezpečnost: agent čte jen pod povolenými adresáři** z vlastní konfigurace (`NORDVARR_LOG_ALLOW`, výchozí `/var/log /var/www`) a cestu ověřuje po rozbalení symbolických odkazů (`realpath`). Agent běží jako root, bez omezení by přístup do Nordvarru znamenal čtení libovolného souboru na všech serverech. Server i agent navíc odmítnou cesty s `..`, mezerami a jinými než bezpečnými znaky.
+3. **Souvislost webu se serverem přes vztahy do vzdálenosti 2** (stejně jako okolí v topologii): web na serveru, web závislý na službě na serveru. Když web souvisí s víc servery, cesty dostanou všechny a chybějící soubor agent přeskočí.
+4. **Cesty v atributu `logy`**, ne v nové tabulce: jdou nastavit i přes API (upsert) a přenáší se exportem inventáře.
+5. **Verze 0.16.0, agent 1.3.0.**
