@@ -54,18 +54,7 @@ final class Request
             $route = $uriPath === '/index.php' ? '/' : $uriPath;
         }
 
-        $headers = [];
-        foreach ($server as $key => $value) {
-            if (is_string($key) && str_starts_with($key, 'HTTP_') && is_string($value)) {
-                $headers[strtolower(str_replace('_', '-', substr($key, 5)))] = $value;
-            }
-        }
-        if (isset($server['CONTENT_LENGTH']) && is_string($server['CONTENT_LENGTH'])) {
-            $headers['content-length'] = $server['CONTENT_LENGTH'];
-        }
-        if (!isset($headers['authorization']) && isset($server['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $headers['authorization'] = (string) $server['REDIRECT_HTTP_AUTHORIZATION'];
-        }
+        $headers = self::headersFromServer($server);
 
         $pretty = ($server['NORDVARR_REWRITE'] ?? $server['REDIRECT_NORDVARR_REWRITE'] ?? '') === '1';
         $https = !empty($server['HTTPS']) && strtolower((string) $server['HTTPS']) !== 'off';
@@ -84,6 +73,33 @@ final class Request
             $maxBody > 0 ? (string) file_get_contents('php://input', false, null, 0, $maxBody + 1) : '',
             $_FILES,
         );
+    }
+
+    /**
+     * Hlavičky požadavku z $_SERVER. Content-Type a Content-Length dává PHP-FPM a CGI
+     * jen jako CONTENT_TYPE a CONTENT_LENGTH (bez předpony HTTP_), vestavěný server oboje.
+     *
+     * @param array<array-key, mixed> $server
+     * @return array<string, string> název hlavičky malými písmeny => hodnota
+     */
+    public static function headersFromServer(array $server): array
+    {
+        $headers = [];
+        foreach ($server as $key => $value) {
+            if (is_string($key) && str_starts_with($key, 'HTTP_') && is_string($value)) {
+                $headers[strtolower(str_replace('_', '-', substr($key, 5)))] = $value;
+            }
+        }
+        foreach (['CONTENT_TYPE' => 'content-type', 'CONTENT_LENGTH' => 'content-length'] as $key => $name) {
+            if (isset($server[$key]) && is_string($server[$key]) && $server[$key] !== '') {
+                $headers[$name] = $server[$key];
+            }
+        }
+        if (!isset($headers['authorization']) && isset($server['REDIRECT_HTTP_AUTHORIZATION'])) {
+            $headers['authorization'] = (string) $server['REDIRECT_HTTP_AUTHORIZATION'];
+        }
+
+        return $headers;
     }
 
     public static function normalizePath(string $path): string

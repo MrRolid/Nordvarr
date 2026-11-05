@@ -298,6 +298,7 @@ Funguje GET i POST. Když signál nepřijde do intervalu plus tolerance, kontrol
 | Kontrola ping má `tool_missing` | chybí příkaz `ping` nebo nemá oprávnění (`setcap cap_net_raw+ep /usr/bin/ping`), případně nastavte `ping_binary` |
 | Expirace domény je "neznámý" | server se nedostane na RDAP (`data.iana.org` a server registru) nebo registr datum expirace nezveřejňuje (např. `.eu`, nemá RDAP a ani WHOIS datum neukazuje): v kontrole vyplňte **Datum expirace (ručně)** podle účtu u registrátora |
 | E-mail se neodesílá | "Odeslat test" u kanálu, historie pokusů v detailu kanálu, port 465 (SSL) nebo 587 (STARTTLS) |
+| Agent nebo API hlásí HTTP 415 `unsupported_media_type` | verze starší než 0.14.1 pod PHP-FPM nečetla hlavičku Content-Type; aktualizujte |
 | Po aktualizaci API vrací 500 | přihlaste se jako admin nebo spusťte `php bin/nordvarr.php migrate` |
 | Zapomenuté heslo | `php bin/nordvarr.php reset-password <e-mail>` |
 | Server s agentem hlásí `agent_missing` | `/usr/local/bin/nordvarr-agent.sh --test` na serveru, `systemctl status nordvarr-agent.timer`, soubor `/var/lib/nordvarr-agent/last-error` |

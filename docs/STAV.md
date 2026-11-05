@@ -4,6 +4,11 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### Oprava 0.14.1 (větev `oprava-content-type-fpm`)
+
+- Na serveru s Apache a PHP-FPM vracelo API pro všechny zápisy (agent, upsert, události) chybu 415 `unsupported_media_type`: PHP-FPM předává hlavičku Content-Type jen jako `CONTENT_TYPE` (bez předpony `HTTP_`) a `Request` ji odtud nebral. Testy běží na vestavěném serveru PHP, který posílá obě varianty, proto chybu neodhalily.
+- `Request::headersFromServer` bere `CONTENT_TYPE` a `CONTENT_LENGTH` vždy. Test `RequestHeadersTest` simuluje proměnné z PHP-FPM.
+
 ### 0.14.0 Stav prostředků v topologii (větev `faze-18-prostredky-v-topologii`)
 
 Z požadavku vlastníka: "viditelný stav prostředků na objektech v topologii, aby se tam dalo vidět barevně, kde je přetížený CPU nebo dochází disk".
@@ -372,5 +377,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.14.0 (stav prostředků v topologii): vydat ručním spuštěním workflow CI na `main`. Nainstalovat agenta na servery vlastníka.
+- Release 0.14.1 (oprava API pod PHP-FPM). Nainstalovat agenta na servery vlastníka.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.
