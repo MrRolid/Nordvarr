@@ -134,6 +134,7 @@ final class ChannelController
             'fallback_password' => ($c['fallback']['password'] ?? '') !== '',
             'bot_token' => ($c['bot_token'] ?? '') !== '',
             'secret' => ($c['secret'] ?? '') !== '',
+            'url' => $channel['type'] === 'discord' && ($c['url'] ?? '') !== '',
         ];
     }
 

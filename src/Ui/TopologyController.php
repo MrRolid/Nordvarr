@@ -52,6 +52,11 @@ final class TopologyController
             $center = (string) $this->topology()->defaultCenter();
         }
 
+        // Topologie z hlavní navigace (bez parametrů): všechny objekty ve 3D.
+        if (array_diff_key($r->query, ['r' => true]) === []) {
+            return ['mode' => 'filter', 'center' => $center, 'depth' => 2, 'type' => '', 'tag' => '', 'status' => '', 'layout' => '3d'];
+        }
+
         return [
             'mode' => $r->queryString('mode') === 'filter' ? 'filter' : 'neighborhood',
             'center' => $center,

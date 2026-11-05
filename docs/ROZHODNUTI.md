@@ -292,3 +292,11 @@ Kandidát z F12. `SPEC.md` se nemění.
 6. **Filtr logu jako `cesta | text`** (pevný text, `grep -F`), ne regulární výraz: bezpečné předání agentovi (jen znaky bez mezer) a stačí na název webu ve společném logu. Hledá se v posledních 20 000 řádcích, aby čtení velkého logu nezatížilo server.
 7. **Verze 0.17.0, agent 1.4.0.**
 
+## 2026-11-05 (0.18.0 Zvuky, Discord, README)
+
+1. **README v angličtině** na přání vlastníka ("v popisu projektu používat pouze angličtinu"). Odchylka od CLAUDE.md (dokumentace česky) se týká popisu projektu (README); podrobný návod `docs/NAVOD.md`, stav a rozhodnutí zůstávají česky, dokud vlastník nerozhodne jinak.
+2. **Discord jako vlastní typ kanálu**, ne jako obecný webhook: Discord vyžaduje vlastní formát zprávy a adresa webhooku je tajná (obsahuje token), proto se ukládá zašifrovaná a hostitel je omezený na domény Discordu.
+3. **Zvuky v prohlížeči přes Web Audio** (generované tóny), žádné zvukové soubory: nic dalšího v `assets/vendor`, žádné licence, funguje s CSP. Nastavení zvuků a ztlumení je v `localStorage` (pohodlí jednoho prohlížeče). Zvuk spouští jen to, co by poslalo notifikaci: potlačené alerty (příčina jinde, údržba) mlčí.
+4. **Topologie z navigace ve 3D se vším**; odkazy s parametry (okolí objektu z karty, filtr) fungují dál stejně.
+5. **Verze 0.18.0.**
+

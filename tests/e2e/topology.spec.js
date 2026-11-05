@@ -133,7 +133,11 @@ test('mapa okolí: graf, příčinná hrana a karta uzlu po kliknutí', async ({
 
 test('filtrový režim podle stavu', async ({ page }) => {
   await loginOk(page);
+  // Topologie z navigace: všechny objekty ve 3D.
   await page.goto('/topology');
+  await expect(page.getByTestId('layout-switch').getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByLabel('Podle filtru')).toBeChecked();
+  await page.goto('/topology?mode=neighborhood');
   await page.getByLabel('Podle filtru').check();
   await page.locator('#t-status').selectOption('unhealthy');
   await page.getByRole('button', { name: 'Zobrazit', exact: true }).click();

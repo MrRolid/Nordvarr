@@ -65,7 +65,14 @@ test('alerty jsou na mobilu bez vodorovného posuvníku', async ({ page }) => {
 
 test('topologie je na mobilu bez vodorovného posuvníku a graf se vykreslí', async ({ page }) => {
   await loginOk(page);
+  // Z navigace se otevře 3D se všemi objekty.
   await page.goto('/topology');
+  await expect(page.getByTestId('map3d')).toBeVisible();
+  await page.waitForFunction(() => (document.getElementById('map3d')?.map3d?.stats().nodes ?? 0) > 0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+
+  // Okolí objektu ve 2D.
+  await page.goto('/topology?mode=neighborhood');
   await expect(page.getByTestId('graph')).toBeVisible();
   await page.waitForFunction(() => (document.getElementById('cy')?.cy?.nodes().length ?? 0) > 0);
   await expect(page.getByTestId('node-panel').getByTestId('node-card')).toBeVisible();

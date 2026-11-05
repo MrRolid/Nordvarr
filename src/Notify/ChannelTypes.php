@@ -15,7 +15,7 @@ use Nordvarr\Security\SecretBox;
  */
 final class ChannelTypes
 {
-    public const TYPES = ['email', 'telegram', 'webhook'];
+    public const TYPES = ['email', 'telegram', 'webhook', 'discord'];
 
     /**
      * @param array<string, mixed> $input pole formuláře pro daný typ
@@ -88,6 +88,17 @@ final class ChannelTypes
                 $config = ['url' => $url, 'secret' => $secret('secret', $existing['secret'] ?? null)];
                 break;
 
+            case 'discord':
+                // Adresa obsahuje token: ukládá se zašifrovaná, prázdné pole zachová dosavadní.
+                $url = $str('url');
+                if ($url !== '' && !DiscordChannel::isValidUrl($url)) {
+                    $errors['url'] = 'invalid_discord_url';
+                } elseif ($url === '' && ($existing['url'] ?? '') === '') {
+                    $errors['url'] = 'invalid_discord_url';
+                }
+                $config = ['url' => $url !== '' ? $box->encrypt($url) : (string) ($existing['url'] ?? '')];
+                break;
+
             default:
                 return ['config' => [], 'errors' => ['type' => 'invalid_channel_type']];
         }
@@ -148,6 +159,7 @@ final class ChannelTypes
             ),
             'telegram' => new TelegramChannel($http, $box->decrypt((string) $config['bot_token']), (string) $config['chat_id'], $telegramApi),
             'webhook' => new WebhookChannel($http, (string) $config['url'], $box->decrypt((string) $config['secret'])),
+            'discord' => new DiscordChannel($http, $box->decrypt((string) $config['url'])),
             default => throw new InvalidArgumentException('Neznámý typ kanálu: ' . $row['type']),
         };
     }
@@ -178,6 +190,7 @@ final class ChannelTypes
             'email' => implode(', ', (array) ($config['to'] ?? [])) . ' (' . ($config['primary']['host'] ?? '') . (is_array($config['fallback'] ?? null) ? ', ' . $config['fallback']['host'] : '') . ')',
             'telegram' => 'chat ' . ($config['chat_id'] ?? ''),
             'webhook' => (string) ($config['url'] ?? ''),
+            'discord' => 'Discord webhook',
             default => '',
         };
     }
