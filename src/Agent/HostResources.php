@@ -49,6 +49,53 @@ final class HostResources
         return ['stale' => $age > (int) $c['grace_s'], 'items' => $items];
     }
 
+    /** Kolik posledních vzorků (minut) má graf na stěně kostky. */
+    public const HISTORY = 30;
+
+    /**
+     * Podrobnosti pro kostku serveru ve 3D: disky (nejplnější první), síť, load a průběh
+     * CPU, RAM a sítě z posledních vzorků.
+     *
+     * @param array<string, mixed> $host řádek agent_hosts
+     * @param array<string, mixed> $config konfigurace kontroly agent
+     * @param list<array<string, mixed>> $samples vzorky agent_samples, nejstarší první
+     * @return array<string, mixed>
+     */
+    public static function details(array $host, array $config, array $samples): array
+    {
+        $c = $config + HostEvaluator::DEFAULTS;
+        $snapshot = (array) $host['snapshot'];
+        $disks = [];
+        foreach ((array) ($snapshot['disks'] ?? []) as $disk) {
+            $pct = Report::diskPct($disk);
+            if ($pct !== null) {
+                $disks[] = self::item('disk', $pct, (float) $c['disk_degraded_pct'], (float) $c['disk_unhealthy_pct'], (string) ($disk['mount'] ?? ''));
+            }
+        }
+        usort($disks, static fn (array $a, array $b): int => $b['pct'] <=> $a['pct'] ?: strcmp($a['detail'], $b['detail']));
+        $sample = $snapshot === [] ? null : Report::sample($snapshot);
+        $samples = array_slice($samples, -self::HISTORY);
+        $series = static fn (string $key): array => array_map(
+            static fn (array $s): ?float => $s[$key] === null ? null : round((float) $s[$key], 1),
+            $samples
+        );
+
+        return [
+            'hostname' => (string) ($host['hostname'] ?? ''),
+            'disks' => array_slice($disks, 0, 4),
+            'load' => $sample['load1'] ?? null,
+            'cores' => $snapshot['cpu']['cores'] ?? null,
+            'rx_bps' => $sample['net_rx_bps'] ?? null,
+            'tx_bps' => $sample['net_tx_bps'] ?? null,
+            'history' => [
+                'cpu' => $series('cpu_pct'),
+                'mem' => $series('mem_pct'),
+                'rx' => $series('net_rx_bps'),
+                'tx' => $series('net_tx_bps'),
+            ],
+        ];
+    }
+
     /**
      * @param list<array<string, mixed>> $disks
      * @return array{pct: float, detail: string}|null

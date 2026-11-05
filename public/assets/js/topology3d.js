@@ -9,6 +9,153 @@ import * as THREE from '../vendor/three-0.170.0/three.module.min.js';
 const STATUS_VARS = { healthy: 'st-healthy', degraded: 'st-degraded', unhealthy: 'st-unhealthy', unknown: 'st-unknown', paused: 'st-paused' };
 const NODE_R = 3.2;
 const MANY = 60;
+// Kostka serveru s agentem: hrana a rozlišení textury jedné stěny.
+const CUBE = NODE_R * 3.6;
+const FACE_PX = 320;
+const LEVEL_VARS = { ok: 'st-healthy', warn: 'st-degraded', crit: 'st-unhealthy', none: 'map-muted' };
+
+// Přenosová rychlost čitelně (bity za sekundu).
+const rate = (bps) => {
+    if (bps === null || bps === undefined) return '-';
+    const bits = bps * 8;
+    if (bits >= 1e9) return `${(bits / 1e9).toFixed(1)} Gb/s`;
+    if (bits >= 1e6) return `${(bits / 1e6).toFixed(1)} Mb/s`;
+    if (bits >= 1e3) return `${Math.round(bits / 1e3)} kb/s`;
+    return `${Math.round(bits)} b/s`;
+};
+
+// Stěny kostky jako plátna: souhrn (dvakrát, protilehlé stěny), CPU, RAM, disky a síť.
+// Pořadí materiálů BoxGeometry: +x, -x, +y (horní), -y (spodní), +z, -z.
+function drawFaces(d, css, labels) {
+    const res = d.resources ?? { stale: false, items: [] };
+    const det = d.hostDetails ?? {};
+    const item = (key) => res.items.find((i) => i.key === key) ?? null;
+    const levelColor = (level) => (res.stale ? css('st-unknown') : css(LEVEL_VARS[level] ?? 'map-muted'));
+    const face = (draw) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = FACE_PX;
+        canvas.height = FACE_PX;
+        const g = canvas.getContext('2d');
+        g.fillStyle = css('surface');
+        g.fillRect(0, 0, FACE_PX, FACE_PX);
+        // Okraj ve stavu objektu.
+        g.strokeStyle = css(STATUS_VARS[d.status] ?? 'map-node-ring');
+        g.lineWidth = 14;
+        g.strokeRect(7, 7, FACE_PX - 14, FACE_PX - 14);
+        g.fillStyle = css('text');
+        g.textBaseline = 'alphabetic';
+        draw(g);
+        return canvas;
+    };
+    const font = (px, weight = 700) => `${weight} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+    const fit = (g, text, max) => {
+        let t = String(text);
+        while (t.length > 1 && g.measureText(t).width > max) t = t.slice(0, -1);
+        return t === String(text) ? t : `${t.slice(0, -1)}...`;
+    };
+    const bar = (g, x, y, w, h, pct, fill) => {
+        g.fillStyle = css('map-node-ring');
+        g.fillRect(x, y, w, h);
+        g.fillStyle = fill;
+        g.fillRect(x, y, Math.max(3, (w * Math.min(100, pct ?? 0)) / 100), h);
+    };
+    // Malý graf posledních hodnot (pevné měřítko 0-100 %, nebo podle maxima).
+    const spark = (g, series, x, y, w, h, stroke, max = 100) => {
+        const values = (series ?? []).map((v) => (v === null ? null : Number(v)));
+        g.strokeStyle = css('map-node-ring');
+        g.lineWidth = 2;
+        g.strokeRect(x, y, w, h);
+        const top = max ?? Math.max(1, ...values.filter((v) => v !== null));
+        if (values.filter((v) => v !== null).length < 2) return;
+        g.strokeStyle = stroke;
+        g.lineWidth = 5;
+        g.beginPath();
+        let started = false;
+        values.forEach((v, i) => {
+            if (v === null) { started = false; return; }
+            const px = x + (w * i) / (values.length - 1);
+            const py = y + h - (h * Math.min(top, v)) / top;
+            if (started) g.lineTo(px, py); else g.moveTo(px, py);
+            started = true;
+        });
+        g.stroke();
+    };
+    const title = (g, text) => {
+        g.font = font(40);
+        g.fillStyle = css('text');
+        g.fillText(text, 30, 66);
+    };
+    const big = (g, it) => {
+        g.font = font(92);
+        g.fillStyle = it ? levelColor(it.level) : css('text');
+        g.fillText(it ? `${it.pct} %` : '-', 30, 168);
+    };
+    const summary = face((g) => {
+        g.font = font(36);
+        g.fillText(fit(g, d.name, FACE_PX - 60), 30, 62);
+        const rows = [['cpu', 'CPU'], ['mem', 'RAM'], ['disk', 'Disk']];
+        rows.forEach(([key, name], i) => {
+            const it = item(key);
+            const y = 112 + i * 54;
+            g.font = font(32);
+            g.fillStyle = css('text');
+            g.fillText(name, 30, y + 22);
+            bar(g, 118, y, 108, 26, it?.pct, it ? levelColor(it.level) : css('st-unknown'));
+            g.fillStyle = css('text');
+            g.textAlign = 'right';
+            g.fillText(it ? `${it.pct}%` : '-', FACE_PX - 28, y + 22);
+            g.textAlign = 'left';
+        });
+        g.font = font(26, 600);
+        g.fillStyle = css('text');
+        g.fillText(fit(g, `${labels.net}: RX ${rate(det.rx_bps)}  TX ${rate(det.tx_bps)}`, FACE_PX - 60), 30, 290);
+        if (res.stale) {
+            g.fillStyle = css('st-unhealthy');
+            g.fillText(labels.stale, 30, 96 - 4);
+        }
+    });
+    const cpu = face((g) => {
+        title(g, 'CPU');
+        big(g, item('cpu'));
+        spark(g, det.history?.cpu, 30, 196, FACE_PX - 60, 72, levelColor(item('cpu')?.level ?? 'none'));
+        g.font = font(26, 600);
+        g.fillStyle = css('text');
+        if (det.load !== null && det.load !== undefined) g.fillText(`load ${det.load}${det.cores ? ` / ${det.cores}` : ''}`, 30, 300);
+    });
+    const mem = face((g) => {
+        title(g, 'RAM');
+        big(g, item('mem'));
+        spark(g, det.history?.mem, 30, 196, FACE_PX - 60, 72, levelColor(item('mem')?.level ?? 'none'));
+    });
+    const disks = face((g) => {
+        title(g, labels.disks);
+        (det.disks ?? []).slice(0, 4).forEach((disk, i) => {
+            const y = 98 + i * 54;
+            g.font = font(26, 600);
+            g.fillStyle = css('text');
+            g.fillText(fit(g, disk.detail || '/', 140), 30, y + 20);
+            bar(g, 176, y, 70, 24, disk.pct, levelColor(disk.level));
+            g.fillStyle = css('text');
+            g.textAlign = 'right';
+            g.fillText(`${disk.pct}%`, FACE_PX - 26, y + 20);
+            g.textAlign = 'left';
+        });
+    });
+    const net = face((g) => {
+        title(g, labels.net);
+        g.font = font(32);
+        g.fillStyle = css('st-healthy');
+        g.fillText(`RX ${rate(det.rx_bps)}`, 30, 118);
+        g.fillStyle = css('map-center');
+        g.fillText(`TX ${rate(det.tx_bps)}`, 30, 162);
+        const rx = det.history?.rx ?? [];
+        const tx = det.history?.tx ?? [];
+        const max = Math.max(1, ...rx.filter((v) => v !== null), ...tx.filter((v) => v !== null));
+        spark(g, rx, 30, 190, FACE_PX - 60, 90, css('st-healthy'), max);
+        spark(g, tx, 30, 190, FACE_PX - 60, 90, css('map-center'), max);
+    });
+    return [cpu, mem, disks, net, summary, summary];
+}
 
 export function createMap3d(container, graph, options = {}) {
     const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || '#888888';
@@ -31,11 +178,15 @@ export function createMap3d(container, graph, options = {}) {
     const world = new THREE.Group();
     scene.add(world);
     const sphere = new THREE.SphereGeometry(NODE_R, 24, 16);
+    const cubeGeometry = new THREE.BoxGeometry(CUBE, CUBE, CUBE);
+    const labels = { net: 'Net', disks: 'Disks', stale: 'Old data', ...(options.labels ?? {}) };
     const raycaster = new THREE.Raycaster();
 
     // Stav scény.
     let data = graph;
     let spread = false;
+    // Servery s agentem jako kostky s hodnotami na stěnách.
+    let cubes = !!options.cubes;
     let nodes = new Map(); // id -> { mesh, label, data, pos }
     let edges = []; // { line, source, target, data }
     let floorLabels = []; // { el, level, radius }
@@ -58,6 +209,37 @@ export function createMap3d(container, graph, options = {}) {
     const floorGap = () => Math.max(40, radius * 0.75) * (spread ? 1.8 : 1);
 
     const statusColor = (status) => color(STATUS_VARS[status] ?? 'map-node-ring');
+
+    const disposeMaterial = (material) => {
+        for (const m of Array.isArray(material) ? material : [material]) {
+            m?.map?.dispose?.();
+            m?.dispose?.();
+        }
+    };
+    const setOpacity = (mesh, opacity) => {
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+            m.opacity = opacity;
+            // Stěny kostky jsou neprůhledné (hrany grafu nesmí prosvítat přes text), průhledné jen ztlumené.
+            if (m.map && m.transparent !== opacity < 1) {
+                m.transparent = opacity < 1;
+                m.needsUpdate = true;
+            }
+        }
+    };
+    const isCube = (d) => cubes && d.host && d.resources && d.hostDetails;
+    // Materiály kostky z pláten stěn (bez stínování, aby byl text čitelný).
+    const cubeMaterials = (d) => {
+        const textures = new Map();
+        return drawFaces(d, css, labels).map((canvas) => {
+            if (!textures.has(canvas)) {
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.anisotropy = 4;
+                textures.set(canvas, texture);
+            }
+            return new THREE.MeshBasicMaterial({ map: textures.get(canvas), transparent: false, opacity: 1 });
+        });
+    };
 
     // Popisek uzlu: název, u serveru s agentem pod ním vytížení (CPU, RAM, disk, GPU) z posledního hlášení.
     const fillLabel = (label, d) => {
@@ -96,9 +278,9 @@ export function createMap3d(container, graph, options = {}) {
     const clear = () => {
         for (const child of [...world.children]) {
             world.remove(child);
-            if (child === marker) continue;
-            if (child.geometry !== sphere) child.geometry?.dispose?.();
-            child.material?.dispose?.();
+            if (child === marker || child === cubeMarker) continue;
+            if (child.geometry !== sphere && child.geometry !== cubeGeometry) child.geometry?.dispose?.();
+            disposeMaterial(child.material);
         }
         labelLayer.replaceChildren();
         nodes = new Map();
@@ -162,16 +344,21 @@ export function createMap3d(container, graph, options = {}) {
             const angle = ((d.fx ?? 0) - minX) / span * Math.PI * 2;
             const r = radius * (1 - 0.22 * sub);
             const pos = new THREE.Vector3(Math.cos(angle) * r, level * floorGap(), Math.sin(angle) * r);
-            const mesh = new THREE.Mesh(sphere, new THREE.MeshLambertMaterial({ color: statusColor(d.status), transparent: true, opacity: 1 }));
+            const cube = isCube(d);
+            const mesh = cube
+                ? new THREE.Mesh(cubeGeometry, cubeMaterials(d))
+                : new THREE.Mesh(sphere, new THREE.MeshLambertMaterial({ color: statusColor(d.status), transparent: true, opacity: 1 }));
             mesh.position.copy(pos);
-            if (d.center) mesh.scale.setScalar(1.35);
+            // Stěna se souhrnem (+z) míří ven z kruhu, protilehlý souhrn dovnitř.
+            if (cube) mesh.rotation.y = Math.PI / 2 - angle;
+            if (d.center) mesh.scale.setScalar(cube ? 1.15 : 1.35);
             mesh.userData.id = d.id;
             world.add(mesh);
             const label = document.createElement('div');
             label.dataset.node = d.id;
             fillLabel(label, d);
             labelLayer.appendChild(label);
-            nodes.set(d.id, { mesh, label, data: d, pos, many });
+            nodes.set(d.id, { mesh, label, data: d, pos, many, cube });
         }
 
         // Hrany.
@@ -192,7 +379,9 @@ export function createMap3d(container, graph, options = {}) {
 
         // Výběr: obrys kolem vybraného uzlu.
         marker.material.color = color('map-center');
+        cubeMarker.material.color = color('map-center');
         world.add(marker);
+        world.add(cubeMarker);
         applyHighlight();
         dirty = true;
     };
@@ -202,6 +391,20 @@ export function createMap3d(container, graph, options = {}) {
         new THREE.MeshBasicMaterial({ color: 0x1f5fa8, wireframe: true, transparent: true, opacity: 0.7 }),
     );
     marker.visible = false;
+    // Výběr kostky: obrys hran (drátěná koule by zakryla text na stěnách).
+    const cubeMarker = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(CUBE * 1.14, CUBE * 1.14, CUBE * 1.14)),
+        new THREE.LineBasicMaterial({ color: 0x1f5fa8 }),
+    );
+    cubeMarker.visible = false;
+    const placeMarker = (n) => {
+        marker.position.copy(n.pos);
+        cubeMarker.position.copy(n.pos);
+        cubeMarker.rotation.copy(n.mesh.rotation);
+        cubeMarker.scale.copy(n.mesh.scale);
+        cubeMarker.visible = marker.visible && n.cube;
+        marker.visible = marker.visible && !n.cube;
+    };
 
     // Zvýraznění: vybraný nebo najetý uzel a jeho sousedé, ostatní ztlumené.
     // V režimu problému má přednost cesta k příčině. Vypnutá patra se nekreslí.
@@ -220,7 +423,7 @@ export function createMap3d(container, graph, options = {}) {
         }
         if (path) {
             for (const [id, n] of nodes) {
-                n.mesh.material.opacity = path.nodes.has(id) ? 1 : 0.15;
+                setOpacity(n.mesh, path.nodes.has(id) ? 1 : 0.15);
                 n.label.classList.toggle('dim', !path.nodes.has(id));
                 n.label.classList.toggle('hidden-far', false);
                 n.label.classList.toggle('active', id === selected);
@@ -232,7 +435,8 @@ export function createMap3d(container, graph, options = {}) {
             }
             const sel = selected ? nodes.get(selected) : null;
             marker.visible = !!sel && !sel.off;
-            if (sel) marker.position.copy(sel.pos);
+            cubeMarker.visible = false;
+            if (sel) placeMarker(sel);
             dirty = true;
             return;
         }
@@ -247,7 +451,7 @@ export function createMap3d(container, graph, options = {}) {
         }
         const dim = hovered !== null && keep.size > 0;
         for (const [id, n] of nodes) {
-            n.mesh.material.opacity = dim && !keep.has(id) ? 0.25 : 1;
+            setOpacity(n.mesh, dim && !keep.has(id) ? 0.25 : 1);
         }
         const hl = color('map-center');
         for (const e of edges) {
@@ -257,7 +461,8 @@ export function createMap3d(container, graph, options = {}) {
         }
         const sel = selected ? nodes.get(selected) : null;
         marker.visible = !!sel && !sel.off;
-        if (sel) marker.position.copy(sel.pos);
+        cubeMarker.visible = false;
+        if (sel) placeMarker(sel);
         for (const [id, n] of nodes) {
             const important = keep.has(id) || !['healthy', 'none', 'paused'].includes(n.data.status) || n.data.center;
             n.label.classList.toggle('hidden-far', n.many && !important);
@@ -341,8 +546,17 @@ export function createMap3d(container, graph, options = {}) {
     const placeLabels = () => {
         for (const n of nodes.values()) {
             const p = project(n.pos);
+            // Popisek pod uzlem; u kostky pod nejnižším rohem na obrazovce, aby nezakrýval stěny.
+            let below = p.y + NODE_R * 2;
+            if (n.cube) {
+                n.mesh.updateMatrixWorld();
+                const h = CUBE / 2;
+                for (const [x, y, z] of [[-h, -h, -h], [h, -h, -h], [-h, -h, h], [h, -h, h], [-h, h, h], [h, h, h], [-h, h, -h], [h, h, -h]]) {
+                    below = Math.max(below, project(new THREE.Vector3(x, y, z).applyMatrix4(n.mesh.matrixWorld)).y);
+                }
+            }
             n.label.hidden = !p.visible || n.off;
-            n.label.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y + NODE_R * 2 + 4)}px) translateX(-50%)`;
+            n.label.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(below + 6)}px) translateX(-50%)`;
         }
         // Popisek patra na levém okraji disku z pohledu kamery.
         const left = new THREE.Vector3(-Math.sin(view.azimuth), 0, Math.cos(view.azimuth)).multiplyScalar(radius + 16);
@@ -414,7 +628,8 @@ export function createMap3d(container, graph, options = {}) {
             if (d > 0) view.distance = Math.min(3000, Math.max(30, pinch.distance * (pinch.d / d)));
         } else {
             view.azimuth += dx * 0.006;
-            view.polar = Math.min(1.55, Math.max(0.02, view.polar - dy * 0.006));
+            // Pod vodorovnou rovinu jen s kostkami (spodní stěna se sítí).
+            view.polar = Math.min(cubes ? 2.3 : 1.55, Math.max(0.02, view.polar - dy * 0.006));
         }
         dirty = true;
     });
@@ -481,7 +696,18 @@ export function createMap3d(container, graph, options = {}) {
             for (const n of next.nodes) {
                 const node = nodes.get(n.data.id);
                 node.data = n.data;
-                node.mesh.material.color = statusColor(n.data.status);
+                if (node.cube !== Boolean(isCube(n.data))) {
+                    build();
+                    return;
+                }
+                if (node.cube) {
+                    const opacity = node.mesh.material[0].opacity;
+                    disposeMaterial(node.mesh.material);
+                    node.mesh.material = cubeMaterials(n.data);
+                    setOpacity(node.mesh, opacity);
+                } else {
+                    node.mesh.material.color = statusColor(n.data.status);
+                }
                 fillLabel(node.label, n.data);
             }
             for (const e of edges) {
@@ -504,6 +730,10 @@ export function createMap3d(container, graph, options = {}) {
             applyHighlight();
         },
         topView,
+        setCubes(on) {
+            cubes = !!on;
+            build();
+        },
         setSpread(on) {
             spread = !!on;
             build();
@@ -523,6 +753,7 @@ export function createMap3d(container, graph, options = {}) {
                 selected,
                 visibleNodes: [...nodes.values()].filter((n) => !n.off).length,
                 path: path ? [...path.nodes].sort() : null,
+                cubes: [...nodes.values()].filter((n) => n.cube).map((n) => n.data.id),
             };
         },
         dispose() {
@@ -530,6 +761,8 @@ export function createMap3d(container, graph, options = {}) {
             observer?.disconnect();
             theme?.removeEventListener?.('change', onTheme);
             clear();
+            cubeGeometry.dispose();
+            cubeMarker.geometry.dispose();
             renderer.dispose();
             container.replaceChildren();
         },

@@ -4,6 +4,15 @@ Aktualizováno: 2026-11-05
 
 ## Hotové fáze
 
+### 0.15.0 Servery jako kostky ve 3D a čitelnější popisky (větev `faze-19-kostky-3d`)
+
+Z požadavků vlastníka: "režim, kdy se dá přepnout server na krychli, která má hodnoty na svých stranách" a "výchozí tabulka má málo čitelné texty, kontrast musí být velký a písmena taky velká".
+
+- 3D: tlačítko **Servery jako kostky**. Stěny jako textury z plátna (canvas): souhrn na protilehlých stěnách natočených ven a dovnitř kruhu, CPU a RAM s grafem, disky nahoře, síť dole. Výběr kostky má obrys hran, popisek je pod kostkou, stěny jsou neprůhledné.
+- Data: `HostResources::details` (disky s úrovní, load, síť, průběh CPU, RAM a sítě z `agent_samples` za 30 minut), `AgentRepository::samplesFor` (jeden dotaz pro všechny servery v mapě).
+- Popisky ve 3D: větší písmo, plné pozadí, barva textu místo šedé, tmavší odstíny stavových barev pro text.
+- Testy: `HostResourcesTest::testDetailsForCube`, `AgentUiTest` (data kostky), e2e `agent.spec.js` (přepnutí, zapamatování volby, ostatní objekty zůstanou koule). Vzhled zkontrolován ze snímků obrazovky.
+
 ### Oprava 0.14.1 (větev `oprava-content-type-fpm`)
 
 - Na serveru s Apache a PHP-FPM vracelo API pro všechny zápisy (agent, upsert, události) chybu 415 `unsupported_media_type`: PHP-FPM předává hlavičku Content-Type jen jako `CONTENT_TYPE` (bez předpony `HTTP_`) a `Request` ji odtud nebral. Testy běží na vestavěném serveru PHP, který posílá obě varianty, proto chybu neodhalily.
@@ -377,5 +386,5 @@ Nic.
 
 ## Další krok
 
-- Release 0.14.1 (oprava API pod PHP-FPM). Nainstalovat agenta na servery vlastníka.
+- Release 0.15.0 (kostky ve 3D). Další servery vlastníka s agentem, logy webů podle rozložení logů na serveru.
 - Další práce podle zkušenosti vlastníka se skutečnými daty. Kandidáti: retence auditu, ověření `.htaccess` na skutečném Apache, agent pro další platformy.

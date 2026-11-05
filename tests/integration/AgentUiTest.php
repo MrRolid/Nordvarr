@@ -98,6 +98,10 @@ final class AgentUiTest extends TestCase
         $resources = $graph['nodes'][0]['data']['resources'];
         self::assertFalse($resources['stale']);
         self::assertSame(['cpu' => 'ok', 'mem' => 'ok', 'disk' => 'warn', 'gpu' => 'none'], array_column($resources['items'], 'level', 'key'));
+        // Kostka ve 3D: disky a průběh z uložených vzorků.
+        $details = $graph['nodes'][0]['data']['hostDetails'];
+        self::assertSame(['/data', '/'], array_column($details['disks'], 'detail'));
+        self::assertNotSame([], $details['history']['cpu']);
 
         $html = json_decode($this->ui('GET', '/topology/node/' . $id)->body, true)['html'];
         self::assertStringContainsString('data-test="node-host"', $html);

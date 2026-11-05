@@ -508,18 +508,19 @@ input[type="radio"] { margin: 0; }
 .map3d canvas { display: block; }
 .map3d canvas.pointer { cursor: pointer; }
 .map3d-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.map3d-label, .map3d-floor { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: .72rem; line-height: 1.2; }
-.map3d-label { color: var(--map-text); font-weight: 600; padding: 0 .25rem; border-radius: 4px; background: color-mix(in srgb, var(--map-bg) 70%, transparent); pointer-events: auto; cursor: pointer; }
-.map3d-label.st-unhealthy { color: var(--st-unhealthy); }
-.map3d-metrics { display: block; font-weight: 400; font-size: .68rem; color: var(--map-muted); text-align: center; font-variant-numeric: tabular-nums; }
-.map3d-metrics .res-warn { color: var(--st-degraded); font-weight: 700; }
-.map3d-metrics .res-crit { color: var(--st-unhealthy); font-weight: 700; }
-.map3d-metrics.stale .res { color: var(--st-unknown); font-weight: 400; }
-.map3d-label.st-degraded { color: var(--st-degraded); }
+.map3d-label, .map3d-floor { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: .95rem; line-height: 1.25; }
+/* Popisky ve 3D: velké písmo, plné pozadí a plná barva textu kvůli kontrastu nad scénou. */
+.map3d-label { color: var(--text); font-weight: 700; padding: .15rem .45rem; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 3px rgb(0 0 0 / .15); pointer-events: auto; cursor: pointer; }
+.map3d-label.st-unhealthy { color: color-mix(in srgb, var(--st-unhealthy) 75%, var(--text)); }
+.map3d-metrics { display: block; font-weight: 600; font-size: .85rem; color: var(--text); text-align: center; font-variant-numeric: tabular-nums; }
+.map3d-metrics .res-warn { color: color-mix(in srgb, var(--st-degraded) 60%, var(--text)); font-weight: 800; }
+.map3d-metrics .res-crit { color: color-mix(in srgb, var(--st-unhealthy) 75%, var(--text)); font-weight: 800; }
+.map3d-metrics.stale .res { color: var(--muted); font-weight: 600; }
+.map3d-label.st-degraded { color: color-mix(in srgb, var(--st-degraded) 60%, var(--text)); }
 .map3d-label.active { outline: 2px solid var(--map-center); }
 .map3d-label.dim { opacity: .3; }
 .map3d-label.hidden-far { display: none; }
-.map3d-floor { color: var(--map-muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; padding-right: .5rem; }
+.map3d-floor { color: var(--text); font-weight: 700; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; padding: .1rem .5rem; border-radius: 4px; background: color-mix(in srgb, var(--surface) 85%, transparent); }
 .map3d-missing { position: absolute; left: .6rem; bottom: 2.4rem; margin: 0; padding: .3rem .5rem; border-radius: 6px; background: var(--surface); color: var(--muted); font-size: .85rem; }
 .seg-small button { border-radius: 0; }
 .seg-small button:first-child { border-radius: 6px 0 0 6px; }
